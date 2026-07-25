@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "localagent"
+version = "0.1.0"
+description = "Qt desktop client for locally-hosted LLMs served by llama.cpp"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Einar Olafsson" }]
+keywords = ["llm", "llama.cpp", "qt", "pyqt6", "local-ai"]
+
+dependencies = [
+    "PyQt6>=6.6",
+    "httpx>=0.27",
+    "markdown>=3.5",
+    "Pygments>=2.17",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "pytest-qt>=4.4"]
+
+[project.scripts]
+localagent = "localagent.app:main"
+
+[project.gui-scripts]
+localagent-gui = "localagent.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
