@@ -138,6 +138,23 @@ REGISTRY: tuple[ModelSpec, ...] = (
         blurb="Largest model that fits. 230B-A10B at Q3.",
         ram_gb=105,
     ),
+    ModelSpec(
+        key="uncensored",
+        label="Qwen3.6-27B · uncensored",
+        script="uncensored.sh",
+        port=8087,
+        blurb="Same 27B base, refusals ablated. Fast (~37 tok/s), all GPU. "
+              "Tool calling is degraded — turn tools off for this one.",
+    ),
+    ModelSpec(
+        key="uncensored-big",
+        label="Qwen3.5-122B · uncensored (flagship)",
+        script="uncensored-big.sh",
+        port=8088,
+        blurb="Most capable uncensored model that fits. ~6-8 tok/s. "
+              "Tool calling is degraded — turn tools off for this one.",
+        ram_gb=90,
+    ),
 )
 
 
