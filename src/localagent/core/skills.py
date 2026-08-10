@@ -20,6 +20,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"
+# Skills the user (or a model, via write_file) authors go here rather than into
+# the installed package, so they survive reinstalls and need no write access to
+# the repo. A user skill with the same filename as a shipped one wins.
+USER_SKILLS_DIR = Path.home() / ".config" / "localagent" / "skills"
 
 # Rough but honest: ~4 characters per token for English prose. Used only to
 # show a cost figure in the UI, never for anything load-bearing.
@@ -75,16 +79,22 @@ def _parse(path: Path) -> Skill | None:
 
 
 def load_all(directory: Path | None = None) -> list[Skill]:
-    """Load every skill, sorted by category then name.
+    """Load shipped skills plus anything in the user directory.
 
     A malformed file is skipped rather than raised — one bad skill should not
-    stop the application from starting.
+    stop the application from starting. Passing ``directory`` loads only that
+    one, which is what the tests use.
     """
-    root = directory or SKILLS_DIR
-    if not root.is_dir():
-        return []
-    found = [s for s in (_parse(p) for p in sorted(root.glob("*.md"))) if s is not None]
-    return sorted(found, key=lambda s: (s.category.lower(), s.name.lower()))
+    roots = [directory] if directory is not None else [SKILLS_DIR, USER_SKILLS_DIR]
+    by_key: dict[str, Skill] = {}
+    for root in roots:
+        if root is None or not root.is_dir():
+            continue
+        for path in sorted(root.glob("*.md")):
+            skill = _parse(path)
+            if skill is not None:
+                by_key[skill.key] = skill  # later root wins, so user overrides shipped
+    return sorted(by_key.values(), key=lambda s: (s.category.lower(), s.name.lower()))
 
 
 def by_category(skills: list[Skill]) -> dict[str, list[Skill]]:

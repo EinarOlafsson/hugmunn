@@ -41,7 +41,9 @@ class Agent:
         auto_approve_reads: bool = True,
         max_iterations: int = 12,
         active_skills: list[skillkit.Skill] | None = None,
+        extra_tools: list[toolkit.Tool] | None = None,
     ) -> None:
+        self.extra_tools = extra_tools or []
         self.client = client
         self.workdir = workdir
         self.use_tools = use_tools
@@ -65,7 +67,14 @@ class Agent:
         """
         messages: list[dict[str, Any]] = [{"role": "system", "content": self.system_prompt}]
         messages.extend(history)
-        schemas = toolkit.schemas() if self.use_tools else None
+        # User plugins are appended after the built-ins so a plugin cannot
+        # shadow a core tool by reusing its name.
+        by_name = {t.name: t for t in self.extra_tools}
+        schemas = None
+        if self.use_tools:
+            schemas = toolkit.schemas() + [
+                t.schema() for t in self.extra_tools if t.name not in toolkit.BY_NAME
+            ]
 
         for iteration in range(self.max_iterations):
             if cancel is not None and cancel.is_set():
@@ -127,7 +136,7 @@ class Agent:
 
                 args = call.parsed_arguments()
                 summary = toolkit.summarize_call(call.name, args)
-                spec = toolkit.BY_NAME.get(call.name)
+                spec = toolkit.BY_NAME.get(call.name) or by_name.get(call.name)
                 yield AgentEvent(
                     "tool_start", tool_name=call.name, tool_summary=summary, tool_id=call.id
                 )
@@ -149,7 +158,9 @@ class Agent:
                         messages.append(result_msg)
                         continue
 
-                output = toolkit.execute(call.name, args, self.workdir)
+                output = toolkit.execute(
+                    call.name, args, self.workdir, extra=by_name
+                )
                 yield AgentEvent(
                     "tool_result", tool_name=call.name, tool_summary=summary,
                     tool_id=call.id, text=output,

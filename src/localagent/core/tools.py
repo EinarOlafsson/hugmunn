@@ -310,10 +310,17 @@ def schemas() -> list[dict[str, Any]]:
     return [t.schema() for t in TOOLS]
 
 
-def execute(name: str, arguments: dict[str, Any], workdir: str) -> str:
-    tool = BY_NAME.get(name)
+def execute(
+    name: str,
+    arguments: dict[str, Any],
+    workdir: str,
+    extra: dict[str, Tool] | None = None,
+) -> str:
+    """Run a tool. ``extra`` holds user plugins; built-ins always win a name clash."""
+    tool = BY_NAME.get(name) or (extra or {}).get(name)
     if tool is None:
-        return f"Error: no such tool {name!r}. Available: {', '.join(BY_NAME)}"
+        known = ", ".join(sorted(set(BY_NAME) | set(extra or {})))
+        return f"Error: no such tool {name!r}. Available: {known}"
     try:
         return tool.run(workdir, **arguments)
     except (ToolError, web.WebError) as exc:

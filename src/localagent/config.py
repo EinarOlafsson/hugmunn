@@ -12,7 +12,7 @@ import json
 import os
 import re
 import shutil
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 MODELS_ROOT = Path(os.environ.get("LOCALAGENT_MODELS_ROOT", Path.home() / ".claude" / "models"))
@@ -209,6 +209,9 @@ class Settings:
     # default-on. An empty list is a real choice (everything off) and is
     # preserved, which is why this can't just default to [].
     enabled_skills: list[str] | None = None
+    # User-authored tools are never on by default — a human reads the file and
+    # switches it on. See core/plugins.py for why.
+    enabled_plugins: list[str] = field(default_factory=list)
     system_prompt: str = (
         "You are a capable coding and writing assistant running locally on the "
         "user's machine. Be direct and concise. When you use a tool, use its "

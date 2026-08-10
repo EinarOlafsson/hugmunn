@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 
 from .. import config
 from ..config import ModelSpec, Settings
+from ..core import plugins
 from ..core import skills as skillkit
 from ..core.agent import Agent
 from ..core.client import LlamaClient
@@ -104,6 +105,8 @@ class MainWindow(QMainWindow):
             if self.settings.enabled_skills is None
             else set(self.settings.enabled_skills)
         )
+        self._plugins = plugins.discover()
+        self._enabled_plugins: set[str] = set(self.settings.enabled_plugins)
 
         self._server_worker: ServerWorker | None = None
         self._agent_worker: AgentWorker | None = None
@@ -199,6 +202,23 @@ class MainWindow(QMainWindow):
         self._update_skills_button()
 
         layout.addSpacing(10)
+        layout.addWidget(self._heading("Custom tools"))
+        self.plugins_button = QPushButton()
+        self.plugins_button.setToolTip(
+            f"Python tools you or a model wrote, from\n{plugins.PLUGIN_DIR}\n\n"
+            "Off until you switch one on — read the file first. Unlike\n"
+            "run_command, an enabled tool runs unreviewed thereafter."
+        )
+        self.plugins_button.setMenu(self._build_plugins_menu())
+        layout.addWidget(self.plugins_button)
+
+        self.plugins_summary = QLabel()
+        self.plugins_summary.setObjectName("blurb")
+        self.plugins_summary.setWordWrap(True)
+        layout.addWidget(self.plugins_summary)
+        self._update_plugins_button()
+
+        layout.addSpacing(10)
         layout.addWidget(self._heading("System prompt"))
         self.system_edit = QPlainTextEdit(self.settings.system_prompt)
         self.system_edit.setMaximumHeight(120)
@@ -289,6 +309,75 @@ class MainWindow(QMainWindow):
             act.triggered.connect(lambda _=False, k=keys: self._set_skills(k))
             menu.addAction(act)
         return menu
+
+    # --------------------------------------------------------------- plugins
+
+    def _build_plugins_menu(self) -> QMenu:
+        menu = QMenu(self)
+        self._plugin_actions: dict[str, QAction] = {}
+
+        ok = [r for r in self._plugins if r.ok]
+        broken = [r for r in self._plugins if not r.ok]
+
+        if not self._plugins:
+            act = QAction("No custom tools found", self)
+            act.setEnabled(False)
+            menu.addAction(act)
+        for result in ok:
+            action = QAction(f"{result.tool.name}   ({result.path.name})", self)
+            action.setCheckable(True)
+            action.setChecked(result.tool.name in self._enabled_plugins)
+            action.setToolTip(result.tool.description[:200])
+            action.toggled.connect(
+                lambda checked, n=result.tool.name: self._on_plugin_toggled(n, checked)
+            )
+            menu.addAction(action)
+        if broken:
+            menu.addSeparator()
+            for result in broken:
+                act = QAction(f"⚠ {result.path.name}: {result.error[:60]}", self)
+                act.setEnabled(False)
+                menu.addAction(act)
+
+        menu.addSeparator()
+        rescan = QAction("Rescan directory", self)
+        rescan.triggered.connect(self._rescan_plugins)
+        menu.addAction(rescan)
+        return menu
+
+    def _on_plugin_toggled(self, name: str, checked: bool) -> None:
+        if checked:
+            self._enabled_plugins.add(name)
+        else:
+            self._enabled_plugins.discard(name)
+        self.settings.enabled_plugins = sorted(self._enabled_plugins)
+        self.settings.save()
+        self._update_plugins_button()
+
+    def _rescan_plugins(self) -> None:
+        """Pick up a tool written during this session without a restart."""
+        self._plugins = plugins.discover()
+        self.plugins_button.setMenu(self._build_plugins_menu())
+        self._update_plugins_button()
+
+    def _active_plugins(self) -> list:
+        return plugins.loaded_tools(self._plugins, self._enabled_plugins)
+
+    def _update_plugins_button(self) -> None:
+        ok = [r for r in self._plugins if r.ok]
+        broken = [r for r in self._plugins if not r.ok]
+        active = self._active_plugins()
+        self.plugins_button.setText(f"{len(active)} of {len(ok)} enabled  ▾")
+        if not self._plugins:
+            self.plugins_summary.setText("None found. Ask a model to write one.")
+        elif active:
+            note = ", ".join(t.name for t in active)
+            self.plugins_summary.setText(f"Active: {note}")
+        else:
+            note = f"{len(ok)} available, none enabled."
+            if broken:
+                note += f" {len(broken)} failed to load."
+            self.plugins_summary.setText(note)
 
     def _on_skill_toggled(self, key: str, checked: bool) -> None:
         if checked:
@@ -506,6 +595,7 @@ class MainWindow(QMainWindow):
             auto_approve_reads=self.settings.auto_approve_reads,
             max_iterations=self.settings.max_tool_iterations,
             active_skills=self._active_skills(),
+            extra_tools=self._active_plugins(),
         )
 
         self._thinking = None
