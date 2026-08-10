@@ -200,6 +200,10 @@ class Settings:
     workdir: str = str(Path.home())
     tools_enabled: bool = True
     auto_approve_reads: bool = True
+    # None means "not chosen yet" — the UI substitutes the skills marked
+    # default-on. An empty list is a real choice (everything off) and is
+    # preserved, which is why this can't just default to [].
+    enabled_skills: list[str] | None = None
     system_prompt: str = (
         "You are a capable coding and writing assistant running locally on the "
         "user's machine. Be direct and concise. When you use a tool, use its "

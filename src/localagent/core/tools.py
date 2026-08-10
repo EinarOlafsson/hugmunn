@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from . import web
+
 MAX_OUTPUT_CHARS = 20_000  # keep a single tool result from blowing the context
 
 
@@ -263,6 +265,42 @@ TOOLS: tuple[Tool, ...] = (
         run=_run_command,
         requires_approval=True,
     ),
+    Tool(
+        name="web_search",
+        description=(
+            "Search the public web and return titles, URLs, and snippets. Call "
+            "this when the answer depends on current information, on something "
+            "after your training cutoff, or on a fact you are not confident "
+            "about. Follow up with web_fetch to read a promising result."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query."},
+                "max_results": {"type": "integer", "description": "How many results to return. Default 8."},
+            },
+            "required": ["query"],
+        },
+        run=web.web_search,
+    ),
+    Tool(
+        name="web_fetch",
+        description=(
+            "Fetch a public http/https URL and return its readable text with "
+            "markup stripped. Use it to read a page found via web_search, or a "
+            "URL the user provided. Public internet only — it cannot reach this "
+            "machine or the local network."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "Absolute http(s) URL."},
+                "max_chars": {"type": "integer", "description": "Truncate the page to this length. Default 15000."},
+            },
+            "required": ["url"],
+        },
+        run=web.web_fetch,
+    ),
 )
 
 BY_NAME: dict[str, Tool] = {t.name: t for t in TOOLS}
@@ -278,7 +316,7 @@ def execute(name: str, arguments: dict[str, Any], workdir: str) -> str:
         return f"Error: no such tool {name!r}. Available: {', '.join(BY_NAME)}"
     try:
         return tool.run(workdir, **arguments)
-    except ToolError as exc:
+    except (ToolError, web.WebError) as exc:
         return f"Error: {exc}"
     except TypeError as exc:
         return f"Error: bad arguments for {name}: {exc}"

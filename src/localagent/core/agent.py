@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterator
 
+from . import skills as skillkit
 from . import tools as toolkit
 from .client import Event, LlamaClient, ToolCall
 
@@ -39,13 +40,17 @@ class Agent:
         use_tools: bool = True,
         auto_approve_reads: bool = True,
         max_iterations: int = 12,
+        active_skills: list[skillkit.Skill] | None = None,
     ) -> None:
         self.client = client
         self.workdir = workdir
-        self.system_prompt = system_prompt
         self.use_tools = use_tools
         self.auto_approve_reads = auto_approve_reads
         self.max_iterations = max_iterations
+        self.active_skills = active_skills or []
+        # Compose once at construction: the skill set is fixed for a turn, and
+        # rebuilding the prompt per iteration would churn the prompt cache.
+        self.system_prompt = skillkit.compose(system_prompt, self.active_skills)
 
     def run(
         self,

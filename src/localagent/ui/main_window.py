@@ -7,15 +7,16 @@ from pathlib import Path
 from typing import Any
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QKeySequence, QShortcut, QTextOption
+from PyQt6.QtGui import QAction, QKeySequence, QShortcut, QTextOption
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
-    QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPlainTextEdit, QPushButton,
-    QSizePolicy, QSplitter, QTextEdit, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit,
+    QPushButton, QSizePolicy, QSplitter, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from .. import config
 from ..config import ModelSpec, Settings
+from ..core import skills as skillkit
 from ..core.agent import Agent
 from ..core.client import LlamaClient
 from ..core.server import ServerManager
@@ -95,6 +96,15 @@ class MainWindow(QMainWindow):
         self.server = ServerManager()
         self.history: list[dict[str, Any]] = []
 
+        self._skills = skillkit.load_all()
+        # First run (None) takes the default-on set; an explicit empty list is
+        # a real user choice and must survive a restart.
+        self._enabled_skills: set[str] = (
+            skillkit.default_keys(self._skills)
+            if self.settings.enabled_skills is None
+            else set(self.settings.enabled_skills)
+        )
+
         self._server_worker: ServerWorker | None = None
         self._agent_worker: AgentWorker | None = None
         self._assistant: AssistantBlock | None = None
@@ -173,6 +183,22 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.auto_reads_check)
 
         layout.addSpacing(10)
+        layout.addWidget(self._heading("Skills"))
+        self.skills_button = QPushButton()
+        self.skills_button.setToolTip(
+            "Instruction packs appended to the system prompt.\n"
+            "Grouped by category; Core is on by default."
+        )
+        self.skills_button.setMenu(self._build_skills_menu())
+        layout.addWidget(self.skills_button)
+
+        self.skills_summary = QLabel()
+        self.skills_summary.setObjectName("blurb")
+        self.skills_summary.setWordWrap(True)
+        layout.addWidget(self.skills_summary)
+        self._update_skills_button()
+
+        layout.addSpacing(10)
         layout.addWidget(self._heading("System prompt"))
         self.system_edit = QPlainTextEdit(self.settings.system_prompt)
         self.system_edit.setMaximumHeight(120)
@@ -232,6 +258,71 @@ class MainWindow(QMainWindow):
         label = QLabel(text)
         label.setObjectName("heading")
         return label
+
+    # ---------------------------------------------------------------- skills
+
+    def _build_skills_menu(self) -> QMenu:
+        """Category submenus of checkable skills, plus bulk actions."""
+        menu = QMenu(self)
+        self._skill_actions: dict[str, QAction] = {}
+
+        for category, group in skillkit.by_category(self._skills).items():
+            submenu = menu.addMenu(category)
+            for skill in group:
+                action = QAction(f"{skill.name}   (~{skill.approx_tokens} tok)", self)
+                action.setCheckable(True)
+                action.setChecked(skill.key in self._enabled_skills)
+                action.setToolTip(skill.description)
+                action.toggled.connect(
+                    lambda checked, k=skill.key: self._on_skill_toggled(k, checked)
+                )
+                submenu.addAction(action)
+                self._skill_actions[skill.key] = action
+
+        menu.addSeparator()
+        for label, keys in (
+            ("Enable all", {s.key for s in self._skills}),
+            ("Defaults only", skillkit.default_keys(self._skills)),
+            ("Disable all", set()),
+        ):
+            act = QAction(label, self)
+            act.triggered.connect(lambda _=False, k=keys: self._set_skills(k))
+            menu.addAction(act)
+        return menu
+
+    def _on_skill_toggled(self, key: str, checked: bool) -> None:
+        if checked:
+            self._enabled_skills.add(key)
+        else:
+            self._enabled_skills.discard(key)
+        self._persist_skills()
+        self._update_skills_button()
+
+    def _set_skills(self, keys: set[str]) -> None:
+        self._enabled_skills = set(keys)
+        for key, action in self._skill_actions.items():
+            action.blockSignals(True)          # don't re-enter _on_skill_toggled
+            action.setChecked(key in self._enabled_skills)
+            action.blockSignals(False)
+        self._persist_skills()
+        self._update_skills_button()
+
+    def _persist_skills(self) -> None:
+        self.settings.enabled_skills = sorted(self._enabled_skills)
+        self.settings.save()
+
+    def _active_skills(self) -> list[skillkit.Skill]:
+        return [s for s in self._skills if s.key in self._enabled_skills]
+
+    def _update_skills_button(self) -> None:
+        active = self._active_skills()
+        self.skills_button.setText(f"{len(active)} of {len(self._skills)} enabled  ▾")
+        if not active:
+            self.skills_summary.setText("No skills active.")
+            return
+        cost = skillkit.total_tokens(active)
+        names = ", ".join(s.name for s in active)
+        self.skills_summary.setText(f"~{cost} tokens per request · {names}")
 
     # ------------------------------------------------------------- model list
 
@@ -385,6 +476,7 @@ class MainWindow(QMainWindow):
             use_tools=self.settings.tools_enabled,
             auto_approve_reads=self.settings.auto_approve_reads,
             max_iterations=self.settings.max_tool_iterations,
+            active_skills=self._active_skills(),
         )
 
         self._thinking = None
