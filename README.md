@@ -49,8 +49,30 @@ is just the reply.
 | `read_file` | auto (configurable) |
 | `list_directory` | auto (configurable) |
 | `search_text` | auto (configurable) |
+| `web_search` | auto (configurable) |
+| `web_fetch` | auto (configurable) |
 | `write_file` | **always asks**, with a diff-style preview |
 | `run_command` | **always asks**, showing the exact command |
+
+**Skills** — markdown instruction packs appended to the system prompt, picked
+from a category dropdown in the sidebar. Nine ship across Core, Coding,
+Science, Web, and Writing; the three Core ones are on by default.
+
+A skill is only instructions — it cannot give a model a capability. Web access
+is a *tool*, not a skill. What the Web research skill does is tell a model that
+already has `web_search` how to use it well: phrase queries like the document
+you want, fetch the page rather than answering from a snippet, cite what you
+actually read.
+
+All nine skills together cost roughly 2,570 tokens; the defaults cost 674. On a
+16-64K context that is affordable even with everything on, so the "Enable all"
+button is a reasonable way to run. The reason to keep them opt-in is focus
+rather than budget: a model given microscopy conventions while writing Python
+is being pulled in two directions.
+
+Add your own by dropping a `.md` file into `src/localagent/skills/` with
+frontmatter (`name`, `category`, `description`, `default`). It is picked up on
+the next launch; a malformed file is skipped rather than crashing the app.
 
 ## Safety model
 
@@ -65,6 +87,15 @@ symlinks pointing outside all fail before anything is opened.
 `run_command` cannot be auto-approved; the "auto-approve" checkbox only covers
 read-only tools. Deny is the default button in the dialog. A local model with
 unattended shell access is a bad trade for a little convenience.
+
+**Web tools cannot reach this machine or the local network.** A model-supplied
+URL is otherwise an SSRF primitive aimed at the LAN — router admin pages,
+internal services, cloud metadata endpoints. `core/web.py` resolves every
+address a hostname maps to (a name can map to several; checking only the first
+leaves a hole) and refuses loopback, private, link-local, reserved, and
+multicast ranges. The check runs again on the final URL after redirects, so a
+public address cannot bounce inward. Responses stop at 5 MB read and 15K
+characters returned, so a large page cannot swallow the context window.
 
 Tool failures return an error string to the model rather than raising, so a bad
 path or a failing command becomes something it can recover from.
