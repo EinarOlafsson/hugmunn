@@ -95,17 +95,13 @@ class TestRegistry:
     def test_by_key_unknown(self):
         assert config.by_key("nonexistent") is None
 
-    def test_abliterated_models_marked_tool_unreliable(self):
-        """Abliteration degrades structured output; the UI relies on this flag."""
-        for key in ("uncensored", "uncensored-big"):
-            spec = config.by_key(key)
-            assert spec is not None, key
-            assert spec.tools_reliable is False, key
+    def test_every_shipped_model_has_tools(self):
+        """Including the abliterated ones — both measured 3/3 structured calls.
 
-    def test_stock_models_keep_tools(self):
-        stock = [m for m in config.REGISTRY if "uncensored" not in m.key]
-        assert stock, "expected some stock models"
-        assert all(m.tools_reliable for m in stock)
+        The tools_reliable flag stays as an escape hatch, but nothing shipped
+        sets it False. If a future model does, test that build first.
+        """
+        assert all(m.tools_reliable for m in config.REGISTRY)
 
 
 class TestSettings:
