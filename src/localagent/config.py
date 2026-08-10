@@ -47,6 +47,12 @@ class ModelSpec:
     port: int
     blurb: str
     ram_gb: int = 0  # extra system RAM the model needs beyond VRAM; 0 = GPU-resident
+    # Abliterated models have had refusal directions edited out of the weights,
+    # and structured output is collateral damage — tool calls come back
+    # malformed or as plain text. Offering tools anyway produces silent
+    # failures, so the UI disables them for these rather than trusting a note
+    # in the docs to be read.
+    tools_reliable: bool = True
 
     @property
     def script_path(self) -> Path:
@@ -143,17 +149,19 @@ REGISTRY: tuple[ModelSpec, ...] = (
         label="Qwen3.6-27B · uncensored",
         script="uncensored.sh",
         port=8087,
-        blurb="Same 27B base, refusals ablated. Fast (~37 tok/s), all GPU. "
-              "Tool calling is degraded — turn tools off for this one.",
+        blurb="Same 27B base, refusals ablated. 36.7 tok/s, all GPU. "
+              "Tools disabled — abliteration breaks tool calling.",
+        tools_reliable=False,
     ),
     ModelSpec(
         key="uncensored-big",
         label="Qwen3.5-122B · uncensored (flagship)",
         script="uncensored-big.sh",
         port=8088,
-        blurb="Most capable uncensored model that fits. ~6-8 tok/s. "
-              "Tool calling is degraded — turn tools off for this one.",
+        blurb="Most capable uncensored model that fits. 13.2 tok/s, and 5x "
+              "faster prompts than the stock 122B. Tools disabled.",
         ram_gb=90,
+        tools_reliable=False,
     ),
 )
 

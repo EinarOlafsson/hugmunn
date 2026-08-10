@@ -358,6 +358,7 @@ class MainWindow(QMainWindow):
         if spec.ram_gb:
             note += f"  Needs ~{spec.ram_gb} GB free RAM."
         self.model_blurb.setText(note)
+        self._sync_tools_for_model(spec)
         if not self.server.is_running:
             self.server_status.setText("Stopped")
 
@@ -424,6 +425,34 @@ class MainWindow(QMainWindow):
         self.workdir_label.setText(str(path))
         self.workdir_label.setToolTip(str(path))
 
+    def _sync_tools_for_model(self, spec: ModelSpec) -> None:
+        """Force tools off for models whose tool calling is unreliable.
+
+        The saved preference is left untouched, so selecting a stock model
+        again restores whatever the user had chosen.
+        """
+        if spec.tools_reliable:
+            self.tools_check.setEnabled(True)
+            self.tools_check.setToolTip("")
+            self.tools_check.blockSignals(True)
+            self.tools_check.setChecked(self.settings.tools_enabled)
+            self.tools_check.blockSignals(False)
+            return
+
+        self.tools_check.blockSignals(True)
+        self.tools_check.setChecked(False)
+        self.tools_check.blockSignals(False)
+        self.tools_check.setEnabled(False)
+        self.tools_check.setToolTip(
+            "Disabled for abliterated models. Removing refusal directions from "
+            "the weights also degrades structured output, so tool calls come "
+            "back malformed or as plain text — the call silently never runs."
+        )
+
+    def _tools_active(self) -> bool:
+        spec = self._current_spec()
+        return self.settings.tools_enabled and (spec is None or spec.tools_reliable)
+
     def _on_tools_toggled(self, enabled: bool) -> None:
         self.settings.tools_enabled = enabled
         self.settings.save()
@@ -473,7 +502,7 @@ class MainWindow(QMainWindow):
             client=LlamaClient(spec.base_url),
             workdir=self.settings.workdir,
             system_prompt=self.settings.system_prompt,
-            use_tools=self.settings.tools_enabled,
+            use_tools=self._tools_active(),
             auto_approve_reads=self.settings.auto_approve_reads,
             max_iterations=self.settings.max_tool_iterations,
             active_skills=self._active_skills(),

@@ -95,6 +95,18 @@ class TestRegistry:
     def test_by_key_unknown(self):
         assert config.by_key("nonexistent") is None
 
+    def test_abliterated_models_marked_tool_unreliable(self):
+        """Abliteration degrades structured output; the UI relies on this flag."""
+        for key in ("uncensored", "uncensored-big"):
+            spec = config.by_key(key)
+            assert spec is not None, key
+            assert spec.tools_reliable is False, key
+
+    def test_stock_models_keep_tools(self):
+        stock = [m for m in config.REGISTRY if "uncensored" not in m.key]
+        assert stock, "expected some stock models"
+        assert all(m.tools_reliable for m in stock)
+
 
 class TestSettings:
     def test_roundtrip(self, tmp_path, monkeypatch):
