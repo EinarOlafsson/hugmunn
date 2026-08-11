@@ -156,3 +156,19 @@ class TestVersion:
 
         changelog = Path(__file__).resolve().parent.parent / "CHANGELOG.md"
         assert f"## {localagent.__version__}" in changelog.read_text()
+
+
+class TestContextSize:
+    """The UI needs the real --ctx-size to warn before a 400 happens."""
+
+    def test_parsed_from_the_launch_script(self):
+        assert config.by_key("code-glm").context_tokens == 32768
+        assert config.by_key("write").context_tokens == 16384
+
+    def test_every_shipped_model_declares_one(self):
+        missing = [m.key for m in config.REGISTRY if not m.context_tokens]
+        assert not missing, f"no --ctx-size found: {missing}"
+
+    def test_missing_script_returns_zero(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(config, "MODELS_ROOT", tmp_path)
+        assert config.ModelSpec("k", "L", "nope.sh", 1, "b").context_tokens == 0

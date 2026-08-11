@@ -147,3 +147,27 @@ class TestDownloadDestination:
     def test_image_search_registered(self):
         from localagent.core import tools
         assert "image_search" in tools.BY_NAME
+
+
+class TestHttpErrorMessages:
+    """A raw 'HTTP 400: {...}' tells the user nothing actionable."""
+
+    def test_context_overflow_is_explained(self):
+        from localagent.core.client import _explain_http
+        msg = _explain_http(400, '{"error":{"message":"the request exceeds the available context size"}}')
+        assert "context window" in msg
+        assert "Disable some skills" in msg
+
+    def test_loading_server_is_explained(self):
+        from localagent.core.client import _explain_http
+        assert "still loading" in _explain_http(503, "loading model")
+
+    def test_unknown_status_still_reports_the_body(self):
+        from localagent.core.client import _explain_http
+        msg = _explain_http(418, "teapot")
+        assert "418" in msg and "teapot" in msg
+
+    def test_unrelated_400_is_not_mislabelled(self):
+        from localagent.core.client import _explain_http
+        msg = _explain_http(400, '{"error":{"message":"invalid tool_choice value"}}')
+        assert "context window" not in msg

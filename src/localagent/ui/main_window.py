@@ -454,7 +454,36 @@ class MainWindow(QMainWindow):
             return
         cost = skillkit.total_tokens(active)
         names = ", ".join(s.name for s in active)
-        self.skills_summary.setText(f"~{cost} tokens per request · {names}")
+        text = f"~{cost} tokens per request · {names}"
+
+        # Skills + tool schemas + the effort block form a fixed preamble on
+        # every request. If that eats the context the model 400s before the
+        # conversation starts, so surface it here rather than at send time.
+        spec = self._current_spec()
+        ctx = spec.context_tokens if spec else 0
+        if ctx:
+            preamble = cost + self._tool_schema_tokens() + self._effort_tokens()
+            share = 100 * preamble / ctx
+            if share >= 60:
+                text = (
+                    f"\u26a0 {preamble:,} tokens of skills + tools is {share:.0f}% of "
+                    f"this model's {ctx // 1024}K context before any conversation. "
+                    f"Disable skills, or pick a longer-context model.\n\n" + text
+                )
+        self.skills_summary.setText(text)
+
+    def _tool_schema_tokens(self) -> int:
+        if not self._tools_active():
+            return 0
+        import json
+
+        from ..core import tools as toolkit
+
+        schemas = toolkit.schemas() + [t.schema() for t in self._active_plugins()]
+        return len(json.dumps(schemas)) // 4
+
+    def _effort_tokens(self) -> int:
+        return len(effortkit.instructions(self._effort())) // 4
 
     # ------------------------------------------------------------- model list
 
@@ -491,6 +520,8 @@ class MainWindow(QMainWindow):
             note += f"  Needs ~{spec.ram_gb} GB free RAM."
         self.model_blurb.setText(note)
         self._sync_tools_for_model(spec)
+        if hasattr(self, 'skills_summary'):
+            self._update_skills_button()
         if not self.server.is_running:
             self.server_status.setText("Stopped")
 
@@ -601,6 +632,8 @@ class MainWindow(QMainWindow):
         if effortkit.grants_subagents(level):
             note += "  Grants the spawn_agent tool."
         self.effort_blurb.setText(note)
+        if hasattr(self, 'skills_summary'):
+            self._update_skills_button()
 
     def _on_autonomy_changed(self) -> None:
         level = self._autonomy()

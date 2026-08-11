@@ -61,6 +61,28 @@ class ModelSpec:
     def base_url(self) -> str:
         return f"http://127.0.0.1:{self.port}"
 
+    @property
+    def context_tokens(self) -> int:
+        """The ``--ctx-size`` the launch script asks for.
+
+        Read from the script rather than hardcoded, so the two cannot drift.
+        The UI needs it to warn when the skill set plus tool schemas would
+        leave no room for the conversation — with everything enabled the
+        preamble is ~14.7K, which overflows a 16K model immediately and
+        surfaces as an opaque HTTP 400 from llama-server.
+        """
+        try:
+            text = self.script_path.read_text(encoding="utf-8")
+        except OSError:
+            return 0
+        for line in text.splitlines():
+            line = line.strip()
+            if line.startswith("--ctx-size"):
+                parts = line.split()
+                if len(parts) > 1 and parts[1].isdigit():
+                    return int(parts[1])
+        return 0
+
     def is_available(self) -> bool:
         """True when the launch script exists and its weights have been downloaded."""
         if not self.script_path.is_file():

@@ -40,6 +40,43 @@ class Event:
     timings: dict[str, Any] = field(default_factory=dict)
 
 
+def _explain_http(status: int, body: str) -> str:
+    """Turn a llama-server error into something the user can act on.
+
+    A raw "HTTP 400: {...}" tells nobody anything. The overwhelmingly common
+    cause here is a prompt that no longer fits: enabling every skill costs
+    ~12K tokens and the tool schemas another ~2.3K, which overflows a 16K
+    model before the first message is typed.
+    """
+    lowered = body.lower()
+    if status == 400 and any(
+        marker in lowered
+        for marker in ("context", "n_ctx", "exceed", "too long", "kv cache", "tokens")
+    ):
+        return (
+            "The prompt is larger than this model's context window.\n\n"
+            "Enabling every skill costs about 12,000 tokens and the tool "
+            "schemas another 2,300 — together that overflows a 16K model "
+            "before you type anything. Disable some skills in the sidebar "
+            "(Defaults only is a good reset), or switch to a 32K model such "
+            "as GLM-4.7-Flash or Qwen3.6-27B · coding.\n\n"
+            f"Server said: {body[:200]}"
+        )
+    if status == 503:
+        return (
+            "The server is still loading the model. Large models read tens of "
+            "gigabytes from disk before serving — wait and try again.\n\n"
+            f"Server said: {body[:200]}"
+        )
+    if status == 404:
+        return (
+            "The server is running but does not have this endpoint — it may be "
+            "an older llama-server build.\n\n"
+            f"Server said: {body[:200]}"
+        )
+    return f"HTTP {status} from the model server: {body[:400]}"
+
+
 class LlamaClient:
     """Thin streaming wrapper. One instance per base URL."""
 
@@ -98,7 +135,10 @@ class LlamaClient:
                 ) as response:
                     if response.status_code != 200:
                         body = response.read().decode("utf-8", "replace")[:500]
-                        yield Event("error", text=f"HTTP {response.status_code}: {body}")
+                        yield Event(
+                            "error",
+                            text=_explain_http(response.status_code, body),
+                        )
                         return
 
                     for line in response.iter_lines():

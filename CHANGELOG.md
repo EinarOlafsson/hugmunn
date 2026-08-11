@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.1
+
+Fixes an HTTP 400 on send when many skills were enabled.
+
+Enabling every skill costs ~12,000 tokens and the tool schemas another
+~2,300. On a 16K model that is 90% of the context consumed before the first
+message, so the first real exchange overflowed and llama-server returned 400 —
+surfaced raw as "HTTP error", which said nothing about the cause.
+
+- `ModelSpec.context_tokens` now reads `--ctx-size` from the launch script, so
+  the app knows each model's real window.
+- The skills panel warns when skills + tool schemas + effort exceed 60% of the
+  selected model's context, naming the number and the percentage.
+- HTTP failures from the server are explained rather than echoed: a context
+  overflow says which setting to change, a 503 says the model is still loading.
+
 ## 0.6.0
 
 Live CPU / RAM / GPU / VRAM meters in the sidebar.
