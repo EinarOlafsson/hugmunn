@@ -1251,8 +1251,13 @@ class MainWindow(QMainWindow):
 
     # ----------------------------------------------------------- reasoning
 
-    def _thinking(self) -> bool | None:
+    def _thinking_enabled(self) -> bool | None:
         """Whether the model should think first. None for cloud models.
+
+        Not ``_thinking``: that name is already the live ThinkingCard widget,
+        and an instance attribute shadows a method of the same name -- so the
+        method was unreachable and every send raised ``'NoneType' object is
+        not callable``.
 
         On Claude and GPT this is the effort tier's thinking budget, set at
         request time by the client, so a second control here would be two
@@ -1514,7 +1519,7 @@ class MainWindow(QMainWindow):
             extra_tools=self._active_plugins(),
             effort=self._effort(),
             autonomy=self._autonomy(),
-            thinking=self._thinking(),
+            thinking=self._thinking_enabled(),
         )
 
         self._thinking = None

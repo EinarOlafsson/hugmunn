@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.12.1
+
+Fixes a crash on every send, introduced in 0.12.0.
+
+`self._thinking` was already the live ThinkingCard widget. Adding a method of
+the same name did not replace it — an instance attribute shadows a method — so
+`self._thinking()` resolved to `None` and every send aborted the process with
+`'NoneType' object is not callable`. Renamed to `_thinking_enabled`.
+
+It shipped because every UI test built the window and read its controls, and
+none of them pressed Send. A window whose controls all report correctly and
+whose Send button crashes is not a tested window. There is now a test that runs
+a full turn against a stub client — verified by reintroducing the bug and
+watching eight of nine fail — plus a check that no method in the file shares a
+name with an instance attribute, since Python gives no warning for that and the
+failure only appears when the method is called.
+
 ## 0.12.0
 
 Reasoning is a control, and the system prompt is a choice.
