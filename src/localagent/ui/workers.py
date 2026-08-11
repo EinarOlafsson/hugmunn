@@ -109,3 +109,36 @@ class AgentWorker(QThread):
                 self.failed.emit(event.text)
             case "done":
                 self.turn_finished.emit(event.timings)
+
+
+class DownloadWorker(QThread):
+    """Fetches a model's weights, reporting byte-level progress."""
+
+    progress = pyqtSignal(object)   # core.downloads.Progress
+    finished_ok = pyqtSignal(str)   # destination
+    failed = pyqtSignal(str)
+
+    def __init__(self, spec, destination, parent=None) -> None:
+        super().__init__(parent)
+        self._spec = spec
+        self._destination = destination
+        self._cancel = threading.Event()
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+    def run(self) -> None:
+        from .. core import downloads
+
+        try:
+            downloads.download(
+                self._spec.repo, list(self._spec.files), self._destination,
+                on_progress=self.progress.emit, cancel=self._cancel,
+            )
+        except downloads.DownloadError as exc:
+            self.failed.emit(str(exc))
+            return
+        except Exception as exc:  # noqa: BLE001 - surface anything to the UI
+            self.failed.emit(f"{type(exc).__name__}: {exc}")
+            return
+        self.finished_ok.emit(str(self._destination))

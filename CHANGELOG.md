@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.7.0
+
+In-app model downloads, and the resource meters move to the bottom.
+
+- Models that have not been downloaded are now **selectable** rather than
+  greyed out — picking one opens a dialog asking where the weights should go.
+  A disabled item cannot be clicked, which made the offer unreachable.
+- The dialog evaluates the chosen disk before you commit: free space against
+  the model's size, and what kind of device it is, read from
+  `/sys/block/*/queue/rotational` rather than guessed from the name. NVMe and
+  SSD pass; an HDD or network mount warns and the button becomes "Download
+  anyway"; too little space blocks outright.
+- The HDD warning is about inference, not just download time. A GGUF is
+  memory-mapped, so a large model reads from disk on every turn, not only at
+  load.
+- Progress bar in the sidebar with byte counts and per-file position.
+  Downloads resume from a partial file with a Range request rather than
+  restarting — at 87 GB over a link measured between 3 and 29 MB/s, losing
+  progress to a dropped connection is expensive.
+- Every model now records its repo, file list and size (480 GB across the
+  nine). Sharded quants list every shard, and a test asserts the count matches
+  the `-of-0000N` suffix, because a partial set loads with an opaque error.
+
 ## 0.6.1
 
 Fixes an HTTP 400 on send when many skills were enabled.

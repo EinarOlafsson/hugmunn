@@ -52,6 +52,12 @@ class ModelSpec:
     # ones — measured 3/3 structured calls with nothing leaking as plain text,
     # so do not set this False without testing that specific build first.
     tools_reliable: bool = True
+    # Where the weights come from, for the in-app downloader. Mirrors
+    # scripts/download.sh; sharded quants list every shard because a
+    # partial set loads with an opaque llama.cpp error.
+    repo: str = ""
+    files: tuple[str, ...] = ()
+    download_gb: float = 0.0
 
     @property
     def script_path(self) -> Path:
@@ -118,6 +124,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
         script="write.sh",
         port=8080,
         blurb="Dense 27B at Q5. Thinking off. ~37 tok/s, fully on GPU.",
+        repo="unsloth/Qwen3.6-27B-GGUF",
+        files=("Qwen3.6-27B-UD-Q5_K_XL.gguf",),
+        download_gb=20.0,
     ),
     ModelSpec(
         key="code",
@@ -125,6 +134,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
         script="code.sh",
         port=8081,
         blurb="Dense 27B at Q4, long context. Thinking auto. ~40 tok/s.",
+        repo="unsloth/Qwen3.6-27B-GGUF",
+        files=("Qwen3.6-27B-UD-Q4_K_XL.gguf",),
+        download_gb=17.6,
     ),
     ModelSpec(
         key="code-glm",
@@ -132,6 +144,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
         script="code-glm.sh",
         port=8084,
         blurb="MoE, 4 of 64 experts active. Fastest here at ~63 tok/s. MIT.",
+        repo="unsloth/GLM-4.7-Flash-GGUF",
+        files=("GLM-4.7-Flash-UD-Q6_K_XL.gguf",),
+        download_gb=26.2,
     ),
     ModelSpec(
         key="code-heavy",
@@ -140,6 +155,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
         port=8082,
         blurb="80B-A3B at Q4. Experts stream from RAM.",
         ram_gb=55,
+        repo="unsloth/Qwen3-Coder-Next-GGUF",
+        files=("Qwen3-Coder-Next-UD-Q4_K_XL.gguf",),
+        download_gb=49.6,
     ),
     ModelSpec(
         key="code-q6",
@@ -148,6 +166,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
         port=8085,
         blurb="Same model at Q6. Best local coding quality.",
         ram_gb=70,
+        repo="unsloth/Qwen3-Coder-Next-GGUF",
+        files=("UD-Q6_K/Qwen3-Coder-Next-UD-Q6_K-00001-of-00003.gguf", "UD-Q6_K/Qwen3-Coder-Next-UD-Q6_K-00002-of-00003.gguf", "UD-Q6_K/Qwen3-Coder-Next-UD-Q6_K-00003-of-00003.gguf"),
+        download_gb=65.8,
     ),
     ModelSpec(
         key="write-big",
@@ -156,6 +177,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
         port=8083,
         blurb="122B-A10B at Q5. Best prose. ~6-8 tok/s.",
         ram_gb=95,
+        repo="unsloth/Qwen3.5-122B-A10B-GGUF",
+        files=("UD-Q5_K_XL/Qwen3.5-122B-A10B-UD-Q5_K_XL-00001-of-00003.gguf", "UD-Q5_K_XL/Qwen3.5-122B-A10B-UD-Q5_K_XL-00002-of-00003.gguf", "UD-Q5_K_XL/Qwen3.5-122B-A10B-UD-Q5_K_XL-00003-of-00003.gguf"),
+        download_gb=91.9,
     ),
     ModelSpec(
         key="agentic",
@@ -164,6 +188,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
         port=8086,
         blurb="Largest model that fits. 230B-A10B at Q3.",
         ram_gb=105,
+        repo="unsloth/MiniMax-M2.7-GGUF",
+        files=("UD-Q3_K_XL/MiniMax-M2.7-UD-Q3_K_XL-00001-of-00004.gguf", "UD-Q3_K_XL/MiniMax-M2.7-UD-Q3_K_XL-00002-of-00004.gguf", "UD-Q3_K_XL/MiniMax-M2.7-UD-Q3_K_XL-00003-of-00004.gguf", "UD-Q3_K_XL/MiniMax-M2.7-UD-Q3_K_XL-00004-of-00004.gguf"),
+        download_gb=101.9,
     ),
     ModelSpec(
         key="uncensored",
@@ -172,6 +199,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
         port=8087,
         blurb="Same 27B base, refusals ablated. 36.7 tok/s, all GPU. "
               "Tool calling verified intact.",
+        repo="llmfan46/Qwen3.6-27B-uncensored-heretic-v2-Native-MTP-Preserved-GGUF",
+        files=("Qwen3.6-27B-uncensored-heretic-v2-Native-MTP-Preserved-Q5_K_M.gguf",),
+        download_gb=19.7,
     ),
     ModelSpec(
         key="uncensored-big",
@@ -181,6 +211,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
         blurb="Most capable uncensored model that fits. 13.2 tok/s, and 5x "
               "faster prompts than the stock 122B. Tool calling verified.",
         ram_gb=90,
+        repo="mradermacher/Qwen3.5-122B-A10B-abliterated-i1-GGUF",
+        files=("Qwen3.5-122B-A10B-abliterated.i1-Q5_K_M.gguf",),
+        download_gb=87.0,
     ),
 )
 

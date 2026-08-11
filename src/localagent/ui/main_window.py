@@ -7,11 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QAction, QKeySequence, QShortcut, QTextOption
+from PyQt6.QtGui import QAction, QColor, QKeySequence, QShortcut, QTextOption
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
     QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit,
-    QPushButton, QSizePolicy, QSplitter, QTextEdit, QVBoxLayout, QWidget,
+    QProgressBar, QPushButton, QSizePolicy, QSplitter, QTextEdit, QVBoxLayout,
+    QWidget,
 )
 
 from .. import config
@@ -24,9 +25,10 @@ from ..core.agent import Agent
 from ..core.client import LlamaClient
 from ..core.server import ServerManager
 from . import style
+from .download_dialog import DownloadDialog
 from .resource_bar import ResourceBar
 from .chat import AssistantBlock, Notice, ThinkingCard, ToolCard, Transcript, UserBubble
-from .workers import AgentWorker, ServerWorker
+from .workers import AgentWorker, DownloadWorker, ServerWorker
 
 
 class ApprovalDialog(QDialog):
@@ -113,6 +115,7 @@ class MainWindow(QMainWindow):
 
         self._server_worker: ServerWorker | None = None
         self._agent_worker: AgentWorker | None = None
+        self._download_worker: DownloadWorker | None = None
         self._assistant: AssistantBlock | None = None
         self._thinking: ThinkingCard | None = None
         self._tool_cards: dict[str, ToolCard] = {}
@@ -143,11 +146,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
-        layout.addWidget(self._heading("System"))
-        self.resources = ResourceBar()
-        layout.addWidget(self.resources)
-
-        layout.addSpacing(10)
         layout.addWidget(self._heading("Model"))
         self.model_combo = QComboBox()
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
@@ -266,6 +264,23 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.system_edit)
 
         layout.addStretch(1)
+        # Meters sit at the bottom: they are ambient status, not a control,
+        # and the model/skill controls above them are what gets used.
+        layout.addWidget(self._heading("System"))
+        self.resources = ResourceBar()
+        layout.addWidget(self.resources)
+
+        self.download_progress = QProgressBar()
+        self.download_progress.setVisible(False)
+        self.download_progress.setTextVisible(True)
+        layout.addWidget(self.download_progress)
+
+        self.download_note = QLabel()
+        self.download_note.setObjectName("blurb")
+        self.download_note.setWordWrap(True)
+        self.download_note.setVisible(False)
+        layout.addWidget(self.download_note)
+
         new_chat = QPushButton("New conversation  (Ctrl+L)")
         new_chat.clicked.connect(self._new_conversation)
         layout.addWidget(new_chat)
@@ -318,6 +333,66 @@ class MainWindow(QMainWindow):
         label = QLabel(text)
         label.setObjectName("heading")
         return label
+
+    # -------------------------------------------------------------- downloads
+
+    def _offer_download(self, spec: ModelSpec) -> None:
+        """Ask where the weights should go, then fetch them."""
+        if not spec.repo or not spec.files:
+            QMessageBox.information(
+                self, "No download configured",
+                f"{spec.label} has no download source recorded. Fetch it manually "
+                f"with ~/.claude/models/scripts/download.sh.",
+            )
+            return
+
+        dialog = DownloadDialog(spec, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        worker = DownloadWorker(spec, dialog.destination(), self)
+        worker.progress.connect(self._on_download_progress)
+        worker.finished_ok.connect(lambda d, s=spec: self._on_download_done(s, d))
+        worker.failed.connect(self._on_download_failed)
+        worker.finished.connect(lambda: setattr(self, "_download_worker", None))
+        self._download_worker = worker
+
+        self.download_progress.setRange(0, 100)
+        self.download_progress.setValue(0)
+        self.download_progress.setVisible(True)
+        self.download_note.setText(f"Starting {spec.label}…")
+        self.download_note.setVisible(True)
+        worker.start()
+
+    def _on_download_progress(self, p) -> None:
+        self.download_progress.setValue(int(p.percent))
+        self.download_progress.setFormat(
+            f"{p.overall_downloaded / 1e9:.1f} / {p.overall_total / 1e9:.1f} GB  (%p%)"
+        )
+        self.download_note.setText(
+            f"file {p.file_index} of {p.file_count} · {p.filename}"
+        )
+
+    def _on_download_done(self, spec: ModelSpec, destination: str) -> None:
+        self.download_progress.setVisible(False)
+        self.download_note.setText(f"{spec.label} downloaded to {destination}")
+        self._refresh_models()
+        if spec.is_available():
+            index = self.model_combo.findData(spec.key)
+            if index >= 0:
+                self.model_combo.setCurrentIndex(index)
+        else:
+            self.download_note.setText(
+                f"Files are in {destination}, but the launch script points "
+                f"elsewhere. Move them under ~/.claude/models/gguf/, or edit "
+                f"{spec.script}."
+            )
+
+    def _on_download_failed(self, message: str) -> None:
+        self.download_progress.setVisible(False)
+        self.download_note.setText("")
+        self.download_note.setVisible(False)
+        QMessageBox.critical(self, "Download failed", message)
 
     # ---------------------------------------------------------------- skills
 
@@ -492,17 +567,29 @@ class MainWindow(QMainWindow):
         self.model_combo.clear()
         for spec in config.REGISTRY:
             available = spec.is_available()
-            label = spec.label if available else f"{spec.label}  — not downloaded"
+            size = f"  ⬇ {spec.download_gb:.0f} GB" if spec.download_gb else ""
+            label = spec.label if available else f"{spec.label}  — not downloaded{size}"
             self.model_combo.addItem(label, spec.key)
-            index = self.model_combo.count() - 1
-            self.model_combo.model().item(index).setEnabled(available)
+            item = self.model_combo.model().item(self.model_combo.count() - 1)
+            # Selectable even when absent: picking one offers to download it.
+            # A disabled item cannot be clicked, so the offer would be
+            # unreachable — which is the whole point of listing it.
+            item.setEnabled(True)
+            if not available:
+                item.setForeground(QColor(style.TEXT_DIM))
+        # Prefer the remembered model, then any downloaded one, so a fresh
+        # install does not open on a model it would immediately offer to fetch.
         wanted = self.model_combo.findData(self.settings.model_key)
-        if wanted >= 0 and self.model_combo.model().item(wanted).isEnabled():
+        downloaded = [i for i in range(self.model_combo.count())
+                      if (spec := config.by_key(self.model_combo.itemData(i)))
+                      and spec.is_available()]
+        if wanted >= 0 and config.by_key(self.settings.model_key) \
+                and config.by_key(self.settings.model_key).is_available():
             self.model_combo.setCurrentIndex(wanted)
-        else:
-            first = next((i for i in range(self.model_combo.count())
-                          if self.model_combo.model().item(i).isEnabled()), 0)
-            self.model_combo.setCurrentIndex(first)
+        elif downloaded:
+            self.model_combo.setCurrentIndex(downloaded[0])
+        elif self.model_combo.count():
+            self.model_combo.setCurrentIndex(0)
         self.model_combo.blockSignals(False)
         self._on_model_changed()
 
@@ -513,6 +600,8 @@ class MainWindow(QMainWindow):
         spec = self._current_spec()
         if spec is None:
             return
+        if not spec.is_available() and self._download_worker is None:
+            self._offer_download(spec)
         self.settings.model_key = spec.key
         self.settings.save()
         note = spec.blurb
