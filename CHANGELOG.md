@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.9.2
+
+Fixes the "1 sibling is not beside it" message, which was wrong twice over.
+
+The download dialog opens for whichever model is *selected*, and on a fresh
+install that is the smallest one — Qwen3.6-27B coding, 17.6 GB. Pointing that
+dialog at a different model's weights was reported as a missing shard, naming
+a file from an unrelated model, about a model that ships as a single file.
+Neither half was true and there was nothing the user could do with it.
+
+- **Weight files are identified by name.** Point the dialog at any `.gguf` and
+  it says which model that is, and offers to record it there. A file matching
+  nothing says so, rather than inventing a shard problem.
+- **Scan a folder…** in the dialog, and **Find my models…** in the menu: point
+  at a directory and every model in it is recorded at once. This is the common
+  case — weights arrive on a second machine as a copied folder — and having to
+  open an offer-to-download flow for the wrong model to say "they are over
+  here" is what made it confusing.
+- The scan looks three levels down, which covers the layout the download
+  scripts produce, and is bounded rather than a full `rglob`: these folders sit
+  on network mounts holding hundreds of gigabytes.
+- An incomplete shard set is not reported as found — two of three parts loads
+  with an opaque llama.cpp error.
+- The real missing-shard message now names the model it belongs to.
+
+A test asserts no two registered models claim the same filename, since
+identification is by name and a collision would silently misfile.
+
 ## 0.9.1
 
 Fixes a machine with correct weights reporting them as not downloaded.

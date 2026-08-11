@@ -58,6 +58,50 @@ def _weights_complete(first: Path) -> bool:
     )
 
 
+def identify(path: str | Path) -> "ModelSpec | None":
+    """Which registered model a weight file belongs to, by filename.
+
+    The app opens its download dialog for whichever model is *selected*, and
+    on a fresh install that is the smallest one -- not necessarily the one the
+    user has weights for. Pointing that dialog at a file for a different model
+    used to be reported as a missing shard, which is both wrong and impossible
+    to act on. Recognising the file is what makes the answer "that is the
+    uncensored 27B, shall I record it there" instead.
+    """
+    name = Path(path).name
+    for spec in REGISTRY:
+        if any(Path(f).name == name for f in spec.files):
+            return spec
+    return None
+
+
+def scan_for_weights(folder: str | Path, max_depth: int = 3) -> dict[str, Path]:
+    """Every registered model whose complete weights are under ``folder``.
+
+    Bounded rather than a full ``rglob``: this runs against directories that
+    can hold hundreds of gigabytes across network mounts, and walking one of
+    those to the leaves would hang the dialog. Three levels covers the layout
+    the download scripts produce (``gguf/<model>/<quant>/shard.gguf``).
+
+    Returned keyed by model, so a folder holding several is one answer rather
+    than one question per file.
+    """
+    root = Path(folder).expanduser()
+    found: dict[str, Path] = {}
+    if not root.is_dir():
+        return found
+    patterns = ["*.gguf"] + ["/".join(["*"] * n) + "/*.gguf"
+                             for n in range(1, max_depth + 1)]
+    for pattern in patterns:
+        for entry in sorted(root.glob(pattern)):
+            spec = identify(entry)
+            if spec is None or spec.key in found:
+                continue
+            if _weights_complete(entry):
+                found[spec.key] = entry
+    return found
+
+
 def find_runtime() -> Path | None:
     """A ``llama-server`` binary this machine can actually execute.
 

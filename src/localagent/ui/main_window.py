@@ -156,6 +156,11 @@ class MainWindow(QMainWindow):
         settings.setShortcut(QKeySequence("Ctrl+,"))
         settings.triggered.connect(self._open_settings)
         app_menu.addAction(settings)
+        locate = QAction("Find my models…", self)
+        locate.setToolTip("Point at a folder of .gguf files and record every "
+                          "model found in it.")
+        locate.triggered.connect(self._find_models)
+        app_menu.addAction(locate)
         app_menu.addSeparator()
 
         # Cleanup is reachable without opening Settings: the moment you want
@@ -422,16 +427,31 @@ class MainWindow(QMainWindow):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
-        # "I already have it" — record the location and skip the download.
-        located = dialog.located_path()
-        if located is not None:
-            config.set_model_path(spec.key, located)
+        # "I already have it" / "Scan a folder" — record what was found and
+        # skip the download. Possibly for a model other than the one this
+        # dialog was opened for, which is the usual case on a second machine.
+        located = dialog.located()
+        if located:
+            for key, path in located.items():
+                config.set_model_path(key, path)
             self.settings.save()
             self._refresh_models()
-            index = self.model_combo.findData(spec.key)
-            if index >= 0:
-                self.model_combo.setCurrentIndex(index)
-            self.download_note.setText(f"{spec.label} located at {located}")
+            # Select something that is now actually usable, preferring the
+            # model the user pointed at over the one the dialog was for.
+            for key in located:
+                index = self.model_combo.findData(key)
+                if index >= 0:
+                    self.model_combo.setCurrentIndex(index)
+                    break
+            if len(located) == 1:
+                key, path = next(iter(located.items()))
+                label = (config.by_key(key) or spec).label
+                self.download_note.setText(f"{label} located at {path.parent}")
+            else:
+                self.download_note.setText(
+                    f"{len(located)} models located: "
+                    + ", ".join((config.by_key(k) or spec).label for k in located)
+                )
             self.download_note.setVisible(True)
             return
 
@@ -838,6 +858,36 @@ class MainWindow(QMainWindow):
         self.transcript.restyle()
         self.resources.restyle()
         self.composer_bar.setStyleSheet(f"border-top: 1px solid {theme.active()['border']};")
+
+    def _find_models(self) -> None:
+        """Scan a folder and record every model in it, in one step.
+
+        Reachable without first triggering a download dialog: on a second
+        machine the weights arrive by copy, and having to open the offer-to-
+        download flow for the wrong model in order to say "actually they are
+        over here" is what made this confusing.
+        """
+        chosen = QFileDialog.getExistingDirectory(
+            self, "Folder holding your model weights", str(config.MODELS_ROOT))
+        if not chosen:
+            return
+        found = config.scan_for_weights(chosen)
+        if not found:
+            QMessageBox.information(
+                self, "No models found",
+                f"No complete model weights under:\n{chosen}\n\n"
+                "Looked three levels down for .gguf files matching a model in "
+                "the list. A sharded model needs all of its parts present.",
+            )
+            return
+        for key, path in found.items():
+            config.set_model_path(key, path)
+        self.settings.save()
+        self._refresh_models()
+        QMessageBox.information(
+            self, f"Found {len(found)} model(s)",
+            "\n".join(f"{config.by_key(k).label}\n    {v}" for k, v in found.items()),
+        )
 
     def _open_settings(self) -> None:
         from .settings_dialog import SettingsDialog

@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QPushButton, QVBoxLayout,
 )
 
+from .. import config
 from ..config import MODELS_ROOT, ModelSpec
 from ..core.downloads import evaluate_disk
 from . import style
@@ -21,7 +22,7 @@ class DownloadDialog(QDialog):
     def __init__(self, spec: ModelSpec, parent=None) -> None:
         super().__init__(parent)
         self.spec = spec
-        self._located: Path | None = None
+        self._located: dict[str, Path] = {}
         self.setWindowTitle(f"Download {spec.label}")
         self.setMinimumWidth(640)
 
@@ -62,6 +63,11 @@ class DownloadDialog(QDialog):
             "I already have it…", QDialogButtonBox.ButtonRole.ActionRole
         )
         self.locate.clicked.connect(self._locate_existing)
+        # The usual case is several models copied across together.
+        self.scan = self.buttons.addButton(
+            "Scan a folder…", QDialogButtonBox.ButtonRole.ActionRole
+        )
+        self.scan.clicked.connect(self._scan_folder)
         self.start = self.buttons.addButton("Download", QDialogButtonBox.ButtonRole.AcceptRole)
         self.start.setObjectName("primary")
         self.buttons.accepted.connect(self.accept)
@@ -73,9 +79,14 @@ class DownloadDialog(QDialog):
     def destination(self) -> Path:
         return Path(self.path_edit.text()).expanduser()
 
-    def located_path(self) -> Path | None:
-        """Set when the user pointed at weights already on disk."""
-        return self._located
+    def located(self) -> dict[str, Path]:
+        """Model key -> weight path, for anything the user pointed at.
+
+        A dict rather than one path because all three outcomes are the same
+        shape: this model's weights, a *different* model's weights, or a
+        folder holding several.
+        """
+        return dict(self._located)
 
     def _locate_existing(self) -> None:
         chosen, _ = QFileDialog.getOpenFileName(
@@ -86,17 +97,81 @@ class DownloadDialog(QDialog):
         if not chosen:
             return
         path = Path(chosen)
-        missing = self.spec.missing_shards(path)
+        owner = config.identify(path)
+
+        if owner is None:
+            QMessageBox.warning(
+                self, "Not a model localagent knows",
+                f"{path.name} does not match any model in the list.\n\n"
+                f"{self.spec.label} expects:\n"
+                + "\n".join(f"  {Path(f).name}" for f in self.spec.files)
+                + "\n\nIf this is a model localagent does not ship, point a "
+                  "launch script at it instead.",
+            )
+            return
+
+        if owner.key != self.spec.key:
+            # The dialog opens for whichever model is selected, and on a fresh
+            # install that is the smallest -- not the one the user has. Saying
+            # "a sibling shard is missing" here was both wrong and unactionable.
+            answer = QMessageBox.question(
+                self, "That is a different model",
+                f"{path.name} is <b>{owner.label}</b>, not {self.spec.label}.\n\n"
+                f"Record it as {owner.label}?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Yes,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
+        missing = owner.missing_shards(path)
         if missing:
             QMessageBox.warning(
                 self, "Incomplete weights",
-                f"{path.name} is one of {len(self.spec.files)} files for this "
-                f"model, and {len(missing)} sibling(s) are not beside it:\n\n"
+                f"{owner.label} ships as {len(owner.files)} files and "
+                f"{len(missing)} of them are not beside this one:\n\n"
                 + "\n".join(f"  {m.name}" for m in missing[:4])
                 + "\n\nllama.cpp needs every shard in the same directory.",
             )
             return
-        self._located = path
+
+        self._located = {owner.key: path}
+        self.accept()
+
+    def _scan_folder(self) -> None:
+        """Point at a directory and record every model found in it.
+
+        The common case is a user who copied several models across at once.
+        Asking them to locate each one through a dialog that opens for the
+        wrong model is how this went wrong in the first place.
+        """
+        chosen = QFileDialog.getExistingDirectory(
+            self, "Folder holding your model weights",
+            self.path_edit.text() or str(Path.home()),
+        )
+        if not chosen:
+            return
+        found = config.scan_for_weights(chosen)
+        if not found:
+            QMessageBox.information(
+                self, "No models found",
+                f"No complete model weights under:\n{chosen}\n\n"
+                "Looked three levels down for .gguf files matching a model in "
+                "the list. A sharded model needs all of its parts present.",
+            )
+            return
+        names = "\n".join(
+            f"  {config.by_key(k).label}\n      {v.name}" for k, v in found.items()
+        )
+        answer = QMessageBox.question(
+            self, f"Found {len(found)} model(s)",
+            f"Under {chosen}:\n\n{names}\n\nRecord all of them?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._located = found
         self.accept()
 
     def _browse(self) -> None:
