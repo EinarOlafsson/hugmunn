@@ -58,6 +58,63 @@ def _weights_complete(first: Path) -> bool:
     )
 
 
+def find_runtime() -> Path | None:
+    """A ``llama-server`` binary this machine can actually execute.
+
+    Checked in the order a user would expect to win: an explicit override,
+    the build under ``bin/``, then whatever is on PATH. ``bin/`` is a symlink
+    into ``src/llama.cpp/build/`` and both are gitignored, so a fresh clone of
+    the models repo has the scripts and the weights and no binary at all --
+    which is exactly the state a second machine starts in.
+    """
+    override = os.environ.get("LLAMA_SERVER", "").strip()
+    if override and os.access(override, os.X_OK):
+        return Path(override)
+    local = MODELS_ROOT / "bin" / "llama-server"
+    if local.is_file() and os.access(local, os.X_OK):
+        return local
+    found = shutil.which("llama-server")
+    return Path(found) if found else None
+
+
+@dataclass(frozen=True)
+class Readiness:
+    """Why a model can or cannot start, in the three parts that fail apart."""
+
+    weights: bool
+    script: bool
+    runtime: bool
+    path: Path = Path()
+
+    @property
+    def can_launch(self) -> bool:
+        """Weights, plus some way to serve them.
+
+        The script is not required: with a binary on hand the server can be
+        invoked directly, which is what makes a machine that has weights but
+        not the scripts repo usable instead of stuck.
+        """
+        return self.weights and (self.script or self.runtime)
+
+    def explain(self) -> str:
+        """One line naming the missing piece and the fix for it.
+
+        Never "not downloaded" when the weights are sitting there -- that
+        sends the user off to re-fetch 87 GB they already have.
+        """
+        if not self.weights:
+            return "not downloaded"
+        if not self.script and not self.runtime:
+            return ("weights found, but no launch script and no llama-server "
+                    "binary - build llama.cpp or set LLAMA_SERVER")
+        if not self.script:
+            return "weights found; no launch script, so default settings are used"
+        if not self.runtime:
+            return ("weights and script found, but no llama-server binary - "
+                    "build llama.cpp or set LLAMA_SERVER")
+        return "ready"
+
+
 @dataclass(frozen=True)
 class ModelSpec:
     """One launchable model, identified by the script that starts its server."""
@@ -171,20 +228,42 @@ class ModelSpec:
             if not (primary.parent / Path(name).name).is_file()
         ]
 
-    def is_available(self) -> bool:
-        """True when the launch script exists and its weights have been downloaded."""
-        if not self.script_path.is_file():
-            return False
-        return bool(self._model_arg_exists())
-
-    def _model_arg_exists(self) -> bool:
-        """Check the effective weight path, and every shard beside it.
+    def has_weights(self) -> bool:
+        """True when the weights are on disk, and every shard beside them.
 
         Large quants ship as ``…-00001-of-00003.gguf`` sets. Checking only the
         first shard reports a half-downloaded model as ready and llama.cpp then
         fails at load with an unhelpful error, so every shard is verified.
+
+        This is what "downloaded" means, and it is deliberately separate from
+        being launchable — see :meth:`readiness`.
         """
         return _weights_complete(self.model_path)
+
+    def readiness(self) -> "Readiness":
+        """What is present, what is missing, and what to do about it.
+
+        Three things have to line up before a model runs, and they fail
+        independently: the weights, the launch script, and a ``llama-server``
+        binary. Collapsing them into one boolean is what made a machine with
+        87 GB of correct weights report the model as *not downloaded* and
+        offer to fetch it again — the launch scripts live in a separate repo,
+        so a second machine routinely has one without the other.
+        """
+        return Readiness(
+            weights=self.has_weights(),
+            script=self.script_path.is_file(),
+            runtime=find_runtime() is not None,
+            path=self.model_path,
+        )
+
+    def is_available(self) -> bool:
+        """True when this model can actually be started."""
+        return self.readiness().can_launch
+
+    # Retained: external callers and older settings code used this name.
+    def _model_arg_exists(self) -> bool:
+        return self.has_weights()
 
 
 # Mirrors ~/.claude/models/scripts/. Ports match the --port in each script.

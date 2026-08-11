@@ -674,9 +674,17 @@ class MainWindow(QMainWindow):
         self.model_combo.blockSignals(True)
         self.model_combo.clear()
         for spec in config.REGISTRY:
-            available = spec.is_available()
+            ready = spec.readiness()
+            available = ready.can_launch
             size = f"  ⬇ {spec.download_gb:.0f} GB" if spec.download_gb else ""
-            label = spec.label if available else f"{spec.label}  — not downloaded{size}"
+            if available:
+                label = spec.label
+            elif ready.weights:
+                # The weights are there; something else is missing. Saying
+                # "not downloaded" here sends the user to re-fetch 87 GB.
+                label = f"{spec.label}  — {ready.explain()}"
+            else:
+                label = f"{spec.label}  — not downloaded{size}"
             self.model_combo.addItem(label, spec.key)
             item = self.model_combo.model().item(self.model_combo.count() - 1)
             # Selectable even when absent: picking one offers to download it.
@@ -761,7 +769,8 @@ class MainWindow(QMainWindow):
             return
 
         if provider == Provider.LOCAL:
-            if not spec.is_available() and self._download_worker is None:
+            ready = spec.readiness()
+            if not ready.weights and self._download_worker is None:
                 self._offer_download(spec)
             self.settings.model_key = spec.key
             self.privacy_label.setText("")
@@ -776,6 +785,12 @@ class MainWindow(QMainWindow):
         note = spec.blurb
         if spec.ram_gb:
             note += f"  Needs ~{spec.ram_gb} GB free RAM."
+        if provider == Provider.LOCAL:
+            ready = spec.readiness()
+            if ready.explain() != "ready":
+                note += f"\n\n\u26a0 {ready.explain()}"
+            if ready.weights:
+                note += f"\n\nWeights: {spec.model_path}"
         if provider != Provider.LOCAL:
             note += f"  {spec.context // 1000}K context."
         self.model_blurb.setText(note)
@@ -866,9 +881,19 @@ class MainWindow(QMainWindow):
         spec = self._current_spec()
         if spec is None:
             return
-        if not spec.is_available():
-            QMessageBox.warning(self, "Not downloaded",
-                                f"{spec.label} has not finished downloading yet.")
+        ready = spec.readiness()
+        if not ready.can_launch:
+            if ready.weights:
+                QMessageBox.warning(
+                    self, "Cannot start yet",
+                    f"{spec.label}\n\nThe weights are here:\n{spec.model_path}\n\n"
+                    f"{ready.explain()}",
+                )
+            else:
+                QMessageBox.warning(
+                    self, "Not downloaded",
+                    f"{spec.label} has not finished downloading yet.",
+                )
             return
         if spec.ram_gb:
             free = config.free_ram_gb()

@@ -63,7 +63,20 @@ class ServerManager:
 
         script = spec.script_path
         if not script.is_file():
-            raise ServerError(f"launch script not found: {script}")
+            # A second machine routinely has the weights and not the scripts:
+            # they live in a separate repo. Serve them directly rather than
+            # refusing, and say that the per-model tuning is not in play.
+            command = self._direct_command(spec)
+            if command is None:
+                raise ServerError(
+                    f"launch script not found: {script}\n\n"
+                    f"and no llama-server binary was found either. Build "
+                    f"llama.cpp, or set LLAMA_SERVER=/path/to/llama-server."
+                )
+            report(f"no launch script; running llama-server directly")
+            self._spawn(command, spec, script.parent if script.parent.is_dir()
+                        else Path.cwd(), report, timeout, client)
+            return
         if not os.access(script, os.X_OK):
             # A missing +x bit is trivially fixable and not worth failing on —
             # three shipped scripts were mode 644 for weeks and simply could
@@ -94,6 +107,35 @@ class ServerManager:
             command += ["--model", str(override)]
             report(f"using weights at {override}")
 
+        self._spawn(command, spec, script.parent, report, timeout, client)
+
+    def _direct_command(self, spec: ModelSpec) -> list[str] | None:
+        """Serve ``spec`` without its launch script, or ``None`` if we cannot.
+
+        Deliberately conservative. The scripts carry tuning that matters --
+        ``--n-cpu-moe`` splits, sampling, reasoning mode -- and guessing at it
+        would be worse than the script. What is here is only what is needed to
+        load the weights and answer: ``--fit on`` sizes the GPU offload
+        automatically, which is the one decision that otherwise OOMs.
+        """
+        from ..config import find_runtime
+
+        runtime = find_runtime()
+        if runtime is None or not spec.has_weights():
+            return None
+        return [
+            str(runtime),
+            "--model", str(spec.model_path),
+            "--alias", spec.key,
+            "--fit", "on",
+            "--ctx-size", "16384",
+            "--flash-attn", "on",
+            "--jinja",
+            "--threads", "16",
+            "--host", "127.0.0.1", "--port", str(spec.port),
+        ]
+
+    def _spawn(self, command, spec, cwd, report, timeout, client) -> None:
         self._proc = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
@@ -101,7 +143,7 @@ class ServerManager:
             text=True,
             bufsize=1,
             start_new_session=True,
-            cwd=str(script.parent),
+            cwd=str(cwd),
         )
         self._spec, self._adopted = spec, False
 

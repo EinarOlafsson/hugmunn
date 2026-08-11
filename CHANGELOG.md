@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.9.1
+
+Fixes a machine with correct weights reporting them as not downloaded.
+
+Three things must line up before a local model runs, and they arrive
+independently: the **weights** (copied by hand, or downloaded), the **launch
+scripts** (a separate repo) and a **llama-server binary** (gitignored inside
+that repo). They were collapsed into one boolean, so any one of them missing
+produced the same message — *not downloaded* — and an offer to re-fetch 87 GB
+that was already on disk.
+
+- `ModelSpec.readiness()` reports the three separately and names the fix for
+  whichever is missing. `has_weights()` is what "downloaded" means; being
+  launchable is a different question.
+- A download is only offered when the weights are genuinely absent.
+- **A model can now start without its launch script**, as long as the weights
+  and a binary are there: `llama-server` is invoked directly with `--fit on`
+  and a conservative set of flags. The scripts carry tuning worth keeping —
+  `--n-cpu-moe` splits, sampling, reasoning mode — so this says it is running
+  without them rather than pretending to be equivalent.
+- `find_runtime()` looks at `$LLAMA_SERVER`, then `bin/llama-server`, then
+  PATH.
+
+The root cause was in the models repo: every launch script opened with a
+literal `BASE=/home/olafsson/.claude/models`, so on any other machine or user
+account it resolved to nothing. `BASE` now comes from the script's own
+location, and the binary is resolved rather than assumed.
+
 ## 0.9.0
 
 Claude and ChatGPT alongside the local models, and spaCR's themes.
