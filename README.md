@@ -44,35 +44,63 @@ is just the reply.
 
 **Tools**, so the model can actually work rather than only talk:
 
-| Tool | Approval |
-|---|---|
-| `read_file` | auto (configurable) |
-| `list_directory` | auto (configurable) |
-| `search_text` | auto (configurable) |
-| `web_search` | auto (configurable) |
-| `web_fetch` | auto (configurable) |
-| `write_file` | **always asks**, with a diff-style preview |
-| `run_command` | **always asks**, showing the exact command |
+| Group | Tools | Approval |
+|---|---|---|
+| **Files** | `read_file` `list_directory` `search_text` `glob_files` `diff_files` | auto |
+| | `write_file` `edit_file` | **asks** |
+| **Execution** | `run_command` `python_exec` | **asks** |
+| **Web** | `web_search` `web_fetch` `image_search` | auto |
+| | `download_pdfs` | **asks** — it writes files |
+| **Data** | `sql_schema` `sql_query` | auto (read-only connection) |
+| **Research** | `pubmed_search` `arxiv_search` `read_pdf` `image_info` | auto |
+
+Nineteen in total. **`edit_file` is the one that matters most.** Without it the
+only way to change a file is `write_file` — reproducing the whole thing, which
+is impossible for anything long in a 32K window and silently drops a function
+every time it nearly succeeds. It replaces an exact substring and *refuses*
+when the target is missing or appears more times than expected, rather than
+taking the first match and corrupting the file quietly.
+
+`sql_query` opens the database read-only through a SQLite URI, so a stray
+`UPDATE` cannot touch a measurement database. `pubmed_search` and
+`arxiv_search` return structured records — real authors, PMIDs, DOIs —
+precisely so a citation assembled from one is not invented.
+
+`read_pdf` prefers `pypdf` and falls back to poppler's `pdftotext`;
+`image_info` needs Pillow. Both name the missing dependency rather than failing
+obscurely — `pip install -e ".[docs]"` gets both.
 
 **Skills** — markdown instruction packs appended to the system prompt, picked
-from a category dropdown in the sidebar. Nine ship across Core, Coding,
-Science, Web, and Writing; the three Core ones are on by default.
+from a category dropdown in the sidebar. Twenty-one ship across Core, Coding,
+Science, Web, Writing, and Meta; four are on by default.
 
 A skill is only instructions — it cannot give a model a capability. Web access
 is a *tool*, not a skill. What the Web research skill does is tell a model that
 already has `web_search` how to use it well: phrase queries like the document
 you want, fetch the page rather than answering from a snippet, cite what you
-actually read.
+actually read. The **Authoring skills & tools** skill teaches that distinction
+explicitly, so a model asked for "a skill to browse the web" pushes back and
+offers to write the tool instead.
 
-All nine skills together cost roughly 2,570 tokens; the defaults cost 674. On a
-16-64K context that is affordable even with everything on, so the "Enable all"
-button is a reasonable way to run. The reason to keep them opt-in is focus
-rather than budget: a model given microscopy conventions while writing Python
-is being pulled in two directions.
+All 21 together cost roughly 8,750 tokens; the defaults cost 949. On a 16-64K
+context even everything-on is affordable, so "Enable all" is a reasonable way
+to run. The reason to keep them opt-in is focus rather than budget: a model
+given microscopy conventions while writing Python is being pulled in two
+directions.
 
-Add your own by dropping a `.md` file into `src/localagent/skills/` with
-frontmatter (`name`, `category`, `description`, `default`). It is picked up on
-the next launch; a malformed file is skipped rather than crashing the app.
+Add your own by dropping a `.md` file into `~/.config/localagent/skills/` with
+frontmatter (`name`, `category`, `description`, `default`) — a model can write
+one there itself with `write_file`. It is picked up on the next launch, and a
+user skill overrides a shipped one with the same filename. A malformed file is
+skipped rather than crashing the app.
+
+**Custom tools** live in `~/.config/localagent/tools/` as `.py` files declaring
+`NAME`, `DESCRIPTION`, `PARAMETERS`, and `run`. They do not auto-load — enable
+each from the sidebar after reading it. That gate is not about capability
+(`run_command` is already arbitrary execution) but about review posture:
+`run_command` shows you the exact command every time, whereas a loaded plugin
+runs unreviewed thereafter. A built-in always wins a name clash, so a plugin
+cannot shadow `read_file`.
 
 ## Safety model
 
