@@ -166,3 +166,53 @@ def test_the_sidebar_never_scrolls_sideways(window, qt_app):
     while scroller is not None and not isinstance(scroller, QScrollArea):
         scroller = scroller.parent()
     assert scroller.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+
+
+def test_the_meters_stop_polling_when_the_window_closes(qt_app, tmp_path, monkeypatch):
+    """A one-second timer that outlives its widgets raises during teardown.
+
+    Qt destroys child C++ objects before Python drops its references, so a
+    tick landing in that window reaches a deleted _Bar. It showed up as a
+    traceback on quit, and as an intermittent error in any test that builds
+    and closes a window — one run in three or four.
+    """
+    import importlib
+
+    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
+    from localagent import config
+
+    importlib.reload(config)
+    from localagent.ui import main_window as mw
+
+    importlib.reload(mw)
+    monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
+    monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_runtime_setup", lambda self: None)
+
+    win = mw.MainWindow()
+    meters = win.resources
+    assert meters._timer.isActive()
+    win.server.stop()
+    win.close()
+    assert not meters._timer.isActive(), "the poll timer must stop with the window"
+
+
+def test_a_tick_after_teardown_does_not_raise(qt_app):
+    """The backstop, for anything that destroys a widget without closeEvent.
+
+    ``deleteLater`` only posts a DeferredDelete event; ``processEvents`` does
+    not deliver it, so the C++ object is still alive afterwards and the test
+    proves nothing. ``sip.delete`` destroys it now, which is what the guard
+    is actually defending against.
+    """
+    from PyQt6 import sip
+
+    from localagent.ui.resource_bar import ResourceBar
+
+    meters = ResourceBar()
+    assert meters._timer.isActive()
+    sip.delete(meters.cpu)
+    assert sip.isdeleted(meters.cpu)
+
+    meters.refresh()          # must not raise
+    assert not meters._timer.isActive(), "a tick on dead widgets must stop the timer"

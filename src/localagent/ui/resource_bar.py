@@ -11,6 +11,7 @@ red means a launch will disappoint.
 
 from __future__ import annotations
 
+from PyQt6 import sip
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout, QWidget
@@ -128,7 +129,26 @@ class ResourceBar(QFrame):
         for bar in (self.cpu, self.ram, self.gpu, self.vram):
             bar.update()
 
+    def stop(self) -> None:
+        """Stop polling. Idempotent, and safe after the widgets are gone."""
+        try:
+            self._timer.stop()
+        except RuntimeError:
+            pass          # the timer's C++ side is already destroyed
+
+    def closeEvent(self, event):  # noqa: N802 - Qt naming
+        self.stop()
+        super().closeEvent(event)
+
     def refresh(self) -> None:
+        # The timer can outlive the bars it updates: Qt destroys child C++
+        # objects before Python drops its references, so a tick that lands in
+        # that window reaches a deleted _Bar and raises. Visible as a
+        # traceback on quit, and as an intermittent failure in any test that
+        # builds and closes a window.
+        if sip.isdeleted(self) or sip.isdeleted(self.cpu):
+            self.stop()
+            return
         snap = self._sampler.sample()
         self.cpu.set_value(snap.cpu_percent, f"{snap.cpu_percent:.0f}%")
         self.ram.set_value(

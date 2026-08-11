@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.13.1
+
+Fixes a crash during shutdown, found by a flaky test rather than by reading.
+
+The resource meters poll once a second. Qt destroys child C++ objects before
+Python drops its references, so a tick landing in that window reached a
+deleted `_Bar` and raised `wrapped C/C++ object has been deleted` — a
+traceback on quit, and an intermittent error in any test that built and closed
+a window, about one run in three.
+
+The window now stops the meters first thing in `closeEvent`, and `refresh`
+checks its widgets are still alive as a backstop for anything that destroys a
+widget without going through it. Five consecutive full runs clean, against
+roughly one failure in three before.
+
+The backstop's first test was wrong in an instructive way: it called
+`deleteLater()` and `processEvents()`, which only *posts* a DeferredDelete
+event and does not deliver it — so the object was still alive and the test
+proved nothing while appearing to pass the interesting case. It uses
+`sip.delete` now.
+
 ## 0.13.0
 
 Three researched uncensored models, and a way to measure rather than guess.

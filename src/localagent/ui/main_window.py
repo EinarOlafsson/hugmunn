@@ -1649,6 +1649,9 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------- close
 
     def closeEvent(self, event):  # noqa: N802 - Qt naming
+        # Before anything else: a one-second timer that fires during teardown
+        # reaches widgets Qt has already destroyed.
+        self.resources.stop()
         if self._agent_worker is not None:
             self._agent_worker.cancel()
             self._agent_worker.wait(3000)
