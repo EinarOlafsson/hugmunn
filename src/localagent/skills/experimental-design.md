@@ -2,6 +2,7 @@
 name: Experimental design
 category: Science
 description: Controls, replication, and blinding — what makes a result interpretable.
+when: planning an experiment, or judging whether an existing result is interpretable.
 default: false
 ---
 

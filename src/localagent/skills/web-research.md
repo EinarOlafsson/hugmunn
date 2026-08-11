@@ -2,6 +2,7 @@
 name: Web research
 category: Web
 description: How to search and read effectively — query phrasing, source quality, citation.
+when: you are about to search, or the answer depends on current information, anything past your training cutoff, or a fact you are not confident about.
 default: true
 ---
 

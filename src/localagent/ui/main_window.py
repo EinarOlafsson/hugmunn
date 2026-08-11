@@ -292,7 +292,10 @@ class MainWindow(QMainWindow):
                 action = QAction(f"{skill.name}   (~{skill.approx_tokens} tok)", self)
                 action.setCheckable(True)
                 action.setChecked(skill.key in self._enabled_skills)
-                action.setToolTip(skill.description)
+                tip = skill.description
+                if skill.when:
+                    tip += f"\n\nApplies when: {skill.when}"
+                action.setToolTip(tip)
                 action.toggled.connect(
                     lambda checked, k=skill.key: self._on_skill_toggled(k, checked)
                 )

@@ -2,6 +2,7 @@
 name: Writing tests
 category: Coding
 description: Tests that fail for the reason they name, and cover the case that actually breaks.
+when: writing tests, or asked whether existing tests are adequate.
 default: false
 ---
 

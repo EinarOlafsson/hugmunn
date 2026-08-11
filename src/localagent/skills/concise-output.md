@@ -2,6 +2,7 @@
 name: Concise output
 category: Core
 description: Lead with the answer; cut padding. Small, and helps almost every reply.
+when: every response — it governs how you write, not what you write.
 default: true
 ---
 

@@ -2,6 +2,7 @@
 name: Authoring skills & tools
 category: Meta
 description: How to write a new skill or tool for yourself, and which of the two a request needs.
+when: asked to create a new skill or tool, or when a request needs a capability you do not have.
 default: false
 ---
 

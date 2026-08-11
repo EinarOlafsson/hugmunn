@@ -2,6 +2,7 @@
 name: spacr codebase
 category: Science
 description: Conventions for the spacr high-content imaging package — layout, data model, and rules.
+when: working anywhere in the spacr codebase.
 default: false
 ---
 

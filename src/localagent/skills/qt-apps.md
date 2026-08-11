@@ -2,6 +2,7 @@
 name: Qt desktop apps (PySide6 / PyQt6)
 category: Coding
 description: Building Qt GUIs in Python — threading rules, signals, and the mistakes that cause silent bugs.
+when: working on a PySide6 or PyQt6 desktop application.
 default: false
 ---
 

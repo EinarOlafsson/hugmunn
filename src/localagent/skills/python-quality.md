@@ -2,6 +2,7 @@
 name: Python quality
 category: Coding
 description: Conventions for readable, idiomatic Python that matches surrounding code.
+when: writing or modifying Python.
 default: false
 ---
 

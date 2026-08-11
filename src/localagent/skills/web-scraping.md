@@ -2,6 +2,7 @@
 name: Web scraping
 category: Web
 description: Collecting pages, images, and PDFs at scale — rate limits, etiquette, and what breaks.
+when: collecting more than one page, image, or PDF — not for a single lookup.
 default: false
 ---
 

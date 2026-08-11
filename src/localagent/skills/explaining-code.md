@@ -2,6 +2,7 @@
 name: Explaining code
 category: Coding
 description: Describing unfamiliar code so someone can act on it, not just recognise it.
+when: asked what code does, how it works, or why it is written that way.
 default: false
 ---
 

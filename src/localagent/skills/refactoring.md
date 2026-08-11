@@ -2,6 +2,7 @@
 name: Refactoring
 category: Coding
 description: Changing structure without changing behaviour — and proving you didn't.
+when: changing the structure of working code without intending to change what it does.
 default: false
 ---
 

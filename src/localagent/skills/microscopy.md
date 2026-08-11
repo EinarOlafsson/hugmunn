@@ -2,6 +2,7 @@
 name: Microscopy & image analysis
 category: Science
 description: Conventions for quantitative fluorescence microscopy and segmentation work.
+when: working with image data, segmentation, or quantitative microscopy.
 default: false
 ---
 

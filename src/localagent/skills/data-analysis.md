@@ -2,6 +2,7 @@
 name: Data analysis
 category: Science
 description: Statistical hygiene — what test, what n, and what the result does not show.
+when: interpreting results, choosing a statistical test, or reporting a comparison.
 default: false
 ---
 

@@ -71,28 +71,41 @@ precisely so a citation assembled from one is not invented.
 obscurely — `pip install -e ".[docs]"` gets both.
 
 **Skills** — markdown instruction packs appended to the system prompt, picked
-from a category dropdown in the sidebar. Twenty-one ship across Core, Coding,
+from a category dropdown in the sidebar. Twenty-seven ship across Core, Coding,
 Science, Web, Writing, and Meta; four are on by default.
 
 A skill is only instructions — it cannot give a model a capability. Web access
 is a *tool*, not a skill. What the Web research skill does is tell a model that
-already has `web_search` how to use it well: phrase queries like the document
-you want, fetch the page rather than answering from a snippet, cite what you
-actually read. The **Authoring skills & tools** skill teaches that distinction
-explicitly, so a model asked for "a skill to browse the web" pushes back and
-offers to write the tool instead.
+already has `web_search` how to use it well. The **Authoring skills & tools**
+skill teaches that distinction explicitly, so a model asked for "a skill to
+browse the web" pushes back and offers to write the tool instead.
 
-All 21 together cost roughly 8,750 tokens; the defaults cost 949. On a 16-64K
-context even everything-on is affordable, so "Enable all" is a reasonable way
-to run. The reason to keep them opt-in is focus rather than budget: a model
-given microscopy conventions while writing Python is being pulled in two
-directions.
+Every skill declares a `when:` trigger, rendered into the prompt as *"Apply
+this when: ..."*. This is what makes breadth and precision compatible rather
+than opposed: without it, an enabled skill applies to every turn
+indiscriminately and a model handed microscopy conventions while writing a
+shell script is pulled two ways. With it, several can be enabled at once and
+each stays dormant until relevant.
+
+| Category | Skills | Cost |
+|---|---:|---:|
+| Core | 4 | ~1,175 |
+| Coding | 10 | ~4,810 |
+| Science | 8 | ~3,687 |
+| Web | 2 | ~878 |
+| Writing | 2 | ~816 |
+| Meta | 1 | ~702 |
+
+Defaults cost ~1,060 tokens. **All 27 cost ~12,000, so "Enable all" is a
+32K-context option, not a 16K one** — past roughly twenty skills, enabling by
+category is the intended workflow. `write.sh` and `uncensored.sh` run 16K
+contexts; `code.sh` and `code-glm.sh` run 32K.
 
 Add your own by dropping a `.md` file into `~/.config/localagent/skills/` with
-frontmatter (`name`, `category`, `description`, `default`) — a model can write
-one there itself with `write_file`. It is picked up on the next launch, and a
-user skill overrides a shipped one with the same filename. A malformed file is
-skipped rather than crashing the app.
+frontmatter (`name`, `category`, `description`, `when`, `default`) — a model
+can write one there itself with `write_file`. It is picked up on the next
+launch, and a user skill overrides a shipped one with the same filename. A
+malformed file is skipped rather than crashing the app.
 
 **Custom tools** live in `~/.config/localagent/tools/` as `.py` files declaring
 `NAME`, `DESCRIPTION`, `PARAMETERS`, and `run`. They do not auto-load — enable

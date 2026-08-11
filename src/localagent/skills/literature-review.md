@@ -2,6 +2,7 @@
 name: Literature review
 category: Science
 description: Searching, reading, and citing papers without inventing references.
+when: searching for, reading, or citing papers.
 default: false
 ---
 

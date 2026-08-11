@@ -2,6 +2,7 @@
 name: Data wrangling (pandas / SQL)
 category: Science
 description: Loading, joining, and aggregating tabular data without silently losing rows.
+when: loading, joining, filtering, or aggregating tabular data.
 default: false
 ---
 

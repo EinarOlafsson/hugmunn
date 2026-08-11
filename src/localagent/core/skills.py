@@ -40,10 +40,24 @@ class Skill:
     description: str
     body: str
     default_on: bool = False
+    # An explicit trigger condition, prepended to the body as "Apply this
+    # when: ...". Without one, a skill that is switched on applies to every
+    # turn indiscriminately — a model handed microscopy conventions while
+    # writing a shell script is being pulled two ways. Stating when a skill
+    # is relevant lets several be enabled at once without diluting each other,
+    # which is what makes breadth and precision compatible rather than opposed.
+    when: str = ""
 
     @property
     def approx_tokens(self) -> int:
-        return max(1, len(self.body) // CHARS_PER_TOKEN)
+        return max(1, len(self.rendered) // CHARS_PER_TOKEN)
+
+    @property
+    def rendered(self) -> str:
+        """Body as it goes into the prompt, with the trigger line if present."""
+        if not self.when:
+            return self.body
+        return f"Apply this when: {self.when}\n\n{self.body}"
 
 
 def _parse(path: Path) -> Skill | None:
@@ -75,6 +89,7 @@ def _parse(path: Path) -> Skill | None:
         description=meta.get("description", ""),
         body=body,
         default_on=meta.get("default", "").lower() in ("true", "yes", "1"),
+        when=meta.get("when", ""),
     )
 
 
@@ -120,7 +135,7 @@ def compose(system_prompt: str, skills: list[Skill]) -> str:
         return system_prompt
     parts = [system_prompt.strip()]
     for skill in skills:
-        parts.append(f"<skill name=\"{skill.name}\">\n{skill.body.strip()}\n</skill>")
+        parts.append(f"<skill name=\"{skill.name}\">\n{skill.rendered.strip()}\n</skill>")
     return "\n\n".join(parts)
 
 

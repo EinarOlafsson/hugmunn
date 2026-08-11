@@ -136,5 +136,63 @@ class TestShippedInventory:
         fat = {s.name: s.approx_tokens for s in skills.load_all() if s.approx_tokens > 1200}
         assert not fat, f"too large: {fat}"
 
-    def test_enabling_everything_stays_under_a_quarter_of_16k(self):
-        assert skills.total_tokens(skills.load_all()) < 12_000
+    def test_enabling_everything_still_fits_a_32k_context(self):
+        """At 27 skills, 'Enable all' is a 32K option, not a 16K one.
+
+        This ceiling catches unbounded growth; it is not a promise that
+        everything-on works everywhere, which stopped being true past ~20
+        skills. Category selection is the intended workflow now. If this
+        fails, trim a skill or split a category — do not just raise it.
+        """
+        total = skills.total_tokens(skills.load_all())
+        assert total < 16_000, f"{total} tokens — trim, or split a category"
+
+    def test_no_category_alone_blows_a_16k_context(self):
+        """Enabling one whole category must stay usable on the smallest models."""
+        grouped = skills.by_category(skills.load_all())
+        fat = {c: skills.total_tokens(g) for c, g in grouped.items()
+               if skills.total_tokens(g) > 5_000}
+        assert not fat, f"category too large to enable wholesale: {fat}"
+
+
+class TestTriggerConditions:
+    """`when:` is what lets many skills be enabled without diluting each other."""
+
+    def test_when_is_parsed(self, tmp_path):
+        (tmp_path / "a.md").write_text(
+            "---\nname: A\ncategory: Core\ndescription: d\nwhen: writing Python.\n---\n\nBody.\n",
+            encoding="utf-8")
+        (skill,) = skills.load_all(tmp_path)
+        assert skill.when == "writing Python."
+
+    def test_when_is_prepended_to_the_rendered_body(self, tmp_path):
+        (tmp_path / "a.md").write_text(
+            "---\nname: A\ncategory: Core\ndescription: d\nwhen: X happens.\n---\n\nDo Y.\n",
+            encoding="utf-8")
+        (skill,) = skills.load_all(tmp_path)
+        assert skill.rendered.startswith("Apply this when: X happens.")
+        assert "Do Y." in skill.rendered
+
+    def test_absent_when_leaves_body_untouched(self, tmp_path):
+        (tmp_path / "a.md").write_text(
+            "---\nname: A\ncategory: Core\ndescription: d\n---\n\nDo Y.\n", encoding="utf-8")
+        (skill,) = skills.load_all(tmp_path)
+        assert skill.rendered == "Do Y."
+
+    def test_compose_uses_rendered_not_raw_body(self, tmp_path):
+        (tmp_path / "a.md").write_text(
+            "---\nname: A\ncategory: Core\ndescription: d\nwhen: X.\n---\n\nDo Y.\n",
+            encoding="utf-8")
+        out = skills.compose("base", skills.load_all(tmp_path))
+        assert "Apply this when: X." in out
+
+    def test_every_shipped_skill_states_when_it_applies(self):
+        missing = [s.name for s in skills.load_all() if not s.when.strip()]
+        assert not missing, f"no trigger condition: {missing}"
+
+    def test_token_cost_counts_the_trigger_line(self, tmp_path):
+        base = "---\nname: A\ncategory: Core\ndescription: d\n{}---\n\n" + "word " * 100 + "\n"
+        (tmp_path / "a.md").write_text(base.format(""), encoding="utf-8")
+        plain = skills.load_all(tmp_path)[0].approx_tokens
+        (tmp_path / "a.md").write_text(base.format("when: " + "x " * 40 + "\n"), encoding="utf-8")
+        assert skills.load_all(tmp_path)[0].approx_tokens > plain

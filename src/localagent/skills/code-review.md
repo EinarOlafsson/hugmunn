@@ -2,6 +2,7 @@
 name: Code review
 category: Coding
 description: Review checklist that finds real defects instead of style opinions.
+when: asked to review, critique, or check code for problems.
 default: false
 ---
 

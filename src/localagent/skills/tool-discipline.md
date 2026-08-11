@@ -2,6 +2,7 @@
 name: Tool discipline
 category: Core
 description: When to reach for a tool and when to answer directly. Reduces both over- and under-calling.
+when: any turn where a tool is available.
 default: true
 ---
 

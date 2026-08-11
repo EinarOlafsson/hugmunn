@@ -2,6 +2,7 @@
 name: Scientific writing
 category: Writing
 description: Manuscript and figure-legend conventions for life-science papers.
+when: drafting or editing a manuscript, abstract, or figure legend.
 default: false
 ---
 

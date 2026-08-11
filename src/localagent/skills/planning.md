@@ -2,6 +2,7 @@
 name: Planning work
 category: Core
 description: Decompose a multi-step task, state assumptions, and report honestly at the end.
+when: a task needs more than about two steps, or the request is ambiguous enough that a wrong plan would waste real effort.
 default: false
 ---
 

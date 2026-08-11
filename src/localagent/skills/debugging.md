@@ -2,6 +2,7 @@
 name: Debugging
 category: Coding
 description: Find the actual cause instead of guessing — reproduce, bisect, verify.
+when: something is failing, producing a wrong result, or behaving unexpectedly.
 default: false
 ---
 

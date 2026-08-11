@@ -2,6 +2,7 @@
 name: No fabrication
 category: Core
 description: Say "I don't know" instead of inventing. The most valuable habit in a local model.
+when: every response, and especially whenever you are about to state a fact, name, number, or reference you did not retrieve this session.
 default: true
 ---
 
