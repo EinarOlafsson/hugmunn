@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import html as html_mod
 import ipaddress
+from pathlib import Path
 import re
 import socket
 from urllib.parse import quote_plus, urlparse
@@ -132,6 +133,126 @@ def web_fetch(_workdir: str, url: str, max_chars: int = MAX_PAGE_CHARS) -> str:
     text = html_to_text(body) if "html" in ctype.lower() else body
     header = f"{response.url}\n{'-' * 60}\n"
     return header + _clip(text, int(max_chars))
+
+
+_VQD = re.compile(r'vqd=["\']?([\d-]+)["\']?')
+
+
+def image_search(_workdir: str, query: str, max_results: int = 12) -> str:
+    """Image search via DuckDuckGo's JSON endpoint.
+
+    Two requests are required: the endpoint rejects anything without a ``vqd``
+    token, which is only obtainable by first loading the search page.
+    """
+    try:
+        with httpx.Client(
+            timeout=TIMEOUT, follow_redirects=True, headers={"User-Agent": UA}
+        ) as client:
+            landing = client.get(
+                "https://duckduckgo.com/", params={"q": query, "iax": "images", "ia": "images"}
+            )
+            match = _VQD.search(landing.text)
+            if match is None:
+                raise WebError(
+                    "could not obtain a search token — DuckDuckGo may have "
+                    "changed its page. Try web_search instead."
+                )
+            payload = client.get(
+                "https://duckduckgo.com/i.js",
+                params={"l": "us-en", "o": "json", "q": query,
+                        "vqd": match.group(1), "f": ",,,", "p": "1"},
+                headers={"Referer": "https://duckduckgo.com/"},
+            ).json()
+    except httpx.HTTPError as exc:
+        raise WebError(f"image search failed: {exc}") from exc
+    except ValueError as exc:
+        raise WebError(f"image search returned unparseable data: {exc}") from exc
+
+    rows = []
+    for item in (payload.get("results") or [])[: int(max_results)]:
+        rows.append(
+            f"{len(rows) + 1}. {item.get('title', '(untitled)')}\n"
+            f"   image:  {item.get('image')}\n"
+            f"   page:   {item.get('url')}\n"
+            f"   size:   {item.get('width')}x{item.get('height')}"
+        )
+    if not rows:
+        return f"No images found for {query!r}."
+    return _clip(f"Image results for {query!r}:\n\n" + "\n\n".join(rows))
+
+
+# Matches both a .pdf extension and extensionless PDF routes like arXiv's
+# /pdf/2401.12345 — the latter is common enough that an extension-only pattern
+# silently finds nothing on major preprint servers.
+_PDF_HREF = re.compile(
+    r'href=["\']([^"\']*?(?:\.pdf(?:\?[^"\']*)?|/pdf/[^"\']+))["\']', re.IGNORECASE
+)
+
+
+def download_pdfs(
+    workdir: str, url: str, subdir: str = "pdfs", max_files: int = 10
+) -> str:
+    """Find every PDF linked from a page and download them into the workdir.
+
+    Downloads land under ``workdir`` — never an arbitrary path — because this
+    tool writes files and the destination must not be model-controlled.
+    """
+    from urllib.parse import urljoin
+
+    _assert_public(url)
+
+    # Validate the destination *before* any network work, so a traversal
+    # attempt fails fast and is caught even when the page has no PDF links.
+    root = Path(workdir).expanduser().resolve()
+    dest = (root / subdir).resolve()
+    if dest != root and root not in dest.parents:
+        raise WebError(
+            f"destination {subdir!r} resolves outside the working directory ({root})"
+        )
+
+    try:
+        with httpx.Client(
+            timeout=TIMEOUT, follow_redirects=True, headers={"User-Agent": UA}
+        ) as client:
+            page = client.get(url)
+            if page.status_code >= 400:
+                raise WebError(f"HTTP {page.status_code} fetching {url}")
+
+            links, seen = [], set()
+            for href in _PDF_HREF.findall(page.text):
+                absolute = urljoin(str(page.url), html_mod.unescape(href))
+                if absolute not in seen:
+                    seen.add(absolute)
+                    links.append(absolute)
+            if not links:
+                return f"No PDF links found on {url}"
+
+            dest.mkdir(parents=True, exist_ok=True)
+
+            rows, saved = [], 0
+            for link in links[: int(max_files)]:
+                name = Path(urlparse(link).path).name or f"file{saved}.pdf"
+                name = "".join(c for c in name if c.isalnum() or c in "._-")[:120]
+                try:
+                    _assert_public(link)
+                    resp = client.get(link)
+                    if resp.status_code >= 400:
+                        rows.append(f"  HTTP {resp.status_code}  {link}")
+                        continue
+                    body = resp.content[:MAX_BYTES]
+                    (dest / name).write_bytes(body)
+                    saved += 1
+                    rows.append(f"  saved {name}  ({len(body) / 1e6:.1f} MB)")
+                except (httpx.HTTPError, WebError, OSError) as exc:
+                    rows.append(f"  failed {link}: {exc}")
+    except httpx.HTTPError as exc:
+        raise WebError(f"request failed: {exc}") from exc
+
+    header = (
+        f"{len(links)} PDF link(s) on {url}; downloaded {saved} to {dest}\n"
+        + ("" if len(links) <= max_files else f"({len(links) - max_files} not fetched — raise max_files)\n")
+    )
+    return _clip(header + "\n".join(rows))
 
 
 _RESULT = re.compile(

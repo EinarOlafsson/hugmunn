@@ -2,7 +2,7 @@
 name: Web research
 category: Web
 description: How to search and read effectively — query phrasing, source quality, citation.
-default: false
+default: true
 ---
 
 Search when the answer depends on current information, on anything after your

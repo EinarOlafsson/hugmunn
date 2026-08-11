@@ -102,3 +102,48 @@ class TestToolRegistration:
         out = tools.execute("web_fetch", {"url": "http://127.0.0.1/"}, "/tmp")
         assert out.startswith("Error:")
         assert "non-public" in out
+
+
+class TestPdfLinkDetection:
+    def test_extension_links_matched(self):
+        found = web._PDF_HREF.findall('<a href="/docs/paper.pdf">x</a>')
+        assert found == ["/docs/paper.pdf"]
+
+    def test_extensionless_pdf_route_matched(self):
+        """arXiv links look like /pdf/2401.12345 with no extension."""
+        found = web._PDF_HREF.findall('<a href="/pdf/2608.07344">x</a>')
+        assert found == ["/pdf/2608.07344"]
+
+    def test_query_string_tolerated(self):
+        found = web._PDF_HREF.findall('<a href="/get.pdf?id=7">x</a>')
+        assert found == ["/get.pdf?id=7"]
+
+    def test_non_pdf_ignored(self):
+        assert web._PDF_HREF.findall('<a href="/page.html">x</a>') == []
+
+
+class TestDownloadDestination:
+    def test_traversal_rejected_before_any_request(self, tmp_path):
+        """Must fail on the path alone — not only when the page has PDF links."""
+        from localagent.core import tools
+        out = tools.execute(
+            "download_pdfs",
+            {"url": "https://example.com/", "subdir": "../../etc"},
+            str(tmp_path),
+        )
+        assert out.startswith("Error:") and "outside the working directory" in out
+
+    def test_absolute_destination_rejected(self, tmp_path):
+        from localagent.core import tools
+        out = tools.execute(
+            "download_pdfs", {"url": "https://example.com/", "subdir": "/etc"}, str(tmp_path)
+        )
+        assert out.startswith("Error:")
+
+    def test_download_pdfs_requires_approval(self):
+        from localagent.core import tools
+        assert tools.BY_NAME["download_pdfs"].requires_approval
+
+    def test_image_search_registered(self):
+        from localagent.core import tools
+        assert "image_search" in tools.BY_NAME

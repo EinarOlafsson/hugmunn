@@ -301,6 +301,42 @@ TOOLS: tuple[Tool, ...] = (
         },
         run=web.web_fetch,
     ),
+    Tool(
+        name="image_search",
+        description=(
+            "Search the web for images. Returns image URLs, the page each came "
+            "from, and pixel dimensions. Use when the user wants pictures, "
+            "diagrams, or reference imagery rather than text."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "What to search for."},
+                "max_results": {"type": "integer", "description": "How many to return. Default 12."},
+            },
+            "required": ["query"],
+        },
+        run=web.image_search,
+    ),
+    Tool(
+        name="download_pdfs",
+        description=(
+            "Find every PDF linked from a web page and download them into the "
+            "working directory. Use for collecting papers from a publication "
+            "list, lab page, or search-result page. Requires user approval."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "Page to scan for PDF links."},
+                "subdir": {"type": "string", "description": "Folder under the working directory. Default 'pdfs'."},
+                "max_files": {"type": "integer", "description": "Cap on downloads. Default 10."},
+            },
+            "required": ["url"],
+        },
+        run=web.download_pdfs,
+        requires_approval=True,
+    ),
 )
 
 BY_NAME: dict[str, Tool] = {t.name: t for t in TOOLS}
