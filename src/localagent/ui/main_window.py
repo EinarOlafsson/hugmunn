@@ -156,6 +156,12 @@ class MainWindow(QMainWindow):
         settings.setShortcut(QKeySequence("Ctrl+,"))
         settings.triggered.connect(self._open_settings)
         app_menu.addAction(settings)
+        runtime = QAction("Set up llama-server…", self)
+        runtime.setToolTip("Point localagent at the binary that serves local "
+                           "models, or find out how to build one.")
+        runtime.triggered.connect(self._setup_runtime)
+        app_menu.addAction(runtime)
+
         locate = QAction("Find my models…", self)
         locate.setToolTip("Point at a folder of .gguf files and record every "
                           "model found in it.")
@@ -859,6 +865,13 @@ class MainWindow(QMainWindow):
         self.resources.restyle()
         self.composer_bar.setStyleSheet(f"border-top: 1px solid {theme.active()['border']};")
 
+    def _setup_runtime(self) -> None:
+        from .runtime_dialog import RuntimeDialog
+
+        if RuntimeDialog(self).exec() == QDialog.DialogCode.Accepted:
+            self.settings.save()
+            self._refresh_models()
+
     def _find_models(self) -> None:
         """Scan a folder and record every model in it, in one step.
 
@@ -933,7 +946,22 @@ class MainWindow(QMainWindow):
             return
         ready = spec.readiness()
         if not ready.can_launch:
-            if ready.weights:
+            if ready.weights and not ready.runtime:
+                # Weights present, nothing to run them with. Offer the fix
+                # rather than restating the problem.
+                answer = QMessageBox.question(
+                    self, "No llama-server on this machine",
+                    f"{spec.label}\n\nThe weights are here:\n{spec.model_path}\n\n"
+                    f"What is missing is llama-server, the llama.cpp binary that "
+                    f"actually serves them. It has to be built for this machine, "
+                    f"which is why copying the weights across was not enough.\n\n"
+                    f"Set it up now?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Yes,
+                )
+                if answer == QMessageBox.StandardButton.Yes:
+                    self._setup_runtime()
+            elif ready.weights:
                 QMessageBox.warning(
                     self, "Cannot start yet",
                     f"{spec.label}\n\nThe weights are here:\n{spec.model_path}\n\n"

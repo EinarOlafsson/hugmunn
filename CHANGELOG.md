@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.9.3
+
+Makes "no llama-server on this machine" fixable from inside the app.
+
+Weights copy between machines fine — 87 GB is only slow. The binary does not:
+it is compiled against one machine's CPU features and CUDA version, which is
+why it is gitignored inside the models repo. So a second machine reliably ends
+up with correct weights and nothing to run them with, and *"build llama.cpp or
+set LLAMA_SERVER"* is accurate without being any help.
+
+- **localagent → Set up llama-server…** searches the conventional locations,
+  reports what each build says about itself (`--version` tells you whether it
+  has CUDA), lets you browse to one, and otherwise gives the exact build
+  commands — with the CUDA architecture filled in for the GPU present.
+- Pressing **Start server** in that state now offers the dialog instead of
+  restating the problem.
+- A chosen binary is **remembered**, so it no longer has to be exported into
+  the environment before launching the GUI. Priority: what you chose, then
+  `$LLAMA_SERVER`, then `bin/`, then PATH, then conventional locations.
+- A chosen path that has since been deleted no longer shadows a working one.
+- `*.gguf` is gitignored. An 87 GB weight file landed in the working tree on
+  another machine — the download dialog takes any folder, and the repo is a
+  reasonable-looking choice — and `git add -A` would have tried to stage it.
+
+The models repo gains `scripts/setup-llama.sh`, which clones and builds
+llama.cpp for the card actually present. Reading the compute capability from
+`nvidia-smi` rather than building for every architecture is the difference
+between a six-minute build and the better part of an hour, and it
+distinguishes "no GPU" from "GPU but no nvcc" — the second is a missing CUDA
+toolkit and worth fixing rather than silently falling back to CPU.
+
 ## 0.9.2
 
 Fixes the "1 sibling is not beside it" message, which was wrong twice over.

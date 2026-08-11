@@ -8,3 +8,9 @@ dist/
 venv/
 *.log
 .localagent/
+
+# Model weights. An 87 GB .gguf landed in this working tree on another
+# machine -- the download dialog defaults to a folder the user picks, and the
+# repo is a reasonable-looking choice. `git add -A` would then try to stage it.
+*.gguf
+*.gguf.part

@@ -102,23 +102,62 @@ def scan_for_weights(folder: str | Path, max_depth: int = 3) -> dict[str, Path]:
     return found
 
 
+# A llama-server the user pointed at, remembered across restarts. Module-level
+# for the same reason as _MODEL_PATHS: readiness is asked from many places
+# that have no Settings handle.
+_RUNTIME_PATH: Path | None = None
+
+
+def set_runtime(path: str | Path | None) -> None:
+    """Record a llama-server binary. None clears it."""
+    global _RUNTIME_PATH
+    _RUNTIME_PATH = Path(path).expanduser() if path else None
+
+
+def runtime_override() -> Path | None:
+    return _RUNTIME_PATH
+
+
+#: Places a llama-server plausibly lives when it was not built into the models
+#: repo. Ollama ships its own llama runner, and conda/pip packages land in the
+#: environment's bin -- both are already on this machine when a user thinks
+#: they have "no llama.cpp".
+_RUNTIME_CANDIDATES = (
+    "~/.local/bin/llama-server",
+    "/usr/local/bin/llama-server",
+    "/opt/homebrew/bin/llama-server",
+    "~/llama.cpp/build/bin/llama-server",
+    "~/src/llama.cpp/build/bin/llama-server",
+)
+
+
 def find_runtime() -> Path | None:
     """A ``llama-server`` binary this machine can actually execute.
 
-    Checked in the order a user would expect to win: an explicit override,
-    the build under ``bin/``, then whatever is on PATH. ``bin/`` is a symlink
-    into ``src/llama.cpp/build/`` and both are gitignored, so a fresh clone of
-    the models repo has the scripts and the weights and no binary at all --
-    which is exactly the state a second machine starts in.
+    Checked in the order a user would expect to win: what they pointed at,
+    the environment, the build under ``bin/``, PATH, then a short list of
+    conventional locations. ``bin/`` is a symlink into ``src/llama.cpp/build/``
+    and both are gitignored, so a fresh clone of the models repo has the
+    scripts and the weights and no binary at all -- which is exactly the state
+    a second machine starts in.
     """
-    override = os.environ.get("LLAMA_SERVER", "").strip()
-    if override and os.access(override, os.X_OK):
-        return Path(override)
-    local = MODELS_ROOT / "bin" / "llama-server"
-    if local.is_file() and os.access(local, os.X_OK):
-        return local
-    found = shutil.which("llama-server")
-    return Path(found) if found else None
+    def usable(candidate) -> Path | None:
+        path = Path(candidate).expanduser()
+        return path if path.is_file() and os.access(path, os.X_OK) else None
+
+    if _RUNTIME_PATH is not None and (found := usable(_RUNTIME_PATH)):
+        return found
+    env = os.environ.get("LLAMA_SERVER", "").strip()
+    if env and (found := usable(env)):
+        return found
+    if found := usable(MODELS_ROOT / "bin" / "llama-server"):
+        return found
+    if which := shutil.which("llama-server"):
+        return Path(which)
+    for candidate in _RUNTIME_CANDIDATES:
+        if found := usable(candidate):
+            return found
+    return None
 
 
 @dataclass(frozen=True)
@@ -470,6 +509,9 @@ class Settings:
     # Absolute path to each model's primary weight file, when the user has
     # put it somewhere other than the launch script's default.
     model_paths: dict[str, str] = field(default_factory=dict)
+    # A llama-server binary the user pointed at, when it is not on PATH and
+    # not built into the models repo.
+    llama_server: str = ""
     effort_level: int = 2      # core.effort.Effort
     autonomy_level: int = 2    # core.autonomy.Autonomy
     custom_base_url: str = ""
@@ -493,10 +535,12 @@ class Settings:
         settings = cls(**{k: v for k, v in data.items() if k in known})
         for key, path in (settings.model_paths or {}).items():
             set_model_path(key, path)
+        set_runtime(settings.llama_server or None)
         return settings
 
     def save(self) -> None:
         self.model_paths = all_model_paths()
+        self.llama_server = str(runtime_override() or "")
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         tmp = CONFIG_FILE.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(asdict(self), indent=2), encoding="utf-8")
