@@ -11,7 +11,8 @@ from PyQt6.QtGui import QAction, QColor, QKeySequence, QShortcut, QTextOption
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
     QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit,
-    QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSplitter, QTextEdit,
+    QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QSplitter,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -21,6 +22,7 @@ from ..core import autonomy as autonomykit
 from ..core import cleanup
 from ..core import credentials
 from ..core import effort as effortkit
+from ..core import context as contextkit
 from ..core import providers
 from ..core import setup_llama
 from ..config import ModelSpec, Settings
@@ -326,6 +328,56 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.autonomy_blurb)
         self._on_effort_changed()
         self._on_autonomy_changed()
+
+        layout.addSpacing(10)
+        layout.addWidget(self._heading("Context"))
+        row = QHBoxLayout()
+        self.context_spin = QSpinBox()
+        self.context_spin.setRange(2048, 1_048_576)
+        self.context_spin.setSingleStep(4096)
+        self.context_spin.setGroupSeparatorShown(True)
+        self.context_spin.setSuffix(" tokens")
+        self.context_spin.setToolTip(
+            "The context window to ask the model for.\n"
+            "Applied at launch — llama.cpp allocates the KV cache once, when\n"
+            "the model loads, so changing it needs a server restart.\n"
+            "Bigger costs VRAM and prompt-processing time."
+        )
+        self.context_spin.valueChanged.connect(self._on_context_size_changed)
+        row.addWidget(self.context_spin, 1)
+        reset = QPushButton("Default")
+        reset.setToolTip("Use this model's own context size.")
+        reset.clicked.connect(self._reset_context_size)
+        row.addWidget(reset)
+        layout.addLayout(row)
+
+        self.context_meter = QProgressBar()
+        self.context_meter.setRange(0, 100)
+        self.context_meter.setFormat("%p% of context used")
+        self.context_meter.setToolTip(
+            "How much of the window this conversation occupies, including\n"
+            "the system prompt, enabled skills and tool schemas."
+        )
+        layout.addWidget(self.context_meter)
+
+        self.context_note = QLabel()
+        self.context_note.setObjectName("blurb")
+        self.context_note.setWordWrap(True)
+        layout.addWidget(self.context_note)
+
+        self.context_combo = QComboBox()
+        for level in contextkit.Strategy:
+            self.context_combo.addItem(contextkit.LABELS[level], int(level))
+        self.context_combo.setCurrentIndex(
+            max(0, self.context_combo.findData(self.settings.context_strategy)))
+        self.context_combo.currentIndexChanged.connect(self._on_context_strategy)
+        layout.addWidget(self.context_combo)
+
+        self.context_strategy_blurb = QLabel()
+        self.context_strategy_blurb.setObjectName("blurb")
+        self.context_strategy_blurb.setWordWrap(True)
+        layout.addWidget(self.context_strategy_blurb)
+        self._on_context_strategy()
 
         layout.addSpacing(10)
         layout.addWidget(self._heading("Skills"))
@@ -844,6 +896,8 @@ class MainWindow(QMainWindow):
             note += f"  {spec.context // 1000}K context."
         self.model_blurb.setText(note)
         self._sync_tools_for_model(spec)
+        if hasattr(self, 'context_spin'):
+            self._sync_context_controls()
         if hasattr(self, 'skills_summary'):
             self._update_skills_button()
         if hasattr(self, 'effort_blurb'):
@@ -1153,6 +1207,84 @@ class MainWindow(QMainWindow):
             + autonomykit.cloud_note(level, self._provider().value)
         )
 
+    # ------------------------------------------------------------- context
+
+    def _context_budget(self) -> contextkit.Budget:
+        """The room this conversation actually has.
+
+        The window minus what is re-sent every request -- system prompt,
+        skills, tool schemas -- minus somewhere to put the reply.
+        """
+        spec = self._current_spec()
+        limit = spec.context_tokens if spec else 0
+        if spec is not None and not self._is_cloud():
+            limit = spec.effective_ctx_size
+        preamble = (
+            contextkit.estimate_tokens(self.settings.system_prompt)
+            + skillkit.total_tokens(self._active_skills())
+            + self._tool_schema_tokens()
+            + self._effort_tokens()
+        )
+        return contextkit.Budget(limit or 8192, preamble,
+                                 self.settings.reserve_output)
+
+    def _context_strategy(self) -> contextkit.Strategy:
+        return contextkit.Strategy(self.context_combo.currentData())
+
+    def _on_context_size_changed(self, value: int) -> None:
+        spec = self._current_spec()
+        if spec is None or self._is_cloud():
+            return
+        config.set_context_size(spec.key, value if value != spec.ctx_size else None)
+        self.settings.save()
+        self._update_context_meter()
+        if self.server.is_running:
+            self.context_note.setText(
+                "Restart the server to apply — the KV cache is allocated at load.")
+
+    def _reset_context_size(self) -> None:
+        spec = self._current_spec()
+        if spec is None or self._is_cloud():
+            return
+        config.set_context_size(spec.key, None)
+        self.settings.save()
+        self._sync_context_controls()
+
+    def _on_context_strategy(self) -> None:
+        level = self._context_strategy()
+        self.settings.context_strategy = int(level)
+        self.settings.save()
+        self.context_strategy_blurb.setText(contextkit.BLURBS[level])
+
+    def _sync_context_controls(self) -> None:
+        """Point the controls at whichever model is selected."""
+        spec = self._current_spec()
+        cloud = self._is_cloud()
+        self.context_spin.setEnabled(spec is not None and not cloud)
+        if spec is None:
+            return
+        self.context_spin.blockSignals(True)
+        self.context_spin.setValue(
+            spec.context if cloud else spec.effective_ctx_size)
+        self.context_spin.blockSignals(False)
+        if cloud:
+            self.context_spin.setToolTip(
+                "Fixed by the provider for this model; it cannot be changed here.")
+        self._update_context_meter()
+
+    def _update_context_meter(self) -> None:
+        budget = self._context_budget()
+        used = contextkit.total_tokens(self.history)
+        percent = int(100 * used / budget.available) if budget.available else 100
+        self.context_meter.setValue(min(100, percent))
+        detail = (f"{used:,} of {budget.available:,} usable "
+                  f"({budget.preamble:,} for skills and tools)")
+        if budget.available <= 0:
+            detail = (f"\u26a0 The system prompt, skills and tool schemas come to "
+                      f"{budget.preamble:,} tokens, which is the whole window. "
+                      f"Disable skills or raise the context size.")
+        self.context_note.setText(detail)
+
     def _on_tools_toggled(self, enabled: bool) -> None:
         self.settings.tools_enabled = enabled
         self.settings.save()
@@ -1171,6 +1303,7 @@ class MainWindow(QMainWindow):
         self.history.clear()
         self.transcript.clear()
         self.stats.clear()
+        self._update_context_meter()
 
     # ------------------------------------------------------------ the turn
 
@@ -1234,6 +1367,23 @@ class MainWindow(QMainWindow):
         self.transcript.add(UserBubble(text))
         self.history.append({"role": "user", "content": text})
 
+        # Fit the conversation before sending. Doing it here rather than
+        # inside the agent means the transcript can say what was lost, which
+        # a silently-shortened history cannot.
+        outcome = contextkit.compress(
+            self.history, self._context_budget(), self._context_strategy(),
+            summarise=self._summarise_span,
+        )
+        if outcome.overflowed:
+            self.transcript.add(Notice(outcome.note, style.ERR))
+            self.transcript.follow()
+            self._update_context_meter()
+            return
+        if outcome.dropped:
+            self.history[:] = outcome.history
+            self.transcript.add(Notice(outcome.note, style.WARN))
+            self.transcript.follow()
+
         spec = self._current_spec()
         assert spec is not None
         agent = Agent(
@@ -1267,6 +1417,25 @@ class MainWindow(QMainWindow):
         self.stats.setText("Generating…")
         self._sync_controls()
         worker.start()
+
+    def _summarise_span(self, messages: list[dict[str, Any]]) -> str:
+        """Ask the current model to summarise the turns being dropped.
+
+        Synchronous and on the GUI thread, which is acceptable only because it
+        happens between turns rather than during one, and a failure falls back
+        to plain dropping rather than losing the message.
+        """
+        client = self._build_client()
+        if client is None:
+            return ""
+        parts = []
+        for event in client.stream(contextkit.summary_request(messages),
+                                   max_tokens=800):
+            if event.kind == "content":
+                parts.append(event.text)
+            elif event.kind == "error":
+                return ""
+        return "".join(parts)
 
     def _cancel(self) -> None:
         if self._agent_worker is not None:
@@ -1327,6 +1496,7 @@ class MainWindow(QMainWindow):
             self._agent_worker.provide_approval(allowed)
 
     def _on_turn_finished(self, timings: dict) -> None:
+        self._update_context_meter()
         if self._thinking is not None:
             self._thinking.finish()
             self._thinking = None

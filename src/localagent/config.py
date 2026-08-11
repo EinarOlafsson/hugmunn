@@ -41,6 +41,27 @@ def all_model_paths() -> dict[str, str]:
     return {k: str(v) for k, v in _MODEL_PATHS.items()}
 
 
+# Context window per model, when overridden. Module-level for the same reason
+# as _MODEL_PATHS: read from places that have no Settings handle.
+_CONTEXT_SIZES: dict[str, int] = {}
+
+
+def set_context_size(key: str, size: int | None) -> None:
+    """Override a model's context window. None or 0 restores its default."""
+    if size:
+        _CONTEXT_SIZES[key] = int(size)
+    else:
+        _CONTEXT_SIZES.pop(key, None)
+
+
+def context_size_override(key: str) -> int:
+    return _CONTEXT_SIZES.get(key, 0)
+
+
+def all_context_sizes() -> dict[str, int]:
+    return dict(_CONTEXT_SIZES)
+
+
 _SHARD_RE = re.compile(r"^(?P<stem>.+)-(?P<index>\d{5})-of-(?P<total>\d{5})\.gguf$")
 
 
@@ -251,6 +272,27 @@ class ModelSpec:
     def base_url(self) -> str:
         return f"http://127.0.0.1:{self.port}"
 
+    @property
+    def effective_ctx_size(self) -> int:
+        """The context window to actually ask for.
+
+        A user override wins over the model's default. Applied at launch, so
+        changing it needs a server restart -- llama.cpp allocates the KV cache
+        once, at load.
+        """
+        return _CONTEXT_SIZES.get(self.key) or self.ctx_size
+
+    def context_arguments(self) -> list[str]:
+        """Extra args appended to a *script* launch to apply an override.
+
+        The scripts hardcode a --ctx-size. Appending another one works because
+        they forward "$@" and llama.cpp takes the last occurrence -- the same
+        mechanism the weight-path override uses, and for the same reason: the
+        script keeps its tuning and is never rewritten.
+        """
+        override = context_size_override(self.key)
+        return ["--ctx-size", str(override)] if override else []
+
     def launch_arguments(self) -> list[str]:
         """The flags a direct launch needs, when there is no script.
 
@@ -260,7 +302,7 @@ class ModelSpec:
         placement are not, because each of those turns a working model into
         an apparently broken one.
         """
-        args = ["--fit", "on", "--ctx-size", str(self.ctx_size),
+        args = ["--fit", "on", "--ctx-size", str(self.effective_ctx_size),
                 "--flash-attn", "on",
                 # Halves the KV cache. At 16K context that is gigabytes, and
                 # on a card the model already nearly fills it is the
@@ -593,6 +635,13 @@ class Settings:
     cloud_models: dict[str, str] = field(default_factory=dict)
     # One of ui.theme.THEMES, or "system".
     theme: str = "dark"
+    # Context window per model, when the user has overridden the default.
+    context_sizes: dict[str, int] = field(default_factory=dict)
+    # core.context.Strategy — what to do when a conversation stops fitting.
+    context_strategy: int = 2
+    # Tokens held back for the reply. A window that is full to the last token
+    # has nowhere to put the answer.
+    reserve_output: int = 2048
     # API keys are deliberately NOT here. See core/credentials.py: this file
     # is the one a user might copy between machines or paste into a bug report.
 
@@ -607,11 +656,14 @@ class Settings:
         for key, path in (settings.model_paths or {}).items():
             set_model_path(key, path)
         set_runtime(settings.llama_server or None)
+        for key, size in (settings.context_sizes or {}).items():
+            set_context_size(key, size)
         return settings
 
     def save(self) -> None:
         self.model_paths = all_model_paths()
         self.llama_server = str(runtime_override() or "")
+        self.context_sizes = all_context_sizes()
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         tmp = CONFIG_FILE.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(asdict(self), indent=2), encoding="utf-8")

@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.11.0
+
+Context controls, context compression, and generated launch scripts.
+
+### Context
+
+- **Context size** is a control in the sidebar, per model, remembered. Applied
+  at launch, because llama.cpp allocates the KV cache once when the model
+  loads — so changing it says it needs a restart rather than appearing to work.
+  On a script launch it is appended as a second `--ctx-size`, the same
+  last-wins mechanism the weight-path override uses, so the script keeps its
+  tuning and is never rewritten.
+- **A usage meter**, counting the system prompt, enabled skills and tool
+  schemas — not just the conversation. That preamble is re-sent on every
+  request and with every skill enabled it has exceeded a 16K window on its
+  own, which used to surface as an unexplained HTTP 400 before a word was
+  typed.
+- **Context handling** when a conversation stops fitting: keep everything and
+  refuse, drop the oldest turns, or replace them with a summary the model
+  writes. What was dropped is said in the transcript rather than silently
+  happening.
+
+The part that is not a preference is *what may be dropped together*. An
+assistant turn that called a tool owns the result that follows it; separating
+them leaves the model looking at a request it never got an answer to, and
+Anthropic rejects it outright — every `tool_use` needs a matching
+`tool_result`. History is compressed in whole turns, and a test asserts the
+two never come apart.
+
+### Launch scripts are generated on first run
+
+0.9.1 could start a model with no script by assembling the command line in
+memory. That worked and was the wrong shape: an argv lasts as long as the
+process, so there is nothing to read and nowhere to put a change. `NCPUMOE` is
+the clearest case — worth several tok/s on the large MoE models, and a knob
+with no handle if the command line is invisible.
+
+The first launch now writes the script instead, in the same dialect as the
+models repo's own: a relocatable `BASE`, a resolved binary, `NCPUMOE` as an
+environment-overridable variable with a comment explaining how to tune it. It
+is **never overwritten** — a script exists to hold tuning, and one that
+regenerates itself would discard the thing it is for.
+
+### Fixed
+
+- The overlap test compared vertical extents rather than rectangles, so two
+  controls side by side in a row read as a collision. It now intersects real
+  geometry.
+- Tests that reload `config` against a temporary models root no longer leak
+  it into the next test — `monkeypatch` restores the environment variable but
+  not the module that already read it, which cost two failures and sixteen
+  silent skips.
+
 ## 0.10.2
 
 "All 49 layers on GPU" and "extremely slow" were not a contradiction.

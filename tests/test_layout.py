@@ -51,16 +51,16 @@ def window(qt_app, tmp_path, monkeypatch):
 
 
 def siblings_of(parent):
-    """Direct children that occupy space, top to bottom."""
+    """Direct children that occupy space, with their rectangles in ``parent``."""
     rows = []
     for child in parent.findChildren(QWidget):
         if child.parent() is not parent or child.isHidden():
             continue
         if child.width() <= 0 or child.height() <= 0:
             continue
-        top = child.mapTo(parent, child.rect().topLeft()).y()
-        rows.append((child, top, child.height()))
-    return sorted(rows, key=lambda row: row[1])
+        rect = child.rect().translated(child.mapTo(parent, child.rect().topLeft()))
+        rows.append((child, rect))
+    return sorted(rows, key=lambda row: (row[1].top(), row[1].left()))
 
 
 def name(widget):
@@ -70,14 +70,22 @@ def name(widget):
 
 
 def overlaps(parent):
-    """Every pair of stacked siblings whose rectangles intersect."""
+    """Every pair of siblings whose rectangles genuinely intersect.
+
+    Rectangles, not vertical extents: two widgets side by side in a row share
+    a vertical band and are not overlapping, which an earlier version of this
+    reported as a fault the moment a spin box gained a button beside it.
+    """
     found = []
     rows = siblings_of(parent)
-    for (upper, top, height), (lower, next_top, _) in zip(rows, rows[1:]):
-        if top + height > next_top:
-            found.append(
-                f"{name(upper)} [{top}..{top + height}] runs into "
-                f"{name(lower)} at {next_top}")
+    for index, (first, a) in enumerate(rows):
+        for second, b in rows[index + 1:]:
+            if b.top() >= a.bottom():
+                break          # sorted by top; nothing later can reach back
+            if a.intersects(b):
+                found.append(
+                    f"{name(first)} {a.getRect()} intersects "
+                    f"{name(second)} {b.getRect()}")
     return found
 
 
@@ -114,7 +122,7 @@ def test_each_meter_stays_inside_its_frame(window, qt_app, height):
     for bar in (meters.cpu, meters.ram, meters.gpu, meters.vram):
         if bar.isHidden():
             continue
-        top = bar.mapTo(meters, bar.rect().topLeft()).y()
+        top = bar.mapTo(meters, bar.rect().topLeft()).y()  # noqa: E501
         assert top >= 0, f"{bar._name} starts {top}px above its frame"
         assert top + bar.height() <= meters.height(), (
             f"at {height}px the {bar._name} meter ends at "

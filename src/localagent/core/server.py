@@ -64,19 +64,25 @@ class ServerManager:
         script = spec.script_path
         if not script.is_file():
             # A second machine routinely has the weights and not the scripts:
-            # they live in a separate repo. Serve them directly rather than
-            # refusing, and say that the per-model tuning is not in play.
-            command = self._direct_command(spec)
-            if command is None:
-                raise ServerError(
-                    f"launch script not found: {script}\n\n"
-                    f"and no llama-server binary was found either. Build "
-                    f"llama.cpp, or set LLAMA_SERVER=/path/to/llama-server."
-                )
-            report(f"no launch script; running llama-server directly")
-            self._spawn(command, spec, script.parent if script.parent.is_dir()
-                        else Path.cwd(), report, timeout, client)
-            return
+            # they live in a separate repo. Write one rather than launching
+            # from an argv that exists only in memory -- a file can be read,
+            # edited and tuned, and NCPUMOE is worth several tok/s on the
+            # large MoE models with nowhere else to put it.
+            from . import scripts
+
+            written = scripts.write(spec, report)
+            if written is None:
+                command = self._direct_command(spec)
+                if command is None:
+                    raise ServerError(
+                        f"launch script not found: {script}\n\n"
+                        f"and no llama-server binary was found either. Build "
+                        f"llama.cpp, or set LLAMA_SERVER=/path/to/llama-server."
+                    )
+                report("running llama-server directly")
+                self._spawn(command, spec, Path.cwd(), report, timeout, client)
+                return
+            script = written
         if not os.access(script, os.X_OK):
             # A missing +x bit is trivially fixable and not worth failing on —
             # three shipped scripts were mode 644 for weeks and simply could
@@ -106,6 +112,10 @@ class ServerManager:
         if override is not None:
             command += ["--model", str(override)]
             report(f"using weights at {override}")
+        context = spec.context_arguments()
+        if context:
+            command += context
+            report(f"context window {context[1]} tokens")
 
         self._spawn(command, spec, script.parent, report, timeout, client)
 
