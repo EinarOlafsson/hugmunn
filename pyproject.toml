@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localagent"
-version = "0.8.0"
+version = "0.9.0"
 description = "Qt desktop client for locally-hosted LLMs served by llama.cpp"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,6 +21,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "pytest-qt>=4.4"]
+# Encrypted API-key storage. Without it keys go to a mode-600 file and the
+# sign-in dialog says so, so this is a real upgrade rather than a requirement.
+keyring = ["keyring>=24.0"]
 
 [project.scripts]
 localagent = "localagent.app:main"

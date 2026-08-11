@@ -1,11 +1,58 @@
 # localagent
 
-A Qt desktop client for the local LLMs served by llama.cpp — chat, streaming,
-and file/shell tool use against models running entirely on your own machine.
+A Qt desktop client for local LLMs and for Claude and ChatGPT — chat,
+streaming, and file/shell tool use, with the same tools and skills whichever
+model is answering.
 
 Built for the model set under `~/.claude/models` (Qwen3.6, Qwen3.5-122B,
 Qwen3-Coder-Next, GLM-4.7-Flash, MiniMax-M2.7), but nothing is specific to those
 weights: anything llama.cpp can serve will work.
+
+## Providers
+
+The model picker has two levels — provider, then the model within it.
+
+| | Local models | Claude | ChatGPT |
+|---|---|---|---|
+| Runs on | this machine | Anthropic's API | OpenAI's API |
+| Needs | weights on disk | an API key | an API key |
+| Privacy | nothing leaves | prompts and tool results are sent | prompts and tool results are sent |
+| Cost | free | per token | per token |
+| Effort tier sets | prompt instructions | thinking budget + instructions | `reasoning_effort` + instructions |
+
+Sign-in happens in the app — pick Claude or ChatGPT and the dialog opens, or
+use **Accounts** in the menu bar. The key is verified before it is saved, by
+listing the models it can reach, and the app then offers **every model your
+account has** rather than a list hardcoded here.
+
+Keys go to your system keyring when there is one, and to a mode-600 file when
+there is not; the dialog says which. They are never written to `settings.json`.
+`ANTHROPIC_API_KEY` and `OPENAI_API_KEY` override anything stored.
+
+Tools and skills are unchanged across providers — they execute on this machine
+whichever model asked for them, so the autonomy policy applies identically.
+What changes is that a file a cloud model reads is a file that provider
+receives, which the sidebar says under the autonomy control.
+
+## Themes
+
+Four palettes — **Dark**, **Light**, **Glass** and **Cell** — plus *Match the
+system*, switchable live from the **View** menu. The palettes and the contrast
+arithmetic come from spaCR; every one is checked against WCAG AA on every
+surface a colour can land on, and a theme that fails is a test failure rather
+than a matter of taste.
+
+## Releasing resources
+
+**localagent → Release RAM / VRAM / CPU / Check disk space**, also in Settings.
+Each names what it will do before doing it and reports what was actually
+freed, measured before and after.
+
+These free what localagent owns and nothing else. No process is killed, nothing
+needs root, and the kernel's page cache is left alone. Releasing VRAM means
+stopping the model server — llama.cpp cannot unload part of a model — and a
+server that was already running when localagent started is left alone, because
+stopping it is not this button's decision.
 
 ## Install
 

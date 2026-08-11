@@ -111,6 +111,34 @@ class AgentWorker(QThread):
                 self.turn_finished.emit(event.timings)
 
 
+class CatalogueWorker(QThread):
+    """Validates an API key by asking the provider what it can reach.
+
+    Doubles as the sign-in check: a key that can list models is a key that
+    works, and the list is needed anyway. Off the GUI thread because a
+    request to an unreachable host sits there for the full timeout, and a
+    frozen sign-in dialog reads as a crash.
+    """
+
+    ok = pyqtSignal(object)   # tuple[CloudModel, ...]
+    failed = pyqtSignal(str)
+
+    def __init__(self, provider, api_key: str, parent=None) -> None:
+        super().__init__(parent)
+        self._provider = provider
+        self._key = api_key
+
+    def run(self) -> None:
+        from ..core import providers
+
+        try:
+            self.ok.emit(providers.fetch_catalogue(self._provider, self._key))
+        except providers.ProviderError as exc:
+            self.failed.emit(str(exc))
+        except Exception as exc:  # noqa: BLE001
+            self.failed.emit(f"{type(exc).__name__}: {exc}")
+
+
 class DownloadWorker(QThread):
     """Fetches a model's weights, reporting byte-level progress."""
 

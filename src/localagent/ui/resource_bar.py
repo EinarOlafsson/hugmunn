@@ -104,6 +104,16 @@ class ResourceBar(QFrame):
         self._timer.start(self.INTERVAL_MS)
         self.refresh()
 
+    def restyle(self) -> None:
+        """Repaint after a theme change.
+
+        The meters read their colours inside ``paintEvent``, which resolves
+        against the live palette, so nothing needs recomputing — they just
+        have to be asked to draw again.
+        """
+        for bar in (self.cpu, self.ram, self.gpu, self.vram):
+            bar.update()
+
     def refresh(self) -> None:
         snap = self._sampler.sample()
         self.cpu.set_value(snap.cpu_percent, f"{snap.cpu_percent:.0f}%")

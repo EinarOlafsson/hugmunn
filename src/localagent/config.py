@@ -350,6 +350,15 @@ class Settings:
     effort_level: int = 2      # core.effort.Effort
     autonomy_level: int = 2    # core.autonomy.Autonomy
     custom_base_url: str = ""
+    # "local" | "anthropic" | "openai" — the first level of the model picker.
+    provider: str = "local"
+    # Last model chosen within each cloud provider, so switching provider and
+    # back does not reset to whatever happens to be first in the list.
+    cloud_models: dict[str, str] = field(default_factory=dict)
+    # One of ui.theme.THEMES, or "system".
+    theme: str = "dark"
+    # API keys are deliberately NOT here. See core/credentials.py: this file
+    # is the one a user might copy between machines or paste into a bug report.
 
     @classmethod
     def load(cls) -> "Settings":

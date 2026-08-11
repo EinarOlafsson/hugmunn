@@ -1,5 +1,91 @@
 # Changelog
 
+## 0.9.0
+
+Claude and ChatGPT alongside the local models, and spaCR's themes.
+
+### Cloud providers
+
+- The model picker is now two levels: **provider** (Local models / Claude /
+  ChatGPT) and then the model within it. Three lists chosen on entirely
+  different grounds — VRAM on one side, price and capability on the other —
+  do not belong flattened into one dropdown of thirty entries.
+- **Sign-in happens in the app.** Selecting Claude or ChatGPT while signed
+  out opens the dialog, which verifies the key by listing what it can reach
+  before saving it. A key that is stored and wrong fails later, mid
+  conversation, as an opaque 401.
+- **Every model the account can reach**, not a shipped list. The catalogue is
+  fetched from the provider on sign-in, so a model released after this was
+  written appears and one the account cannot use does not. The built-in list
+  is a fallback that exists so the dropdown is not empty.
+- API keys go to the system keyring when there is one, and to a mode-600 file
+  when there is not — created 0600 rather than chmod'ed after, so there is no
+  window where it is world-readable. Never to `settings.json`, which is the
+  file a user copies between machines. `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`
+  override stored state.
+- A cloud model is marked as one, in the sidebar, every time. That the
+  conversation leaves the machine is the one property of a model choice that
+  is invisible in the answer.
+
+The OpenAI adapter is thin — its Chat Completions API is the shape llama.cpp
+imitates. Anthropic's is a genuine translation: `/v1/messages`, `x-api-key`,
+the system prompt as a top-level field, `input_schema` rather than
+`parameters`, `tool_use` blocks rather than `tool_calls`, and no `tool` role
+at all. Results ride back as `tool_result` blocks inside a *user* message, and
+every result for one assistant turn must arrive together — so consecutive
+results are merged. Sending them separately works for a single call and fails
+the moment a model requests two tools at once.
+
+### Effort and autonomy on cloud models
+
+- **Effort** was prompt-only, because a local model has no dial. Claude and
+  GPT do, so the tier now sets one: an extended-thinking budget (0 / 4K / 16K
+  / 32K tokens) on Anthropic, `reasoning_effort` (minimal / low / medium /
+  high) on OpenAI. The prompt text is still sent — the budget decides how long
+  the model may think, the instructions decide what to do with the time.
+  A budget larger than the model's output ceiling is clamped rather than sent,
+  leaving room to answer; spending the whole allowance on thinking ends the
+  turn mid-thought and shows nothing.
+- **Autonomy** needs no mapping and the sidebar now says why: tools execute on
+  *this* machine whichever model asked, so the policy is unchanged and no API
+  can widen it. What does change is the consequence of a read — a file a cloud
+  model reads is a file that provider receives — and the level-1 and level-4
+  blurbs now say so.
+
+### Themes, from spaCR
+
+- Four palettes — **Dark**, **Light**, **Glass**, **Cell** — plus *Match the
+  system*. Switchable live from the View menu or Settings.
+- Every palette is checked against WCAG AA on every surface a colour can
+  appear on, and a failure is a test failure rather than a matter of taste.
+- `ui/style.py` is now a live proxy rather than a set of constants. spaCR
+  shipped a module-level `PALETTE` holding the dark colours, two dozen widgets
+  imported it, and the light theme drew near-black panels on a near-white page
+  — measured at 1.08:1. Three captures of that kind existed here and are
+  fixed: a class-level colour dict, a default argument, and rendered markdown
+  that carries its CSS inline and has to be re-rendered rather than repainted.
+
+### Release resources
+
+Adapted from spaCR's `resource_cleanup`, including its refusal: no process is
+killed, nothing needs root, no `drop_caches`. Reachable from the localagent
+menu and from Settings, each behind a confirmation that names what will happen
+rather than asking "are you sure?".
+
+The VRAM button differs from spaCR's and the difference is the honest part.
+spaCR holds VRAM through torch in its own process, so clearing it is
+`empty_cache()`. localagent holds none — llama-server does, in a child
+process, and 20 GB of weights is the whole of it. So the button stops the
+server, says that unloading is all-or-nothing, and leaves an *adopted* server
+alone: somebody else started it, and stopping it is not this button's call.
+
+### Fixed
+
+- Cancelling the sign-in dialog reopened it without limit. `_sign_in`
+  refreshes the model list on close, and the refresh is what offers the
+  dialog, so a cancelled sign-in re-entered the same path and the modal could
+  not be escaped.
+
 ## 0.8.0
 
 Weights can live anywhere; the app remembers where.

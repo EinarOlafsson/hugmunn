@@ -125,3 +125,59 @@ def instructions(level: Effort) -> str:
 
 def grants_subagents(level: Effort) -> bool:
     return level >= Effort.EXHAUSTIVE
+
+
+# ------------------------------------------------- the same tier, in the cloud
+#
+# A local model has no dial for this, so the tier is entirely prompt: the text
+# above is what makes tier 3 slower and more careful than tier 1. Claude and
+# GPT both have a real one, and using it means the tier buys actual extra
+# computation rather than only a change of instructions.
+#
+# The prompt text is still sent. The two are complementary — the budget decides
+# how long the model may think, the instructions decide what to do with the
+# time — and a model given 32K thinking tokens with no direction spends them
+# rehearsing the question.
+
+
+#: Thinking tokens per tier for Anthropic's extended thinking.
+#:
+#: 1024 is the API's floor, so tier 1 turns it off rather than asking for a
+#: budget that would be rejected. The budget is spent from the same allowance
+#: as the visible answer, which is why the client raises ``max_tokens`` to
+#: clear it — asking for 32K of thinking inside a 32K limit leaves no room to
+#: reply, and the turn ends mid-thought with nothing shown.
+ANTHROPIC_BUDGET = {
+    Effort.QUICK: 0,
+    Effort.STANDARD: 4_096,
+    Effort.THOROUGH: 16_384,
+    Effort.EXHAUSTIVE: 32_768,
+}
+
+#: The nearest equivalent on OpenAI's four-step ``reasoning_effort``.
+OPENAI_EFFORT = {
+    Effort.QUICK: "minimal",
+    Effort.STANDARD: "low",
+    Effort.THOROUGH: "medium",
+    Effort.EXHAUSTIVE: "high",
+}
+
+
+def anthropic_budget(level: Effort) -> int:
+    """Extended-thinking budget in tokens. 0 disables thinking."""
+    return ANTHROPIC_BUDGET[level]
+
+
+def openai_effort(level: Effort) -> str:
+    return OPENAI_EFFORT[level]
+
+
+def cloud_note(level: Effort, provider: str) -> str:
+    """One line for the sidebar saying what the tier does on this provider."""
+    if provider == "anthropic":
+        budget = anthropic_budget(level)
+        return ("Thinking off." if not budget
+                else f"Up to {budget:,} thinking tokens per turn.")
+    if provider == "openai":
+        return f"reasoning_effort = {openai_effort(level)}."
+    return "Prompt-only on local models — they have no thinking dial."

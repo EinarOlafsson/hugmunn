@@ -9,7 +9,7 @@ from typing import Any
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QColor, QKeySequence, QShortcut, QTextOption
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
     QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit,
     QProgressBar, QPushButton, QSizePolicy, QSplitter, QTextEdit, QVBoxLayout,
     QWidget,
@@ -17,15 +17,20 @@ from PyQt6.QtWidgets import (
 
 from .. import config
 from ..core import autonomy as autonomykit
+from ..core import cleanup
+from ..core import credentials
 from ..core import effort as effortkit
+from ..core import providers
 from ..config import ModelSpec, Settings
 from ..core import plugins
 from ..core import skills as skillkit
 from ..core.agent import Agent
 from ..core.client import LlamaClient
+from ..core.providers import Provider
 from ..core.server import ServerManager
-from . import style
+from . import style, theme
 from .download_dialog import DownloadDialog
+from .login_dialog import LoginDialog
 from .resource_bar import ResourceBar
 from .chat import AssistantBlock, Notice, ThinkingCard, ToolCard, Transcript, UserBubble
 from .workers import AgentWorker, DownloadWorker, ServerWorker
@@ -119,7 +124,11 @@ class MainWindow(QMainWindow):
         self._assistant: AssistantBlock | None = None
         self._thinking: ThinkingCard | None = None
         self._tool_cards: dict[str, ToolCard] = {}
+        # Providers we have already offered a sign-in dialog for this session.
+        self._offered_login: set[Provider] = set()
 
+        # Restore any cloud catalogue we can reach without blocking startup —
+        # the stored list is refreshed in Settings, not on every launch.
         self._build_ui()
         self._refresh_models()
         self._sync_controls()
@@ -134,9 +143,50 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([300, 880])
         self.setCentralWidget(splitter)
+        self._build_menus()
 
         QShortcut(QKeySequence("Ctrl+L"), self, self._new_conversation)
         QShortcut(QKeySequence("Ctrl+Return"), self, self._send)
+
+    def _build_menus(self) -> None:
+        bar = self.menuBar()
+
+        app_menu = bar.addMenu("&localagent")
+        settings = QAction("Settings…", self)
+        settings.setShortcut(QKeySequence("Ctrl+,"))
+        settings.triggered.connect(self._open_settings)
+        app_menu.addAction(settings)
+        app_menu.addSeparator()
+
+        # Cleanup is reachable without opening Settings: the moment you want
+        # it is the moment something is already too slow to go hunting.
+        for action_key in cleanup.ACTIONS:
+            title, _ = cleanup.CONFIRMATIONS[action_key]
+            act = QAction(f"{title}…", self)
+            act.triggered.connect(lambda _=False, a=action_key: self._quick_cleanup(a))
+            app_menu.addAction(act)
+
+        app_menu.addSeparator()
+        quit_action = QAction("Quit", self)
+        quit_action.setShortcut(QKeySequence("Ctrl+Q"))
+        quit_action.triggered.connect(self.close)
+        app_menu.addAction(quit_action)
+
+        view = bar.addMenu("&View")
+        self._theme_actions: dict[str, QAction] = {}
+        for name in ("system", *theme.THEMES):
+            act = QAction(theme.LABELS[name], self)
+            act.setCheckable(True)
+            act.setChecked(name == self.settings.theme)
+            act.triggered.connect(lambda _=False, n=name: self.apply_theme(n))
+            view.addAction(act)
+            self._theme_actions[name] = act
+
+        accounts = bar.addMenu("&Accounts")
+        for provider in providers.CLOUD:
+            act = QAction(f"Sign in to {providers.LABELS[provider]}…", self)
+            act.triggered.connect(lambda _=False, p=provider: self._sign_in(p))
+            accounts.addAction(act)
 
     def _build_sidebar(self) -> QWidget:
         panel = QFrame()
@@ -146,10 +196,31 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
+        # Two levels, because the three lists are chosen on different grounds:
+        # a local model by what fits in VRAM, a cloud model by price and
+        # capability. One flat dropdown of thirty entries makes both harder.
+        layout.addWidget(self._heading("Provider"))
+        self.provider_combo = QComboBox()
+        for provider in Provider:
+            self.provider_combo.addItem(providers.LABELS[provider], provider.value)
+        self.provider_combo.setCurrentIndex(
+            max(0, self.provider_combo.findData(self.settings.provider))
+        )
+        self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
+        layout.addWidget(self.provider_combo)
+
         layout.addWidget(self._heading("Model"))
         self.model_combo = QComboBox()
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         layout.addWidget(self.model_combo)
+
+        # Never subtle. A cloud model means the conversation leaves the
+        # machine, and that is the one property of a model choice the user
+        # cannot see from the answer it produces.
+        self.privacy_label = QLabel()
+        self.privacy_label.setObjectName("cloud")
+        self.privacy_label.setWordWrap(True)
+        layout.addWidget(self.privacy_label)
 
         self.model_blurb = QLabel()
         self.model_blurb.setObjectName("blurb")
@@ -299,6 +370,7 @@ class MainWindow(QMainWindow):
 
         bar = QFrame()
         bar.setStyleSheet(f"border-top: 1px solid {style.BORDER};")
+        self.composer_bar = bar  # restyled on a theme change
         bar_layout = QHBoxLayout(bar)
         bar_layout.setContentsMargins(16, 10, 16, 12)
         bar_layout.setSpacing(8)
@@ -582,7 +654,22 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------- model list
 
+    def _provider(self) -> Provider:
+        return Provider(self.provider_combo.currentData())
+
+    def _on_provider_changed(self) -> None:
+        self.settings.provider = self._provider().value
+        self.settings.save()
+        self._refresh_models()
+
+    def refresh_models(self) -> None:
+        """Public: the settings dialog calls this after a sign-in."""
+        self._refresh_models()
+
     def _refresh_models(self) -> None:
+        if self._provider() != Provider.LOCAL:
+            self._refresh_cloud_models()
+            return
         spec_zero = config.ModelSpec("", "", "", 0, "")  # sort key fallback
         self.model_combo.blockSignals(True)
         self.model_combo.clear()
@@ -621,26 +708,151 @@ class MainWindow(QMainWindow):
         self.model_combo.blockSignals(False)
         self._on_model_changed()
 
-    def _current_spec(self) -> ModelSpec | None:
-        return config.by_key(self.model_combo.currentData())
+    def _refresh_cloud_models(self) -> None:
+        """Fill the second dropdown from one provider's catalogue."""
+        provider = self._provider()
+        self.model_combo.blockSignals(True)
+        self.model_combo.clear()
+        for model in providers.models_for(provider):
+            self.model_combo.addItem(model.label, model.key)
+            self.model_combo.setItemData(
+                self.model_combo.count() - 1,
+                f"{model.id}\n{model.blurb}\n{model.context:,} token context",
+                Qt.ItemDataRole.ToolTipRole,
+            )
+        remembered = self.settings.cloud_models.get(provider.value, "")
+        index = self.model_combo.findData(f"{provider.value}:{remembered}")
+        self.model_combo.setCurrentIndex(max(0, index))
+        self.model_combo.blockSignals(False)
+
+        if not credentials.is_signed_in(provider) and provider not in self._offered_login:
+            # The list shown before sign-in is a fallback, so offer the dialog
+            # rather than letting the first send fail with a 401. Once per
+            # provider: _sign_in refreshes this list when it closes, so
+            # cancelling would otherwise reopen the dialog forever.
+            self._offered_login.add(provider)
+            self._sign_in(provider)
+        self._on_model_changed()
+
+    def _current_spec(self):
+        """The selected model: a local ``ModelSpec`` or a cloud ``CloudModel``.
+
+        Both answer ``label``/``blurb``/``context_tokens``/``is_available()``,
+        which is everything the sidebar reads, so callers do not branch.
+        """
+        key = self.model_combo.currentData()
+        if not key:
+            return None
+        if self._provider() == Provider.LOCAL:
+            return config.by_key(key)
+        return providers.by_key(key)
+
+    def _is_cloud(self) -> bool:
+        return self._provider() != Provider.LOCAL
 
     def _on_model_changed(self) -> None:
         spec = self._current_spec()
+        provider = self._provider()
+
         if spec is None:
+            self.model_blurb.setText("")
+            self.privacy_label.setText("")
+            self._sync_controls()
             return
-        if not spec.is_available() and self._download_worker is None:
-            self._offer_download(spec)
-        self.settings.model_key = spec.key
+
+        if provider == Provider.LOCAL:
+            if not spec.is_available() and self._download_worker is None:
+                self._offer_download(spec)
+            self.settings.model_key = spec.key
+            self.privacy_label.setText("")
+        else:
+            self.settings.cloud_models[provider.value] = spec.id
+            self.privacy_label.setText(
+                f"⚠ Runs on {providers.LABELS[provider]}'s servers. Prompts and "
+                f"tool results are sent to them."
+            )
         self.settings.save()
+
         note = spec.blurb
         if spec.ram_gb:
             note += f"  Needs ~{spec.ram_gb} GB free RAM."
+        if provider != Provider.LOCAL:
+            note += f"  {spec.context // 1000}K context."
         self.model_blurb.setText(note)
         self._sync_tools_for_model(spec)
         if hasattr(self, 'skills_summary'):
             self._update_skills_button()
+        if hasattr(self, 'effort_blurb'):
+            self._on_effort_changed()
+            self._on_autonomy_changed()
         if not self.server.is_running:
             self.server_status.setText("Stopped")
+        self._sync_controls()
+
+    # -------------------------------------------------- accounts and themes
+
+    def _sign_in(self, provider: Provider) -> None:
+        dialog = LoginDialog(provider, self)
+        dialog.exec()
+        if credentials.is_signed_in(provider):
+            # Signing out later should be allowed to prompt again.
+            self._offered_login.discard(provider)
+        if self._provider() == provider:
+            self._refresh_cloud_models()
+        self._sync_controls()
+
+    def apply_theme(self, name: str) -> None:
+        """Switch theme and repaint everything that captured a colour.
+
+        The stylesheet covers the widgets Qt styles for us. The ones that
+        build their own colour strings — the transcript's rendered HTML, the
+        resource meters, the top border of the composer bar — captured the
+        old palette when they were constructed and have to be told, which is
+        why each exposes a restyle method rather than being reconstructed.
+        """
+        theme.set_active(name)
+        self.settings.theme = name
+        self.settings.save()
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(theme.stylesheet())
+        for key, action in getattr(self, "_theme_actions", {}).items():
+            action.blockSignals(True)
+            action.setChecked(key == name)
+            action.blockSignals(False)
+        self.transcript.restyle()
+        self.resources.restyle()
+        self.composer_bar.setStyleSheet(f"border-top: 1px solid {theme.active()['border']};")
+
+    def _open_settings(self) -> None:
+        from .settings_dialog import SettingsDialog
+
+        SettingsDialog(self, self).exec()
+
+    def _quick_cleanup(self, action: str) -> None:
+        title, explanation = cleanup.CONFIRMATIONS[action]
+        if action == "disk":
+            entries = cleanup.disk_report()
+            QMessageBox.information(
+                self, title,
+                "\n".join(e.summary() for e in entries) or "No readable drives.",
+            )
+            return
+        answer = QMessageBox.question(
+            self, title, explanation,
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer != QMessageBox.StandardButton.Ok:
+            return
+        if action == "ram":
+            result = cleanup.clear_ram()
+        elif action == "vram":
+            result = cleanup.clear_vram(self.server)
+            self._sync_controls()
+        else:
+            result = cleanup.clear_cpu()
+        QMessageBox.information(self, title, result.summary())
 
     # ------------------------------------------------------------ server ctl
 
@@ -748,6 +960,9 @@ class MainWindow(QMainWindow):
         note = effortkit.BLURBS[level]
         if effortkit.grants_subagents(level):
             note += "  Grants the spawn_agent tool."
+        # On a cloud model the tier is not only prompt text — it sets a real
+        # thinking budget — so say which, or the two look like the same dial.
+        note += "  " + effortkit.cloud_note(level, self._provider().value)
         self.effort_blurb.setText(note)
         if hasattr(self, 'skills_summary'):
             self._update_skills_button()
@@ -756,7 +971,10 @@ class MainWindow(QMainWindow):
         level = self._autonomy()
         self.settings.autonomy_level = int(level)
         self.settings.save()
-        self.autonomy_blurb.setText(autonomykit.BLURBS[level])
+        self.autonomy_blurb.setText(
+            autonomykit.BLURBS[level] + "  "
+            + autonomykit.cloud_note(level, self._provider().value)
+        )
 
     def _on_tools_toggled(self, enabled: bool) -> None:
         self.settings.tools_enabled = enabled
@@ -779,22 +997,60 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------ the turn
 
+    def _ready_to_send(self) -> bool:
+        """A cloud model needs a key; a local one needs a running server."""
+        if self._is_cloud():
+            return credentials.is_signed_in(self._provider()) and self._current_spec() is not None
+        return self.server.is_running
+
     def _sync_controls(self) -> None:
+        cloud = self._is_cloud()
         running = self.server.is_running
         busy = self._agent_worker is not None
+
+        # There is no process to start for a cloud model, so the control that
+        # starts one is hidden rather than disabled — a greyed button invites
+        # the question of what would un-grey it.
+        self.server_button.setVisible(not cloud)
+        self.server_status.setVisible(not cloud)
         self.server_button.setEnabled(not busy)
         self.server_button.setText("Stop server" if running else "Start server")
-        self.send_button.setEnabled(running and not busy)
+
+        self.send_button.setEnabled(self._ready_to_send() and not busy)
         self.send_button.setVisible(not busy)
         self.stop_button.setVisible(busy)
-        self.model_combo.setEnabled(not busy and not running)
+        self.provider_combo.setEnabled(not busy)
+        self.model_combo.setEnabled(not busy and (cloud or not running))
         self.composer.setEnabled(not busy)
 
+    def _build_client(self):
+        """The client for the selected model. One call site, three providers."""
+        spec = self._current_spec()
+        if spec is None:
+            return None
+        if not self._is_cloud():
+            return LlamaClient(spec.base_url)
+        from ..core import cloud
+
+        provider = self._provider()
+        key = credentials.load(provider)
+        if not key:
+            return None
+        return cloud.build(spec, key, self.settings.effort_level)
+
     def _send(self) -> None:
-        if self._agent_worker is not None or not self.server.is_running:
+        if self._agent_worker is not None or not self._ready_to_send():
             return
         text = self.composer.toPlainText().strip()
         if not text:
+            return
+
+        client = self._build_client()
+        if client is None:
+            QMessageBox.warning(
+                self, "Not signed in",
+                f"Sign in to {providers.LABELS[self._provider()]} before sending.",
+            )
             return
         self.composer.clear()
 
@@ -804,7 +1060,7 @@ class MainWindow(QMainWindow):
         spec = self._current_spec()
         assert spec is not None
         agent = Agent(
-            client=LlamaClient(spec.base_url),
+            client=client,
             workdir=self.settings.workdir,
             system_prompt=self.settings.system_prompt,
             use_tools=self._tools_active(),

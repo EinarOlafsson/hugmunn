@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QToolButton, QVBoxLayout, QWidget,
 )
 
-from . import style
+from . import style, theme
 
 _MD_EXTENSIONS = ["fenced_code", "codehilite", "tables", "sane_lists", "nl2br"]
 _MD_CONFIG = {
@@ -119,10 +119,19 @@ class ToolCard(QFrame):
     """One tool invocation: what was called, and what it returned."""
 
     STATE_ICON = {"running": "◌", "ok": "●", "denied": "✕", "error": "▲"}
-    STATE_COLOR = {
-        "running": style.TEXT_DIM, "ok": style.OK,
-        "denied": style.WARN, "error": style.ERR,
-    }
+
+    @staticmethod
+    def _state_colour(state: str) -> str:
+        """Resolved per call, never stored.
+
+        This was a class-level dict, which meant it captured the dark
+        palette at import time and no theme change could ever reach it.
+        """
+        palette = theme.active()
+        return {
+            "running": palette["fg_dim"], "ok": palette["success"],
+            "denied": palette["warning"], "error": palette["error"],
+        }[state]
 
     def __init__(self, name: str, summary: str, parent=None) -> None:
         super().__init__(parent)
@@ -152,7 +161,7 @@ class ToolCard(QFrame):
 
     def _set_state(self, state: str) -> None:
         self._icon.setText(self.STATE_ICON[state])
-        self._icon.setStyleSheet(f"color: {self.STATE_COLOR[state]};")
+        self._icon.setStyleSheet(f"color: {self._state_colour(state)};")
 
     def set_result(self, output: str) -> None:
         self._set_state("error" if output.startswith("Error:") else "ok")
@@ -195,6 +204,9 @@ class AssistantBlock(QWidget):
         self._dirty = False
         self._view.setHtml(render_markdown("".join(self._raw)))
 
+    def restyle(self) -> None:
+        self._view.setHtml(render_markdown("".join(self._raw)))
+
     def finish(self) -> None:
         self._timer.stop()
         self._flush()
@@ -222,6 +234,20 @@ class Transcript(QScrollArea):
         self._layout.setSpacing(12)
         self._layout.addStretch(1)
         self.setWidget(self._inner)
+
+    def restyle(self) -> None:
+        """Re-render every block after a theme change.
+
+        Rendered markdown carries its CSS inline — QTextBrowser's stylesheet
+        support is too limited to drive it from the application sheet — so
+        the HTML already on screen still holds the previous palette and has
+        to be rebuilt, not merely repainted.
+        """
+        for index in range(self._layout.count()):
+            widget = self._layout.itemAt(index).widget()
+            refresh = getattr(widget, "restyle", None)
+            if callable(refresh):
+                refresh()
 
     def add(self, widget: QWidget) -> QWidget:
         at_bottom = self._at_bottom()
@@ -251,7 +277,10 @@ class Transcript(QScrollArea):
 
 
 class Notice(QLabel):
-    def __init__(self, text: str, colour: str = style.TEXT_DIM, parent=None) -> None:
+    def __init__(self, text: str, colour: str | None = None, parent=None) -> None:
         super().__init__(text, parent)
+        # Not a default argument: those are evaluated at import, which would
+        # pin this to whichever theme happened to be active then.
+        colour = colour or theme.active()["fg_dim"]
         self.setWordWrap(True)
         self.setStyleSheet(f"color: {colour}; font-size: 12px; padding: 4px 2px;")

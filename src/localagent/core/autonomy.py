@@ -137,3 +137,31 @@ def decide(
 
     # Autonomy.FULL — protected paths already checked above.
     return Decision(False)
+
+
+# ------------------------------------------------------------ cloud models
+#
+# Autonomy needs no provider mapping, and that is worth stating rather than
+# leaving implied. Tools execute *here* — `read_file` opens a file on this
+# disk, `run_command` runs a shell on this machine — whichever model asked.
+# So `decide` is the authority for Claude and GPT exactly as it is for a
+# local model, and no cloud API can widen it.
+#
+# What does change is the consequence of a *read*. A local model that reads a
+# file has read a file. A cloud model that reads one has sent its contents to
+# a third party, because the result goes back into the next request. That is
+# not a reason to require approval for reads — the user chose the provider —
+# but it is a reason for the UI to say so plainly and for level 1 to remain
+# genuinely useful rather than merely tedious.
+
+
+def cloud_note(level: Autonomy, provider: str) -> str:
+    """What this level means when the model is not running locally."""
+    if provider == "local":
+        return "Tools run on this machine and nothing leaves it."
+    name = {"anthropic": "Anthropic", "openai": "OpenAI"}.get(provider, provider)
+    if level == Autonomy.CONFIRM_ALL:
+        return (f"Every call is shown before it runs, so nothing reaches {name} "
+                f"without you seeing it first.")
+    return (f"Tool results are sent to {name} as part of the next request — "
+            f"a file this model reads is a file {name} receives.")
