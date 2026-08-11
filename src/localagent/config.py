@@ -563,6 +563,50 @@ REGISTRY: tuple[ModelSpec, ...] = (
         files=("Qwen3.5-122B-A10B-abliterated.i1-Q5_K_M.gguf",),
         download_gb=87.0,
     ),
+    ModelSpec(
+        key="uncensored-gemma",
+        reasoning="off",
+        ctx_size=16384,
+        label="Gemma-4-31B · uncensored (accuracy)",
+        script="uncensored-gemma.sh",
+        port=8089,
+        blurb="Dense 31B, Heretic method. Gemma abliterations lose the least "
+              "capability of any family measured (MMLU 68.0 vs 68.4 aligned), "
+              "and Heretic co-minimises refusals against KL divergence rather "
+              "than trading one for the other. Fits on a 24 GB card.",
+        repo="llmfan46/gemma-4-31B-it-uncensored-heretic-GGUF",
+        files=("gemma-4-31B-it-uncensored-heretic-Q5_K_M.gguf",),
+        download_gb=21.8,
+    ),
+    ModelSpec(
+        key="uncensored-fast",
+        reasoning="off",
+        ctx_size=16384,
+        label="Gemma-4-26B-A4B · uncensored (fast)",
+        script="uncensored-fast.sh",
+        port=8090,
+        blurb="MoE with 4B active, so several times faster than a dense 26B. "
+              "Abliterated harder than most. Q6 fits on a 24 GB card.",
+        repo="mradermacher/gemma-4-26B-A4B-it-ultra-uncensored-heretic-i1-GGUF",
+        files=("gemma-4-26B-A4B-it-ultra-uncensored-heretic.i1-Q6_K.gguf",),
+        download_gb=22.6,
+    ),
+    ModelSpec(
+        key="uncensored-code",
+        reasoning="auto",
+        ctx_size=32768,
+        n_cpu_moe=999,
+        label="Qwen3-Coder-Next 80B · uncensored",
+        script="uncensored-code.sh",
+        port=8091,
+        blurb="The 80B-A3B already here, abliterated. Q4 is 48.6 GB against "
+              "the stock 49.6 GB, so it drops into a slot known to work at "
+              "~23 tok/s.",
+        ram_gb=55,
+        repo="bartowski/huihui-ai_Qwen3-Coder-Next-abliterated-GGUF",
+        files=("huihui-ai_Qwen3-Coder-Next-abliterated-Q4_K_M.gguf",),
+        download_gb=48.6,
+    ),
 )
 
 

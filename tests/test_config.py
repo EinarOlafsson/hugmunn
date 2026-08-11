@@ -166,8 +166,19 @@ class TestContextSize:
         assert config.by_key("write").context_tokens == 16384
 
     def test_every_shipped_model_declares_one(self):
-        missing = [m.key for m in config.REGISTRY if not m.context_tokens]
-        assert not missing, f"no --ctx-size found: {missing}"
+        """On the spec, which is authoritative when no script exists yet.
+
+        ``context_tokens`` reads the launch script and is 0 without one — and
+        a model added to the registry has no script until it is first run,
+        which is exactly the state the newer entries are in here.
+        """
+        missing = [m.key for m in config.REGISTRY if not m.ctx_size]
+        assert not missing, f"no context size declared: {missing}"
+
+    def test_the_script_wins_when_there_is_one(self):
+        for spec in config.REGISTRY:
+            if spec.script_path.is_file():
+                assert spec.context_tokens == spec.ctx_size, spec.key
 
     def test_missing_script_returns_zero(self, tmp_path, monkeypatch):
         monkeypatch.setattr(config, "MODELS_ROOT", tmp_path)

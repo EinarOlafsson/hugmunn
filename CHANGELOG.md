@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.13.0
+
+Three researched uncensored models, and a way to measure rather than guess.
+
+Model cards are not comparable — one build's "abliterated" is another's
+"ultra-uncensored", and neither figure came from the same test. So the new
+entries were chosen from download counts, update recency and published method
+quality, and `tools/refusal_probe.py` exists so the claim can be checked in
+two minutes instead of after a 50 GB download.
+
+| key | model | size | fits |
+|---|---|---|---|
+| `uncensored-gemma` | Gemma-4-31B, Heretic | 21.8 GB | entirely on a 24 GB card |
+| `uncensored-fast` | Gemma-4-26B-A4B, MoE, 4B active | 22.6 GB | entirely on a 24 GB card |
+| `uncensored-code` | Qwen3-Coder-Next 80B abliterated | 48.6 GB | the slot the stock 80B already uses |
+
+Gemma-based abliterations preserve the most capability of any family measured
+(MMLU 68.0 against 68.4 aligned), and Heretic co-minimises refusals *against*
+KL divergence from the original rather than trading one for the other — 3/100
+refusals at 0.16 KL, where manual abliteration of the same model managed
+0.45–1.04. Every URL and file size in the table was verified against the
+Hugging Face API rather than transcribed from a page.
+
+`tools/refusal_probe.py` asks a running server twelve ordinary graduate
+parasitology and pharmacology questions — mechanism, toxicity, dosing, immune
+evasion, containment — and reports how many were answered, hedged, or refused.
+It judges refusal on the *opening*, because a model that answers in full and
+then adds a disclaimer has complied, and counting that as a refusal makes
+every model look censored.
+
 ## 0.12.1
 
 Fixes a crash on every send, introduced in 0.12.0.
