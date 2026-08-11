@@ -152,6 +152,13 @@ def find_runtime() -> Path | None:
         return found
     if found := usable(MODELS_ROOT / "bin" / "llama-server"):
         return found
+    # What localagent built for itself. Ahead of PATH because a build made
+    # for this machine's GPU beats whatever generic binary happens to be
+    # installed system-wide.
+    data_dir = os.environ.get(
+        "LOCALAGENT_DATA_DIR", str(Path.home() / ".local" / "share" / "localagent"))
+    if found := usable(Path(data_dir) / "bin" / "llama-server"):
+        return found
     if which := shutil.which("llama-server"):
         return Path(which)
     for candidate in _RUNTIME_CANDIDATES:

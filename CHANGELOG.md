@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.10.0
+
+localagent sets up llama.cpp itself, on any machine.
+
+0.9.3 could tell you a binary was missing and show you the commands. That is
+still two manual steps, and the second one — running a script inside the models
+repo — is circular on the machine that needs it most, because that repo is
+often not cloned there.
+
+- **It builds llama.cpp for you.** Clone, configure, compile, install. The GPU's
+  compute capability is read from `nvidia-smi` and the build targets only that
+  card; building for every architecture turns four minutes into most of an
+  hour. Verified end to end here: 225 seconds with CUDA on an RTX 3090, and the
+  resulting binary reports the card correctly.
+- **Offered on launch** when that is genuinely the blocker — weights present,
+  no binary — rather than leaving a model list where nothing starts and no
+  indication why. Not offered when nothing is downloaded yet, because then the
+  binary is not the problem.
+- **Compiler output streams into the dialog.** A build with no output for four
+  minutes is indistinguishable from a hang, and gets killed.
+- **Preflight before anything is promised**: it says what it will do, what it
+  will cost, and — if cmake or a compiler is missing — the install command for
+  this machine's package manager. A GPU present without `nvcc` is called out
+  specifically, since silently producing a CPU build on a machine with a 3090
+  wastes the thing the user bought.
+- **Download a prebuilt** for machines with no toolchain, labelled CPU-only on
+  Linux because llama.cpp publishes CUDA builds for Windows and not for Linux.
+  The confirmation says what that costs rather than presenting it as equivalent.
+- Installs to `~/.local/share/localagent/`, so none of it depends on the models
+  repo existing. Capped at 16 cores — this machine runs other people's jobs.
+
 ## 0.9.3
 
 Makes "no llama-server on this machine" fixable from inside the app.

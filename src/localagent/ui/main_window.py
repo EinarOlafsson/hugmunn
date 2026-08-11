@@ -21,6 +21,7 @@ from ..core import cleanup
 from ..core import credentials
 from ..core import effort as effortkit
 from ..core import providers
+from ..core import setup_llama
 from ..config import ModelSpec, Settings
 from ..core import plugins
 from ..core import skills as skillkit
@@ -132,6 +133,9 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._refresh_models()
         self._sync_controls()
+        # Deferred so the window is on screen before anything modal appears:
+        # a dialog over a blank grey rectangle reads as a crash on startup.
+        QTimer.singleShot(400, self._offer_runtime_setup)
 
     # ------------------------------------------------------------------ UI
 
@@ -864,6 +868,31 @@ class MainWindow(QMainWindow):
         self.transcript.restyle()
         self.resources.restyle()
         self.composer_bar.setStyleSheet(f"border-top: 1px solid {theme.active()['border']};")
+
+    def _offer_runtime_setup(self) -> None:
+        """On a machine with weights and no binary, offer to build one.
+
+        Asked once per launch and only when it is actually the blocker: there
+        are weights to run, and nothing to run them with. Staying silent would
+        leave the user with a model list where nothing starts and no
+        indication of why.
+        """
+        if self._is_cloud() or config.find_runtime() is not None:
+            return
+        if not any(spec.has_weights() for spec in config.REGISTRY):
+            return   # nothing downloaded yet; the binary is not the problem
+        checks = setup_llama.preflight()
+        answer = QMessageBox.question(
+            self, "Set up llama-server?",
+            "You have model weights on this machine but no <b>llama-server</b> "
+            "to run them with.\n\nIt is part of llama.cpp and has to be built "
+            "for this machine's CPU and GPU, which is why copying the weights "
+            "across was not enough.\n\n" + checks.summary() + "\n\nSet it up now?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self._setup_runtime()
 
     def _setup_runtime(self) -> None:
         from .runtime_dialog import RuntimeDialog

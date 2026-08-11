@@ -42,6 +42,30 @@ arithmetic come from spaCR; every one is checked against WCAG AA on every
 surface a colour can land on, and a theme that fails is a test failure rather
 than a matter of taste.
 
+## Setting up llama-server
+
+Local models are served by `llama-server`, part of llama.cpp. It has to be
+compiled for the machine it runs on — its CPU features and its CUDA version —
+so it cannot ship with the app and cannot be copied from a machine that works.
+A second machine therefore ends up with correct model weights and nothing to
+run them with.
+
+localagent builds it. On launch, if there are weights and no binary, it offers
+to; **localagent → Set up llama-server…** does the same on demand. It reads the
+GPU's compute capability from `nvidia-smi` and builds only for that card —
+targeting every architecture turns a four-minute build into most of an hour —
+and streams the compiler output so a long build is distinguishable from a hang.
+Measured here: 225 seconds with CUDA on an RTX 3090, using 16 cores.
+
+If cmake or a compiler is missing it says so and names the install command for
+this machine's package manager. **Download a prebuilt binary** is offered as an
+alternative that needs no toolchain, labelled CPU-only on Linux because
+llama.cpp publishes CUDA builds for Windows and not for Linux. You can also
+point at one you already have; the choice is remembered.
+
+Everything lands in `~/.local/share/localagent/`, so none of this depends on
+the models repo being cloned.
+
 ## Releasing resources
 
 **localagent → Release RAM / VRAM / CPU / Check disk space**, also in Settings.

@@ -1,21 +1,18 @@
-"""Point localagent at a llama-server, or find out how to get one.
+"""Get llama-server onto this machine, without leaving the app.
 
-The weights are the hard part to obtain and the easy part to move: 87 GB
-copied onto a second machine works fine. The binary is the opposite — small,
-but it has to be built for that machine's CPU and GPU, and it is gitignored
-inside the models repo precisely because a build is not portable.
+The weights copy between machines fine. The binary does not — it is compiled
+against this machine's CPU features and CUDA version — so a second machine
+reliably ends up with correct weights and nothing to run them with.
 
-So a second machine reliably ends up with correct weights and nothing to run
-them with. "build llama.cpp or set LLAMA_SERVER" is accurate and does not help
-anybody at 11pm, hence this: it searches the places one plausibly already is,
-lets the user point at it, and otherwise gives the exact commands.
+Telling the user to run a shell script in the models repo does not close that
+gap, because the machine that needs this is often the one where the models
+repo was never cloned. So the dialog does the work: it looks at the machine,
+says what it will do and what that costs, and builds it.
 """
 
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
@@ -25,16 +22,18 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import config
+from ..core import setup_llama
 from . import theme
+from .workers import SetupWorker
 
-#: Searched when the user asks localagent to go looking. Deliberately a fixed
-#: list rather than a filesystem walk: the machine that needs this has model
-#: weights on network mounts, and a find(1) over those takes minutes.
+#: Searched when looking for an existing binary. A fixed list rather than a
+#: filesystem walk: the machine that needs this has weights on network mounts,
+#: and a find(1) over those takes minutes.
 SEARCH_ROOTS = (
-    "~/.claude/models/bin", "~/.local/bin", "/usr/local/bin", "/usr/bin",
-    "/opt/homebrew/bin", "~/llama.cpp/build/bin", "~/src/llama.cpp/build/bin",
+    "~/.local/share/localagent/bin", "~/.claude/models/bin", "~/.local/bin",
+    "/usr/local/bin", "/usr/bin", "/opt/homebrew/bin",
+    "~/llama.cpp/build/bin", "~/src/llama.cpp/build/bin",
     "~/git/llama.cpp/build/bin", "~/repo/llama.cpp/build/bin",
-    "~/miniconda3/bin", "~/anaconda3/bin", "~/.cargo/bin",
 )
 
 BUILD_STEPS = """\
@@ -42,72 +41,97 @@ git clone https://github.com/ggml-org/llama.cpp
 cd llama.cpp
 cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86
 cmake --build build --config Release -j 16
-# the binary lands at build/bin/llama-server
-"""
-
-BUILD_STEPS_CPU = """\
-git clone https://github.com/ggml-org/llama.cpp
-cd llama.cpp
-cmake -B build
-cmake --build build --config Release -j 16
-# the binary lands at build/bin/llama-server
 """
 
 
 def search() -> list[Path]:
     """Every llama-server on this machine, in the conventional places."""
+    import shutil
+
     found: list[Path] = []
-    on_path = shutil.which("llama-server")
-    if on_path:
-        found.append(Path(on_path))
-    for root in SEARCH_ROOTS:
-        candidate = Path(root).expanduser() / "llama-server"
+    seen: set[Path] = set()
+
+    def add(candidate: Path) -> None:
         if candidate.is_file() and os.access(candidate, os.X_OK):
             resolved = candidate.resolve()
-            if resolved not in {p.resolve() for p in found}:
+            if resolved not in seen:
+                seen.add(resolved)
                 found.append(candidate)
+
+    if on_path := shutil.which("llama-server"):
+        add(Path(on_path))
+    for root in SEARCH_ROOTS:
+        add(Path(root).expanduser() / "llama-server")
     return found
 
 
 def describe(path: Path) -> str:
-    """The build's own version line, which says whether it has CUDA."""
+    """The build's own version line, which is how you tell if it has CUDA."""
+    import subprocess
+
     try:
         result = subprocess.run([str(path), "--version"], capture_output=True,
                                 text=True, timeout=10)
     except (OSError, subprocess.SubprocessError):
         return "could not be run"
-    text = (result.stdout + result.stderr).strip().splitlines()
-    return text[0][:120] if text else "no version reported"
+    lines = (result.stdout + result.stderr).strip().splitlines()
+    return lines[0][:120] if lines else "no version reported"
 
 
 class RuntimeDialog(QDialog):
-    """Find, choose, or learn how to build a llama-server."""
+    """Set up, find, or choose a llama-server."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("llama-server")
-        self.setMinimumWidth(720)
-        palette = theme.active()
+        self.setWindowTitle("Set up llama-server")
+        self.setMinimumSize(760, 560)
+        self._worker: SetupWorker | None = None
+        self.checks = setup_llama.preflight()
 
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
 
         head = QLabel(
-            "localagent runs your local models through <b>llama-server</b>, "
-            "part of llama.cpp. The weights move between machines fine; the "
-            "binary has to be built for this one, so a machine with the "
-            "models often has no way to run them."
+            "Local models are served by <b>llama-server</b>, part of llama.cpp. "
+            "It has to be built for this machine's CPU and GPU, which is why "
+            "copying model weights across is not enough on its own."
         )
         head.setWordWrap(True)
         layout.addWidget(head)
 
-        current = config.find_runtime()
-        self.status = QLabel()
-        self.status.setWordWrap(True)
-        self.status.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(self.status)
+        self.plan = QLabel(self.checks.summary())
+        self.plan.setWordWrap(True)
+        self.plan.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(self.plan)
 
+        # The button that does the whole thing. First, and primary, because it
+        # is what almost everyone opening this dialog wants.
+        actions = QHBoxLayout()
+        self.build_button = QPushButton("Build it for me")
+        self.build_button.setObjectName("primary")
+        self.build_button.clicked.connect(lambda: self._start("build"))
+        self.build_button.setEnabled(self.checks.can_build)
+        actions.addWidget(self.build_button)
+
+        self.prebuilt_button = QPushButton("Download a prebuilt binary")
+        self.prebuilt_button.clicked.connect(self._confirm_prebuilt)
+        self.prebuilt_button.setEnabled(setup_llama.prebuilt_asset_name() is not None)
+        actions.addWidget(self.prebuilt_button)
+
+        find = QPushButton("Search this machine")
+        find.clicked.connect(self._search)
+        actions.addWidget(find)
+        layout.addLayout(actions)
+
+        if not self.checks.can_build and self.checks.advice():
+            advice = QLabel(f"To enable building: <code>{self.checks.advice()}</code>")
+            advice.setWordWrap(True)
+            advice.setTextFormat(Qt.TextFormat.RichText)
+            layout.addWidget(advice)
+
+        layout.addWidget(QLabel("Or point at one you already have:"))
         row = QHBoxLayout()
+        current = config.find_runtime()
         self.path_edit = QLineEdit(str(current) if current else "")
         self.path_edit.setPlaceholderText("/path/to/llama-server")
         self.path_edit.textChanged.connect(self._revalidate)
@@ -115,31 +139,24 @@ class RuntimeDialog(QDialog):
         browse = QPushButton("Browse…")
         browse.clicked.connect(self._browse)
         row.addWidget(browse)
-        find = QPushButton("Search this machine")
-        find.clicked.connect(self._search)
-        row.addWidget(find)
         layout.addLayout(row)
 
-        layout.addWidget(QLabel("If you do not have one, build it:"))
-        steps = QPlainTextEdit(BUILD_STEPS if _has_nvidia() else BUILD_STEPS_CPU)
-        steps.setReadOnly(True)
-        steps.setMaximumHeight(150)
-        layout.addWidget(steps)
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        self.status.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(self.status)
 
-        note = QLabel(
-            "The CUDA architecture above is 86, which is right for an RTX 30xx. "
-            "Drop <code>-DGGML_CUDA=ON</code> for a CPU-only build."
-            if _has_nvidia() else
-            "No NVIDIA GPU was detected here, so this is a CPU build. Large "
-            "models will be slow."
-        )
-        note.setObjectName("blurb")
-        note.setWordWrap(True)
-        layout.addWidget(note)
+        self.log = QPlainTextEdit()
+        self.log.setReadOnly(True)
+        self.log.setVisible(False)
+        self.log.setMaximumBlockCount(4000)   # a full build is a lot of lines
+        layout.addWidget(self.log, 1)
 
         self.buttons = QDialogButtonBox()
-        self.buttons.addButton("Close", QDialogButtonBox.ButtonRole.RejectRole)
-        self.save = self.buttons.addButton("Use this", QDialogButtonBox.ButtonRole.AcceptRole)
+        self.close_button = self.buttons.addButton(
+            "Close", QDialogButtonBox.ButtonRole.RejectRole)
+        self.save = self.buttons.addButton(
+            "Use this", QDialogButtonBox.ButtonRole.AcceptRole)
         self.save.setObjectName("primary")
         self.buttons.accepted.connect(self._accept)
         self.buttons.rejected.connect(self.reject)
@@ -154,27 +171,25 @@ class RuntimeDialog(QDialog):
         text = self.path_edit.text().strip()
         if not text:
             self.status.setText(
-                f"<span style='color:{palette['error']}'>None found on this "
-                f"machine.</span> Point at one, or build it below."
-            )
+                f"<span style='color:{palette['error']}'>No llama-server found "
+                f"on this machine.</span>")
             self.save.setEnabled(False)
             return
         path = Path(text).expanduser()
         if not path.is_file():
-            self.status.setText(
-                f"<span style='color:{palette['error']}'>No such file.</span>")
+            self.status.setText(f"<span style='color:{palette['error']}'>No such "
+                                f"file.</span>")
             self.save.setEnabled(False)
-            return
-        if not os.access(path, os.X_OK):
+        elif not os.access(path, os.X_OK):
             self.status.setText(
                 f"<span style='color:{palette['warning']}'>Not executable.</span> "
                 f"Run: <code>chmod +x {path}</code>")
             self.save.setEnabled(False)
-            return
-        self.status.setText(
-            f"<span style='color:{palette['success']}'>Executable.</span> "
-            f"{describe(path)}")
-        self.save.setEnabled(True)
+        else:
+            self.status.setText(
+                f"<span style='color:{palette['success']}'>Ready.</span> "
+                f"{describe(path)}")
+            self.save.setEnabled(True)
 
     def _browse(self) -> None:
         chosen, _ = QFileDialog.getOpenFileName(
@@ -189,7 +204,7 @@ class RuntimeDialog(QDialog):
                 self, "Nothing found",
                 "No llama-server in any of the usual places:\n\n"
                 + "\n".join(f"  {r}" for r in SEARCH_ROOTS)
-                + "\n\nBuild it with the commands below, or browse to it if it "
+                + "\n\nBuild one with the button above, or browse to it if it "
                   "is somewhere else.",
             )
             return
@@ -198,13 +213,76 @@ class RuntimeDialog(QDialog):
             QMessageBox.information(
                 self, f"Found {len(found)}",
                 "Using the first; edit the path to pick another.\n\n"
-                + "\n".join(f"  {p}" for p in found),
+                + "\n".join(f"  {p}" for p in found))
+
+    def _confirm_prebuilt(self) -> None:
+        """Say what a downloaded build costs before downloading one."""
+        import platform
+
+        if platform.system().lower() == "linux":
+            answer = QMessageBox.question(
+                self, "This will be CPU-only",
+                "llama.cpp publishes prebuilt CUDA binaries for Windows but not "
+                "for Linux, so a downloaded build here cannot use your GPU.\n\n"
+                + (f"That matters: your {self.checks.gpu_name} would sit idle, "
+                   "and a large model on CPU alone is several times slower.\n\n"
+                   if self.checks.has_gpu else "")
+                + "It needs no compiler and takes seconds, so it is a reasonable "
+                  "way to get going.\n\nDownload it?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel if self.checks.can_build_cuda
+                else QMessageBox.StandardButton.Yes,
             )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        self._start("prebuilt")
+
+    def _start(self, mode: str) -> None:
+        if self._worker is not None:
+            return
+        self.log.setVisible(True)
+        self.log.clear()
+        for button in (self.build_button, self.prebuilt_button, self.save):
+            button.setEnabled(False)
+        self.close_button.setText("Cancel")
+
+        worker = SetupWorker(mode, self)
+        worker.line.connect(self._append)
+        worker.ok.connect(self._on_ok)
+        worker.failed.connect(self._on_failed)
+        worker.finished.connect(self._on_finished)
+        self._worker = worker
+        worker.start()
+
+    def _append(self, line: str) -> None:
+        self.log.appendPlainText(line)
+
+    def _on_ok(self, path: str) -> None:
+        config.set_runtime(path)
+        self.path_edit.setText(path)
+        self.status.setText(
+            f"<span style='color:{theme.active()['success']}'>Built and "
+            f"installed.</span> {describe(Path(path))}")
+        self.accept()
+
+    def _on_failed(self, message: str) -> None:
+        self._append("")
+        self._append(f"FAILED: {message}")
+        QMessageBox.critical(self, "Setup failed", message)
+
+    def _on_finished(self) -> None:
+        self._worker = None
+        self.build_button.setEnabled(self.checks.can_build)
+        self.prebuilt_button.setEnabled(setup_llama.prebuilt_asset_name() is not None)
+        self.close_button.setText("Close")
+        self._revalidate()
 
     def _accept(self) -> None:
         config.set_runtime(self.path_edit.text().strip())
         self.accept()
 
-
-def _has_nvidia() -> bool:
-    return shutil.which("nvidia-smi") is not None
+    def reject(self) -> None:  # noqa: D102 - Qt naming
+        if self._worker is not None:
+            self._worker.cancel()
+            self._worker.wait(5000)
+        super().reject()

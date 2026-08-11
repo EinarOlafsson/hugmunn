@@ -139,6 +139,42 @@ class CatalogueWorker(QThread):
             self.failed.emit(f"{type(exc).__name__}: {exc}")
 
 
+class SetupWorker(QThread):
+    """Builds or downloads llama-server, streaming output as it goes.
+
+    A build takes minutes. Off the GUI thread so the window stays alive, and
+    line by line so the user can tell a long compile from a hang -- silence
+    for four minutes is what makes people kill it.
+    """
+
+    line = pyqtSignal(str)
+    ok = pyqtSignal(str)      # path to the binary
+    failed = pyqtSignal(str)
+
+    def __init__(self, mode: str = "build", parent=None) -> None:
+        super().__init__(parent)
+        self._mode = mode
+        self._cancel = threading.Event()
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+    def run(self) -> None:
+        from ..core import setup_llama
+
+        action = (setup_llama.download_prebuilt if self._mode == "prebuilt"
+                  else setup_llama.build)
+        try:
+            binary = action(self.line.emit, cancel=self._cancel)
+        except setup_llama.SetupError as exc:
+            self.failed.emit(str(exc))
+            return
+        except Exception as exc:  # noqa: BLE001
+            self.failed.emit(f"{type(exc).__name__}: {exc}")
+            return
+        self.ok.emit(str(binary))
+
+
 class DownloadWorker(QThread):
     """Fetches a model's weights, reporting byte-level progress."""
 
