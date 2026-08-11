@@ -15,6 +15,8 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import config
+from ..core import autonomy as autonomykit
+from ..core import effort as effortkit
 from ..config import ModelSpec, Settings
 from ..core import plugins
 from ..core import skills as skillkit
@@ -184,6 +186,38 @@ class MainWindow(QMainWindow):
         )
         self.auto_reads_check.toggled.connect(self._on_auto_reads_toggled)
         layout.addWidget(self.auto_reads_check)
+
+        layout.addSpacing(10)
+        layout.addWidget(self._heading("Effort"))
+        self.effort_combo = QComboBox()
+        for level in effortkit.Effort:
+            self.effort_combo.addItem(effortkit.LABELS[level], int(level))
+        self.effort_combo.setCurrentIndex(
+            max(0, self.effort_combo.findData(self.settings.effort_level))
+        )
+        self.effort_combo.currentIndexChanged.connect(self._on_effort_changed)
+        layout.addWidget(self.effort_combo)
+        self.effort_blurb = QLabel()
+        self.effort_blurb.setObjectName("blurb")
+        self.effort_blurb.setWordWrap(True)
+        layout.addWidget(self.effort_blurb)
+
+        layout.addSpacing(10)
+        layout.addWidget(self._heading("Autonomy"))
+        self.autonomy_combo = QComboBox()
+        for level in autonomykit.Autonomy:
+            self.autonomy_combo.addItem(autonomykit.LABELS[level], int(level))
+        self.autonomy_combo.setCurrentIndex(
+            max(0, self.autonomy_combo.findData(self.settings.autonomy_level))
+        )
+        self.autonomy_combo.currentIndexChanged.connect(self._on_autonomy_changed)
+        layout.addWidget(self.autonomy_combo)
+        self.autonomy_blurb = QLabel()
+        self.autonomy_blurb.setObjectName("blurb")
+        self.autonomy_blurb.setWordWrap(True)
+        layout.addWidget(self.autonomy_blurb)
+        self._on_effort_changed()
+        self._on_autonomy_changed()
 
         layout.addSpacing(10)
         layout.addWidget(self._heading("Skills"))
@@ -545,6 +579,29 @@ class MainWindow(QMainWindow):
         spec = self._current_spec()
         return self.settings.tools_enabled and (spec is None or spec.tools_reliable)
 
+    # ------------------------------------------------- effort and autonomy
+
+    def _effort(self) -> effortkit.Effort:
+        return effortkit.Effort(self.effort_combo.currentData())
+
+    def _autonomy(self) -> autonomykit.Autonomy:
+        return autonomykit.Autonomy(self.autonomy_combo.currentData())
+
+    def _on_effort_changed(self) -> None:
+        level = self._effort()
+        self.settings.effort_level = int(level)
+        self.settings.save()
+        note = effortkit.BLURBS[level]
+        if effortkit.grants_subagents(level):
+            note += "  Grants the spawn_agent tool."
+        self.effort_blurb.setText(note)
+
+    def _on_autonomy_changed(self) -> None:
+        level = self._autonomy()
+        self.settings.autonomy_level = int(level)
+        self.settings.save()
+        self.autonomy_blurb.setText(autonomykit.BLURBS[level])
+
     def _on_tools_toggled(self, enabled: bool) -> None:
         self.settings.tools_enabled = enabled
         self.settings.save()
@@ -599,6 +656,8 @@ class MainWindow(QMainWindow):
             max_iterations=self.settings.max_tool_iterations,
             active_skills=self._active_skills(),
             extra_tools=self._active_plugins(),
+            effort=self._effort(),
+            autonomy=self._autonomy(),
         )
 
         self._thinking = None

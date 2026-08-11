@@ -10,7 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterator
 
+from . import autonomy as autonomykit
+from . import effort as effortkit
 from . import skills as skillkit
+from . import subagent as subagentkit
 from . import tools as toolkit
 from .client import Event, LlamaClient, ToolCall
 
@@ -42,17 +45,40 @@ class Agent:
         max_iterations: int = 12,
         active_skills: list[skillkit.Skill] | None = None,
         extra_tools: list[toolkit.Tool] | None = None,
+        effort: effortkit.Effort | None = None,
+        autonomy: autonomykit.Autonomy | None = None,
+        tool_allowlist: set[str] | None = None,
+        depth: int = 0,
     ) -> None:
-        self.extra_tools = extra_tools or []
+        self.extra_tools = list(extra_tools or [])
         self.client = client
         self.workdir = workdir
         self.use_tools = use_tools
         self.auto_approve_reads = auto_approve_reads
         self.max_iterations = max_iterations
         self.active_skills = active_skills or []
+        self.effort = effort or effortkit.Effort.STANDARD
+        self.autonomy = autonomy or autonomykit.Autonomy.ASK_TO_WRITE
+        # None means "every registered tool"; a subagent gets a narrowed set.
+        self.tool_allowlist = tool_allowlist
+        self.depth = depth
+
+        # Subagents are a tier-4 capability, and only the top-level agent gets
+        # them — a child that could spawn children fans out without bound.
+        if effortkit.grants_subagents(self.effort) and depth == 0:
+            self.extra_tools.append(
+                toolkit.Tool(
+                    name="spawn_agent",
+                    description=subagentkit.DESCRIPTION,
+                    parameters=subagentkit.SCHEMA,
+                    run=subagentkit.make_spawn_agent(client, workdir, depth),
+                )
+            )
+
         # Compose once at construction: the skill set is fixed for a turn, and
         # rebuilding the prompt per iteration would churn the prompt cache.
-        self.system_prompt = skillkit.compose(system_prompt, self.active_skills)
+        prompt = skillkit.compose(system_prompt, self.active_skills)
+        self.system_prompt = f"{prompt}\n\n{effortkit.instructions(self.effort)}"
 
     def run(
         self,
@@ -72,7 +98,12 @@ class Agent:
         by_name = {t.name: t for t in self.extra_tools}
         schemas = None
         if self.use_tools:
-            schemas = toolkit.schemas() + [
+            builtin = [
+                s for s in toolkit.schemas()
+                if self.tool_allowlist is None
+                or s["function"]["name"] in self.tool_allowlist
+            ]
+            schemas = builtin + [
                 t.schema() for t in self.extra_tools if t.name not in toolkit.BY_NAME
             ]
 
@@ -141,7 +172,13 @@ class Agent:
                     "tool_start", tool_name=call.name, tool_summary=summary, tool_id=call.id
                 )
 
-                needs_ok = spec is not None and spec.requires_approval
+                # The autonomy level is the authority on whether a human sees
+                # this call; the tool's own flag only raises the floor.
+                verdict = autonomykit.decide(
+                    call.name, args, self.workdir, self.autonomy,
+                    tool_requires_approval=bool(spec and spec.requires_approval),
+                )
+                needs_ok = verdict.needs_approval
                 if needs_ok or not self.auto_approve_reads:
                     if not approve(call.name, summary, args):
                         denial = "User denied this tool call. Do not retry it; ask what to do instead."

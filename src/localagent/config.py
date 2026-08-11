@@ -218,6 +218,8 @@ class Settings:
         "result rather than guessing. Prefer showing code over describing it."
     )
     max_tool_iterations: int = 12
+    effort_level: int = 2      # core.effort.Effort
+    autonomy_level: int = 2    # core.autonomy.Autonomy
     custom_base_url: str = ""
 
     @classmethod
