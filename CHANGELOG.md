@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.10.2
+
+"All 49 layers on GPU" and "extremely slow" were not a contradiction.
+
+The placement was right and the model was still unusable, because the
+direct-launch fallback added in 0.9.1 sent only enough flags to load the
+weights. It called that being conservative. It was not — the omitted flags are
+the ones that decide whether a model is usable:
+
+- **No `--reasoning off`.** Qwen3.6 thinks by default, so the server spent
+  hundreds of tokens on a chain of thought before the first visible word. At
+  37 tok/s that is most of a minute of silence, which is indistinguishable
+  from a slow model. This is the likely cause of the report.
+- **No `--n-cpu-moe`.** A 122B mixture-of-experts had nowhere to put its
+  experts but a 24 GB card.
+- **No KV quantization.** At 16–32K context an f16 cache is gigabytes of VRAM
+  the model needed for itself.
+- **The wrong context size** — a flat 16K, where five of the nine models ask
+  for 32K.
+
+The tuning is data on `ModelSpec` now, so the fallback and the script build
+from the same source. A test compares every field against the shipped script
+and fails on any divergence; it caught the context sizes immediately.
+
 ## 0.10.1
 
 Three reported problems, one of them mine twice over.

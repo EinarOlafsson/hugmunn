@@ -227,6 +227,22 @@ class ModelSpec:
     files: tuple[str, ...] = ()
     download_gb: float = 0.0
 
+    # Tuning that has to survive when there is no launch script to read it
+    # from. Not a duplicate of the script for its own sake: without these the
+    # direct-launch fallback produced a model that was correct and unusable.
+    #
+    # `reasoning` is the one that bites hardest. Qwen3.6 thinks by default, so
+    # a server started without "off" spends hundreds of tokens on a chain of
+    # thought before the first visible word. At 37 tok/s that is most of a
+    # minute of apparent silence, which reads as "extremely slow" even though
+    # throughput is exactly right.
+    reasoning: str = "off"          # "off" | "auto"
+    #: Expert layers to keep in system RAM. 0 means the model is dense or
+    #: fits entirely on the GPU. A MoE launched without this on a 24 GB card
+    #: does not fail -- it thrashes.
+    n_cpu_moe: int = 0
+    ctx_size: int = 16384
+
     @property
     def script_path(self) -> Path:
         return MODELS_ROOT / "scripts" / self.script
@@ -234,6 +250,31 @@ class ModelSpec:
     @property
     def base_url(self) -> str:
         return f"http://127.0.0.1:{self.port}"
+
+    def launch_arguments(self) -> list[str]:
+        """The flags a direct launch needs, when there is no script.
+
+        Deliberately the small set that changes whether the model is usable,
+        not an attempt to reproduce the script. Sampling is left to
+        llama.cpp's defaults; reasoning mode, KV quantization and expert
+        placement are not, because each of those turns a working model into
+        an apparently broken one.
+        """
+        args = ["--fit", "on", "--ctx-size", str(self.ctx_size),
+                "--flash-attn", "on",
+                # Halves the KV cache. At 16K context that is gigabytes, and
+                # on a card the model already nearly fills it is the
+                # difference between fitting and spilling.
+                "--cache-type-k", "q8_0", "--cache-type-v", "q8_0",
+                "--jinja", "--threads", "16",
+                "--reasoning", self.reasoning]
+        if self.reasoning == "auto":
+            # Without this the chain of thought is not separated out and
+            # lands in the visible answer.
+            args += ["--reasoning-format", "deepseek"]
+        if self.n_cpu_moe:
+            args += ["--n-gpu-layers", "999", "--n-cpu-moe", str(self.n_cpu_moe)]
+        return args
 
     @property
     def context_tokens(self) -> int:
@@ -360,6 +401,8 @@ class ModelSpec:
 REGISTRY: tuple[ModelSpec, ...] = (
     ModelSpec(
         key="write",
+        reasoning="off",
+        ctx_size=16384,
         label="Qwen3.6-27B · writing",
         script="write.sh",
         port=8080,
@@ -370,6 +413,8 @@ REGISTRY: tuple[ModelSpec, ...] = (
     ),
     ModelSpec(
         key="code",
+        reasoning="auto",
+        ctx_size=32768,
         label="Qwen3.6-27B · coding",
         script="code.sh",
         port=8081,
@@ -380,6 +425,8 @@ REGISTRY: tuple[ModelSpec, ...] = (
     ),
     ModelSpec(
         key="code-glm",
+        reasoning="auto",
+        ctx_size=32768,
         label="GLM-4.7-Flash · coding",
         script="code-glm.sh",
         port=8084,
@@ -390,6 +437,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
     ),
     ModelSpec(
         key="code-heavy",
+        reasoning="auto",
+        ctx_size=32768,
+        n_cpu_moe=999,
         label="Qwen3-Coder-Next 80B · coding",
         script="code-heavy.sh",
         port=8082,
@@ -401,6 +451,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
     ),
     ModelSpec(
         key="code-q6",
+        reasoning="auto",
+        ctx_size=32768,
+        n_cpu_moe=999,
         label="Qwen3-Coder-Next 80B · coding (Q6)",
         script="code-q6.sh",
         port=8085,
@@ -412,6 +465,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
     ),
     ModelSpec(
         key="write-big",
+        reasoning="off",
+        ctx_size=16384,
+        n_cpu_moe=999,
         label="Qwen3.5-122B · writing (flagship)",
         script="write-big.sh",
         port=8083,
@@ -423,6 +479,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
     ),
     ModelSpec(
         key="agentic",
+        reasoning="auto",
+        ctx_size=32768,
+        n_cpu_moe=999,
         label="MiniMax-M2.7 230B · agentic",
         script="agentic.sh",
         port=8086,
@@ -434,6 +493,8 @@ REGISTRY: tuple[ModelSpec, ...] = (
     ),
     ModelSpec(
         key="uncensored",
+        reasoning="off",
+        ctx_size=16384,
         label="Qwen3.6-27B · uncensored",
         script="uncensored.sh",
         port=8087,
@@ -445,6 +506,9 @@ REGISTRY: tuple[ModelSpec, ...] = (
     ),
     ModelSpec(
         key="uncensored-big",
+        reasoning="off",
+        ctx_size=16384,
+        n_cpu_moe=999,
         label="Qwen3.5-122B · uncensored (flagship)",
         script="uncensored-big.sh",
         port=8088,

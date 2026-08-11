@@ -112,11 +112,12 @@ class ServerManager:
     def _direct_command(self, spec: ModelSpec) -> list[str] | None:
         """Serve ``spec`` without its launch script, or ``None`` if we cannot.
 
-        Deliberately conservative. The scripts carry tuning that matters --
-        ``--n-cpu-moe`` splits, sampling, reasoning mode -- and guessing at it
-        would be worse than the script. What is here is only what is needed to
-        load the weights and answer: ``--fit on`` sizes the GPU offload
-        automatically, which is the one decision that otherwise OOMs.
+        The flags come from the spec rather than being invented here, so the
+        fallback and the script cannot drift. An earlier version sent only
+        enough to load the weights, which produced a model that was correct
+        and unusable: no ``--reasoning off`` meant Qwen3.6 spent most of a
+        minute thinking before its first visible word, and no ``--n-cpu-moe``
+        meant a 122B MoE thrashed against a 24 GB card.
         """
         from ..config import find_runtime
 
@@ -127,11 +128,7 @@ class ServerManager:
             str(runtime),
             "--model", str(spec.model_path),
             "--alias", spec.key,
-            "--fit", "on",
-            "--ctx-size", "16384",
-            "--flash-attn", "on",
-            "--jinja",
-            "--threads", "16",
+            *spec.launch_arguments(),
             "--host", "127.0.0.1", "--port", str(spec.port),
         ]
 
