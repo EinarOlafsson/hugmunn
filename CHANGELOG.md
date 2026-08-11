@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.10.1
+
+Three reported problems, one of them mine twice over.
+
+### Text drew a box of the wrong colour
+
+`QWidget { background: … }` in the stylesheet painted *every* widget, labels
+included, so a label inside a raised panel drew a window-coloured rectangle
+behind its text — every piece of text in the app carrying a box that did not
+match its container. Barely visible on the dark theme, where the window and the
+panels are two near-blacks a few levels apart; obvious on the other three.
+
+Containers are painted explicitly now and everything else inherits what it sits
+on. Caught by rendering the widgets offscreen and sampling pixels, since the
+whole symptom is what it looks like: the tests take the dominant colour of each
+label's rectangle and compare it against the palette, across all four themes.
+
+### The resource meters overlapped their neighbours
+
+The sidebar is fifteen sections tall and wants about 1400px. On any normal
+screen there is a shortfall, and Qt resolves that by compressing children below
+their size hints — but a fixed-height widget cannot compress, so it gets drawn
+*outside* its parent, on top of whatever is next to it. The four meters are
+30px each in a frame the layout had squeezed to 65px.
+
+The sidebar scrolls now, which is the only arrangement where nothing overlaps at
+any window size, and the meters claim their full height so no layout tries. A
+test walks the sidebar's geometry at four window heights looking for
+intersecting rectangles.
+
+### "It works but it is extremely slow"
+
+The app could not answer whether a model was on the GPU, which is the first
+thing worth knowing — and localagent may itself have built a CPU-only binary,
+if the CUDA toolkit was absent at build time.
+
+- The server status now reads **"all 49 layers on GPU"**, or **"0 layers on
+  GPU — running entirely on the CPU"**, parsed from llama.cpp's own startup log.
+- A model that loads with nothing on the GPU, on a machine that *has* one, now
+  says so and gives the fix.
+- The runtime dialog reports whether a binary is GPU-capable via
+  `--list-devices`, rather than showing a version string. `--version` names the
+  compiler and says nothing about the backend, so "it built fine" was never
+  evidence the card was in play.
+
 ## 0.10.0
 
 localagent sets up llama.cpp itself, on any machine.

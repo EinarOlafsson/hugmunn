@@ -308,9 +308,27 @@ def stylesheet(name: str | None = None) -> str:
     p = palette_for(resolve(name) if name else _active)
     page = p["backdrop"] or p["page"]
     return f"""
-QWidget {{ background: {p['bg']}; color: {p['fg']}; font-size: 14px; }}
+/* No background here. A blanket QWidget rule paints every widget, labels
+   included, so a label inside a raised panel draws a window-coloured box
+   behind its text -- every piece of text in the app carrying a rectangle of
+   the wrong colour. Containers are painted explicitly below; everything else
+   inherits what it sits on. */
+QWidget {{ color: {p['fg']}; font-size: 14px; }}
 QMainWindow, QDialog {{ background: {page}; }}
 QScrollArea, QScrollArea > QWidget > QWidget {{ background: transparent; }}
+
+/* Passive widgets: never their own colour, always their container's. */
+QLabel, QCheckBox, QRadioButton, QGroupBox, QSplitter, QScrollBar,
+QDialogButtonBox, QTabWidget, QTabWidget::pane, QStackedWidget {{
+    background: transparent;
+}}
+
+/* Text views inside a card are part of the card, not fields on top of it. */
+QFrame#toolCard QPlainTextEdit, QFrame#thinkCard QPlainTextEdit,
+QFrame#toolCard QTextBrowser, QFrame#thinkCard QTextBrowser,
+QFrame#userMsg QLabel {{
+    background: transparent; border: none;
+}}
 
 QLabel#heading {{ color: {p['fg_dim']}; font-size: 11px; font-weight: 600;
                   text-transform: uppercase; letter-spacing: 1px; }}

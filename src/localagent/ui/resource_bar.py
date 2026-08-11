@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor, QPainter
-from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from ..core.resources import Sampler, Snapshot
 from . import style
@@ -25,9 +25,11 @@ CRITICAL = 90.0
 class _Bar(QWidget):
     """One labelled meter: name on the left, value right, bar underneath."""
 
+    HEIGHT = 30
+
     def __init__(self, name: str, parent=None) -> None:
         super().__init__(parent)
-        self.setFixedHeight(30)
+        self.setFixedHeight(self.HEIGHT)
         self._name = name
         self._percent = 0.0
         self._detail = ""
@@ -85,6 +87,13 @@ class ResourceBar(QFrame):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(2)
 
+        # Each bar is a fixed 30px and cannot compress, so a layout short of
+        # room does not shrink them -- it draws them outside this frame, over
+        # whatever is next to it. Claiming the full height up front is what
+        # stops the layout from trying.
+        self.setSizePolicy(self.sizePolicy().horizontalPolicy(),
+                           QSizePolicy.Policy.Fixed)
+
         self._sampler = Sampler()
         self.cpu = _Bar("CPU")
         self.ram = _Bar("RAM")
@@ -98,6 +107,11 @@ class ResourceBar(QFrame):
         self.note.setWordWrap(True)
         self.note.setVisible(False)
         layout.addWidget(self.note)
+
+        self.setMinimumHeight(
+            4 * _Bar.HEIGHT + layout.spacing() * 3
+            + layout.contentsMargins().top() + layout.contentsMargins().bottom()
+        )
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.refresh)

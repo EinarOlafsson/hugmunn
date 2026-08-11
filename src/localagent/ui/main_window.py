@@ -11,7 +11,8 @@ from PyQt6.QtGui import QAction, QColor, QKeySequence, QShortcut, QTextOption
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
     QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit,
-    QProgressBar, QPushButton, QSizePolicy, QSplitter, QTextEdit, QVBoxLayout,
+    QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSplitter, QTextEdit,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -204,6 +205,23 @@ class MainWindow(QMainWindow):
             accounts.addAction(act)
 
     def _build_sidebar(self) -> QWidget:
+        """The controls column, inside a scroll area.
+
+        It has to scroll. The column is fifteen sections tall and wants about
+        1400px; a 1080p screen gives it rather less, and Qt resolves that
+        shortfall by compressing children below their size hints. Widgets with
+        a fixed height -- the four resource meters -- cannot compress, so they
+        are simply drawn outside their frame, on top of whatever is next to
+        them. Scrolling is the only arrangement in which nothing can overlap
+        at any window size.
+        """
+        scroller = QScrollArea()
+        scroller.setWidgetResizable(True)
+        scroller.setFrameShape(QFrame.Shape.NoFrame)
+        scroller.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroller.setMinimumWidth(286)   # 270 for content, plus the scrollbar
+
         panel = QFrame()
         panel.setObjectName("sidebar")
         panel.setMinimumWidth(270)
@@ -372,7 +390,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(new_chat)
 
         self._update_workdir_label()
-        return panel
+        scroller.setWidget(panel)
+        return scroller
 
     def _build_conversation(self) -> QWidget:
         page = QWidget()
@@ -1027,7 +1046,33 @@ class MainWindow(QMainWindow):
         worker.start()
 
     def _on_server_ready(self, model_name: str) -> None:
-        self.server_status.setText(f"Ready · {model_name}")
+        """Report where the model is actually running, not just that it started.
+
+        "Ready" and "ready but entirely on the CPU" look identical and feel
+        very different, and the second is the single most likely reason a
+        model is unexpectedly slow. llama.cpp says which in its startup log;
+        nothing was reading it.
+        """
+        status = f"Ready · {model_name}"
+        placement = setup_llama.offload_from_log(self.server.log_tail)
+        if placement:
+            status += f"\n{placement}"
+        self.server_status.setText(status)
+
+        if placement.startswith("0 layers"):
+            info = setup_llama.runtime_info()
+            if not info.has_gpu and setup_llama.preflight().has_gpu:
+                # The build cannot use the card at all -- which localagent may
+                # have caused, by building without the CUDA toolkit present.
+                QMessageBox.warning(
+                    self, "Running on the CPU",
+                    f"{model_name} loaded, but llama-server is a <b>CPU-only "
+                    f"build</b> and cannot use your GPU. That is why it is slow.\n\n"
+                    f"This happens when the CUDA toolkit was not installed at "
+                    f"build time. Install it and rebuild:\n\n"
+                    f"    sudo apt install nvidia-cuda-toolkit\n\n"
+                    f"then localagent → Set up llama-server… and build again.",
+                )
         self._sync_controls()
 
     def _on_server_failed(self, message: str) -> None:

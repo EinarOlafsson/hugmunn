@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -337,3 +338,96 @@ def download_prebuilt(on_progress: Callable[[str], None], cancel=None) -> Path:
         on_progress("note: this is a CPU-only build — no Linux CUDA release is "
                     "published. Build from source to use the GPU.")
     return binary
+
+
+# ------------------------------------------------------- what a build can do
+
+
+@dataclass(frozen=True)
+class RuntimeInfo:
+    """Whether a given llama-server can use the GPU at all.
+
+    This is the question behind "why is it so slow". A CPU-only build on a
+    machine with a good GPU runs a large model several times slower and gives
+    no indication that anything is wrong -- it is simply, quietly, not using
+    the card. Since localagent may have produced that build itself (when the
+    CUDA toolkit was absent at build time), it owes the user the answer.
+    """
+
+    path: Path
+    version: str = ""
+    devices: tuple[str, ...] = ()
+
+    @property
+    def has_gpu(self) -> bool:
+        return any(d.startswith(("CUDA", "ROCm", "Metal", "Vulkan", "SYCL"))
+                   for d in self.devices)
+
+    def summary(self) -> str:
+        if self.has_gpu:
+            return "GPU-capable: " + "; ".join(self.devices)
+        return ("CPU-only build — this binary cannot use a GPU. Rebuild with "
+                "the CUDA toolkit installed for a large speedup.")
+
+
+def runtime_info(path: Path | None = None) -> RuntimeInfo:
+    """Ask a llama-server binary what compute devices it was built for.
+
+    ``--list-devices`` is the reliable signal: a CUDA build enumerates its
+    cards, a CPU-only build has nothing to list. ``--version`` does not say —
+    it reports the compiler, not the backend — which is why "it says it built
+    fine" is not evidence that the GPU is in play.
+    """
+    if path is None:
+        from ..config import find_runtime
+
+        path = find_runtime()
+    if path is None:
+        return RuntimeInfo(Path())
+
+    def ask(*args) -> str:
+        try:
+            result = subprocess.run([str(path), *args], capture_output=True,
+                                    text=True, timeout=20)
+            return result.stdout + result.stderr
+        except (OSError, subprocess.SubprocessError):
+            return ""
+
+    version = ""
+    for line in ask("--version").splitlines():
+        if line.lower().startswith("version"):
+            version = line.strip()
+            break
+
+    devices = tuple(
+        line.strip()
+        for line in ask("--list-devices").splitlines()
+        if ":" in line and not line.lower().startswith("available")
+    )
+    return RuntimeInfo(Path(path), version, devices)
+
+
+#: llama.cpp says this once per load, and it is the definitive answer for a
+#: *particular model* rather than for the binary: a CUDA build still runs on
+#: the CPU when the layers do not fit, or when --n-gpu-layers is 0.
+_OFFLOAD_RE = re.compile(r"offloaded\s+(\d+)\s*/\s*(\d+)\s+layers?\s+to\s+GPU")
+
+
+def offload_from_log(lines) -> str:
+    """Read "N/M layers on GPU" out of a server's startup output.
+
+    Empty when the server has not said. Worth surfacing because it answers
+    the question the resource meters only hint at, and it distinguishes the
+    two different slow cases: a CPU-only binary, and a GPU binary whose model
+    did not fit.
+    """
+    for line in reversed(list(lines)):
+        match = _OFFLOAD_RE.search(line)
+        if match:
+            on_gpu, total = int(match[1]), int(match[2])
+            if on_gpu == 0:
+                return "0 layers on GPU — running entirely on the CPU"
+            if on_gpu >= total:
+                return f"all {total} layers on GPU"
+            return f"{on_gpu} of {total} layers on GPU, the rest on CPU"
+    return ""

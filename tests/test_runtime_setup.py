@@ -110,11 +110,12 @@ def test_the_dialog_still_shows_manual_steps_as_a_fallback():
     assert "CMAKE_CUDA_ARCHITECTURES" in BUILD_STEPS
 
 
-def test_describe_reports_what_a_binary_says(tmp_path):
+def test_describe_answers_whether_the_gpu_is_usable(tmp_path):
+    """Not the version string: that reports the compiler, not the backend."""
     from localagent.ui.runtime_dialog import describe
 
-    binary = make_binary(tmp_path / "llama-server")
-    assert "version" in describe(binary)
+    binary = make_binary(tmp_path / "llama-server")   # prints only a version
+    assert "CPU-only" in describe(binary)
 
 
 def test_describe_does_not_raise_on_a_binary_that_will_not_run(tmp_path):
@@ -350,6 +351,91 @@ def test_no_offer_when_nothing_is_downloaded(qt_app, tmp_path, monkeypatch):
     try:
         window._offer_runtime_setup()
         assert not asked
+    finally:
+        window.server.stop()
+        window.close()
+
+
+# --------------------------------------------- CPU or GPU, and saying which
+#
+# "It works but it is extremely slow" has two different causes that look
+# identical from the outside: a CPU-only binary, and a GPU binary whose model
+# did not fit in VRAM. llama.cpp reports both and nothing was reading it.
+
+
+def test_a_cuda_build_is_recognised_as_gpu_capable():
+    from localagent.core.setup_llama import RuntimeInfo
+    from pathlib import Path
+
+    info = RuntimeInfo(Path("/x"), "version: 1",
+                       ("CUDA0: NVIDIA GeForce RTX 3090 (24123 MiB, 57 MiB free)",))
+    assert info.has_gpu
+    assert "RTX 3090" in info.summary()
+
+
+def test_a_cpu_only_build_says_so_and_says_what_to_do():
+    from localagent.core.setup_llama import RuntimeInfo
+    from pathlib import Path
+
+    info = RuntimeInfo(Path("/x"), "version: 1", ())
+    assert not info.has_gpu
+    assert "CPU-only" in info.summary()
+    assert "CUDA toolkit" in info.summary()
+
+
+def test_a_version_string_alone_does_not_imply_a_gpu():
+    """The build log saying 'built with GNU 13.3.0' tells you nothing."""
+    from localagent.core.setup_llama import RuntimeInfo
+    from pathlib import Path
+
+    assert not RuntimeInfo(Path("/x"), "built with GNU 13.3.0", ()).has_gpu
+
+
+def test_offload_is_read_out_of_the_startup_log():
+    from localagent.core.setup_llama import offload_from_log
+
+    assert offload_from_log(
+        ["load_tensors: offloaded 49/49 layers to GPU"]) == "all 49 layers on GPU"
+    assert "entirely on the CPU" in offload_from_log(
+        ["load_tensors: offloaded 0/49 layers to GPU"])
+    assert offload_from_log(
+        ["load_tensors: offloaded 20/49 layers to GPU"]
+    ) == "20 of 49 layers on GPU, the rest on CPU"
+
+
+def test_the_last_offload_line_wins():
+    """A server that reloads logs twice; the current load is the answer."""
+    from localagent.core.setup_llama import offload_from_log
+
+    assert offload_from_log([
+        "load_tensors: offloaded 0/49 layers to GPU",
+        "load_tensors: offloaded 49/49 layers to GPU",
+    ]) == "all 49 layers on GPU"
+
+
+def test_a_log_that_says_nothing_gives_nothing():
+    from localagent.core.setup_llama import offload_from_log
+
+    assert offload_from_log(["starting", "listening on 127.0.0.1:8080"]) == ""
+
+
+def test_the_status_line_reports_where_the_model_ran(qt_app, tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
+    from localagent import config as cfg
+
+    importlib.reload(cfg)
+    from localagent.ui import main_window as mw
+
+    importlib.reload(mw)
+    monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
+    monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_runtime_setup", lambda self: None)
+
+    window = mw.MainWindow()
+    try:
+        window.server.log_tail = ["load_tensors: offloaded 49/49 layers to GPU"]
+        window._on_server_ready("qwen3.6-27b")
+        assert "all 49 layers on GPU" in window.server_status.text()
     finally:
         window.server.stop()
         window.close()

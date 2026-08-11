@@ -66,16 +66,15 @@ def search() -> list[Path]:
 
 
 def describe(path: Path) -> str:
-    """The build's own version line, which is how you tell if it has CUDA."""
-    import subprocess
+    """Whether this binary can use the GPU.
 
-    try:
-        result = subprocess.run([str(path), "--version"], capture_output=True,
-                                text=True, timeout=10)
-    except (OSError, subprocess.SubprocessError):
+    Not the version string, which reports the compiler and says nothing about
+    the backend -- "it built fine" is not evidence that the card is in play.
+    """
+    info = setup_llama.runtime_info(path)
+    if not info.version and not info.devices:
         return "could not be run"
-    lines = (result.stdout + result.stderr).strip().splitlines()
-    return lines[0][:120] if lines else "no version reported"
+    return info.summary()[:200]
 
 
 class RuntimeDialog(QDialog):
