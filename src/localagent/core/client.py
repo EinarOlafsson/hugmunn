@@ -116,11 +116,19 @@ class LlamaClient:
         temperature: float | None = None,
         max_tokens: int = 4096,
         cancel: Any = None,  # threading.Event-like; .is_set() ends the stream
+        thinking: bool | None = None,
     ) -> Iterator[Event]:
         payload: dict[str, Any] = {
             "messages": messages,
             "stream": True,
             "max_tokens": max_tokens,
+            # Qwen3 templates define enable_thinking and default it to *true*,
+            # so a model left alone thinks before every answer. Sent per
+            # request rather than only as a launch flag: it is a property of
+            # the task, and a restart to change it costs a reload of the
+            # weights.
+            **({"chat_template_kwargs": {"enable_thinking": thinking}}
+               if thinking is not None else {}),
             # llama-server already has per-model sampling from its launch flags;
             # only override when the caller explicitly asks.
             **({"temperature": temperature} if temperature is not None else {}),

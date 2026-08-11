@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.12.0
+
+Reasoning is a control, and the system prompt is a choice.
+
+Both came out of one finding: a model that refused with thinking on and
+complied with it off. The mechanism is in the chat template — Qwen3 defines
+`enable_thinking` and **defaults it to true**, so a model left alone thinks
+before every answer, and the refusal forms during the thinking.
+
+- **Reasoning** is a sidebar control, per model, remembered. Sent as a
+  per-request template argument rather than only a launch flag, so changing it
+  takes effect on the next message with no reload of the weights. The
+  uncensored models default to off, and their descriptions now say why.
+- **System prompt presets**: Assistant, Minimal, None, Coding, Writing,
+  Research. This is the largest lever the app has over behaviour and it
+  previously had exactly one setting, written once and never chosen. Minimal
+  and None matter on the abliterated builds — assistant framing re-establishes
+  the role that refusal behaviour belongs to, and those two stop adding a
+  persona nobody asked for. Research states that clinical and biological
+  material is the normal subject matter rather than a warning sign.
+
 ## 0.11.0
 
 Context controls, context compression, and generated launch scripts.

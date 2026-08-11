@@ -48,8 +48,10 @@ class Agent:
         effort: effortkit.Effort | None = None,
         autonomy: autonomykit.Autonomy | None = None,
         tool_allowlist: set[str] | None = None,
+        thinking: bool | None = None,
         depth: int = 0,
     ) -> None:
+        self.thinking = thinking
         self.extra_tools = list(extra_tools or [])
         self.client = client
         self.workdir = workdir
@@ -117,7 +119,9 @@ class Agent:
             timings: dict[str, Any] = {}
             failed = False
 
-            for event in self.client.stream(messages, tools=schemas, cancel=cancel):
+            for event in self.client.stream(
+                messages, tools=schemas, cancel=cancel, thinking=self.thinking
+            ):
                 if event.kind == "reasoning":
                     yield AgentEvent("reasoning", text=event.text)
                 elif event.kind == "content":

@@ -23,6 +23,7 @@ from ..core import cleanup
 from ..core import credentials
 from ..core import effort as effortkit
 from ..core import context as contextkit
+from ..core import prompts as promptkit
 from ..core import providers
 from ..core import setup_llama
 from ..config import ModelSpec, Settings
@@ -330,6 +331,27 @@ class MainWindow(QMainWindow):
         self._on_autonomy_changed()
 
         layout.addSpacing(10)
+        layout.addWidget(self._heading("Reasoning"))
+        self.thinking_combo = QComboBox()
+        self.thinking_combo.addItem("Off — answer directly", False)
+        self.thinking_combo.addItem("On — think first", True)
+        self.thinking_combo.setToolTip(
+            "Qwen3 templates default this ON, so a model left alone thinks\n"
+            "before every answer. Sent per request, so changing it takes\n"
+            "effect on the next message with no server restart.\n\n"
+            "Thinking helps on hard reasoning; it costs time on everything\n"
+            "else, and on the abliterated builds it has been observed to\n"
+            "reintroduce refusals that are absent with it off."
+        )
+        self.thinking_combo.currentIndexChanged.connect(self._on_thinking_changed)
+        layout.addWidget(self.thinking_combo)
+
+        self.thinking_blurb = QLabel()
+        self.thinking_blurb.setObjectName("blurb")
+        self.thinking_blurb.setWordWrap(True)
+        layout.addWidget(self.thinking_blurb)
+
+        layout.addSpacing(10)
         layout.addWidget(self._heading("Context"))
         row = QHBoxLayout()
         self.context_spin = QSpinBox()
@@ -414,6 +436,24 @@ class MainWindow(QMainWindow):
 
         layout.addSpacing(10)
         layout.addWidget(self._heading("System prompt"))
+        self.prompt_combo = QComboBox()
+        for preset in promptkit.PRESETS:
+            self.prompt_combo.addItem(preset.label, preset.key)
+        self.prompt_combo.addItem("Custom", "custom")
+        self.prompt_combo.setToolTip(
+            "The largest lever this app has over how a model behaves.\n\n"
+            "Assistant framing is part of what brings refusals back on the\n"
+            "abliterated builds — Minimal and None stop adding a persona\n"
+            "that was never asked for."
+        )
+        self.prompt_combo.currentIndexChanged.connect(self._on_preset_chosen)
+        layout.addWidget(self.prompt_combo)
+
+        self.prompt_note = QLabel()
+        self.prompt_note.setObjectName("blurb")
+        self.prompt_note.setWordWrap(True)
+        layout.addWidget(self.prompt_note)
+
         self.system_edit = QPlainTextEdit(self.settings.system_prompt)
         self.system_edit.setMaximumHeight(120)
         self.system_edit.textChanged.connect(self._on_system_changed)
@@ -442,6 +482,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(new_chat)
 
         self._update_workdir_label()
+        self._sync_preset_combo()
         scroller.setWidget(panel)
         return scroller
 
@@ -897,6 +938,7 @@ class MainWindow(QMainWindow):
         self.model_blurb.setText(note)
         self._sync_tools_for_model(spec)
         if hasattr(self, 'context_spin'):
+            self._sync_thinking_control()
             self._sync_context_controls()
         if hasattr(self, 'skills_summary'):
             self._update_skills_button()
@@ -1207,6 +1249,55 @@ class MainWindow(QMainWindow):
             + autonomykit.cloud_note(level, self._provider().value)
         )
 
+    # ----------------------------------------------------------- reasoning
+
+    def _thinking(self) -> bool | None:
+        """Whether the model should think first. None for cloud models.
+
+        On Claude and GPT this is the effort tier's thinking budget, set at
+        request time by the client, so a second control here would be two
+        dials on one mechanism.
+        """
+        if self._is_cloud():
+            return None
+        return bool(self.thinking_combo.currentData())
+
+    def _on_thinking_changed(self) -> None:
+        spec = self._current_spec()
+        if spec is None or self._is_cloud():
+            return
+        wanted = bool(self.thinking_combo.currentData())
+        self.settings.thinking[spec.key] = wanted
+        self.settings.save()
+        self._describe_thinking(wanted)
+
+    def _describe_thinking(self, wanted: bool) -> None:
+        if self._is_cloud():
+            self.thinking_blurb.setText(
+                "Set by the effort tier on this provider.")
+        elif wanted:
+            self.thinking_blurb.setText(
+                "Slower, and stronger on multi-step problems. Thinking is shown "
+                "separately from the answer.")
+        else:
+            self.thinking_blurb.setText(
+                "Answers begin immediately. This model's default.")
+
+    def _sync_thinking_control(self) -> None:
+        spec = self._current_spec()
+        cloud = self._is_cloud()
+        self.thinking_combo.setEnabled(spec is not None and not cloud)
+        if spec is None:
+            return
+        # The saved preference, else whatever the model ships with.
+        wanted = self.settings.thinking.get(
+            spec.key, False if cloud else spec.reasoning != "off")
+        self.thinking_combo.blockSignals(True)
+        self.thinking_combo.setCurrentIndex(
+            max(0, self.thinking_combo.findData(bool(wanted))))
+        self.thinking_combo.blockSignals(False)
+        self._describe_thinking(bool(wanted))
+
     # ------------------------------------------------------------- context
 
     def _context_budget(self) -> contextkit.Budget:
@@ -1296,6 +1387,32 @@ class MainWindow(QMainWindow):
     def _on_system_changed(self) -> None:
         self.settings.system_prompt = self.system_edit.toPlainText()
         self.settings.save()
+        self._sync_preset_combo()
+        if hasattr(self, "context_meter"):
+            self._update_context_meter()
+
+    def _on_preset_chosen(self) -> None:
+        key = self.prompt_combo.currentData()
+        preset = promptkit.BY_KEY.get(key)
+        if preset is None:          # "Custom" is a label for what is there
+            self.prompt_note.setText("Edited by hand.")
+            return
+        self.system_edit.blockSignals(True)
+        self.system_edit.setPlainText(preset.text)
+        self.system_edit.blockSignals(False)
+        self.settings.system_prompt = preset.text
+        self.settings.save()
+        self.prompt_note.setText(preset.note)
+        if hasattr(self, "context_meter"):
+            self._update_context_meter()
+
+    def _sync_preset_combo(self) -> None:
+        key = promptkit.match(self.settings.system_prompt)
+        self.prompt_combo.blockSignals(True)
+        self.prompt_combo.setCurrentIndex(max(0, self.prompt_combo.findData(key)))
+        self.prompt_combo.blockSignals(False)
+        preset = promptkit.BY_KEY.get(key)
+        self.prompt_note.setText(preset.note if preset else "Edited by hand.")
 
     def _new_conversation(self) -> None:
         if self._agent_worker is not None:
@@ -1397,6 +1514,7 @@ class MainWindow(QMainWindow):
             extra_tools=self._active_plugins(),
             effort=self._effort(),
             autonomy=self._autonomy(),
+            thinking=self._thinking(),
         )
 
         self._thinking = None

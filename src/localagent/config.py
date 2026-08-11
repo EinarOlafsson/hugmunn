@@ -541,7 +541,8 @@ REGISTRY: tuple[ModelSpec, ...] = (
         script="uncensored.sh",
         port=8087,
         blurb="Same 27B base, refusals ablated. 36.7 tok/s, all GPU. "
-              "Tool calling verified intact.",
+              "Tool calling verified intact."
+              "Reasoning off matters here: with thinking on, refusals reappear.",
         repo="llmfan46/Qwen3.6-27B-uncensored-heretic-v2-Native-MTP-Preserved-GGUF",
         files=("Qwen3.6-27B-uncensored-heretic-v2-Native-MTP-Preserved-Q5_K_M.gguf",),
         download_gb=19.7,
@@ -555,7 +556,8 @@ REGISTRY: tuple[ModelSpec, ...] = (
         script="uncensored-big.sh",
         port=8088,
         blurb="Most capable uncensored model that fits. 13.2 tok/s, and 5x "
-              "faster prompts than the stock 122B. Tool calling verified.",
+              "faster prompts than the stock 122B. Tool calling verified."
+              "Reasoning off matters here: with thinking on, refusals reappear.",
         ram_gb=90,
         repo="mradermacher/Qwen3.5-122B-A10B-abliterated-i1-GGUF",
         files=("Qwen3.5-122B-A10B-abliterated.i1-Q5_K_M.gguf",),
@@ -642,6 +644,9 @@ class Settings:
     # Tokens held back for the reply. A window that is full to the last token
     # has nowhere to put the answer.
     reserve_output: int = 2048
+    # Whether each local model thinks before answering. Absent means the
+    # model's own default from the registry.
+    thinking: dict[str, bool] = field(default_factory=dict)
     # API keys are deliberately NOT here. See core/credentials.py: this file
     # is the one a user might copy between machines or paste into a bug report.
 

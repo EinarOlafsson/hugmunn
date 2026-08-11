@@ -136,6 +136,7 @@ class OpenAIClient(_CloudBase):
         temperature: float | None = None,
         max_tokens: int = 4096,
         cancel: Any = None,
+        thinking: bool | None = None,   # set by the effort tier, not per call
     ) -> Iterator[Event]:
         payload: dict[str, Any] = {
             "model": self.model.id,
@@ -362,6 +363,7 @@ class AnthropicClient(_CloudBase):
         temperature: float | None = None,
         max_tokens: int = 4096,
         cancel: Any = None,
+        thinking: bool | None = None,   # set by the effort tier, not per call
     ) -> Iterator[Event]:
         payload = self._payload(messages, tools, temperature, max_tokens)
         # Tool arguments arrive as partial JSON on input_json_delta and are
