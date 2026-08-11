@@ -24,6 +24,7 @@ from ..core.agent import Agent
 from ..core.client import LlamaClient
 from ..core.server import ServerManager
 from . import style
+from .resource_bar import ResourceBar
 from .chat import AssistantBlock, Notice, ThinkingCard, ToolCard, Transcript, UserBubble
 from .workers import AgentWorker, ServerWorker
 
@@ -142,6 +143,11 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
+        layout.addWidget(self._heading("System"))
+        self.resources = ResourceBar()
+        layout.addWidget(self.resources)
+
+        layout.addSpacing(10)
         layout.addWidget(self._heading("Model"))
         self.model_combo = QComboBox()
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)

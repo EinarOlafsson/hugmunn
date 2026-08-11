@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+Live CPU / RAM / GPU / VRAM meters in the sidebar.
+
+Read from `/proc` and `nvidia-smi` directly rather than adding a psutil
+dependency. Bars are colour-coded by pressure, and the note under them names
+the specific problem rather than saying "high usage" — swap in use, VRAM
+exhausted, or too little RAM for the large models. Every parser degrades to
+zeros instead of raising, since it runs on a one-second timer.
+
 ## 0.5.0
 
 Effort tiers and autonomy levels.
