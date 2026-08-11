@@ -19,6 +19,27 @@ MODELS_ROOT = Path(os.environ.get("LOCALAGENT_MODELS_ROOT", Path.home() / ".clau
 CONFIG_DIR = Path(os.environ.get("LOCALAGENT_CONFIG_DIR", Path.home() / ".config" / "localagent"))
 CONFIG_FILE = CONFIG_DIR / "settings.json"
 
+# Where the user actually put each model, keyed by model key. Populated from
+# Settings on load. Kept module-level because ModelSpec is frozen and its
+# availability check is called from many places that have no Settings handle.
+_MODEL_PATHS: dict[str, Path] = {}
+
+
+def set_model_path(key: str, path: str | Path | None) -> None:
+    """Record where a model's primary weight file lives. None clears it."""
+    if path is None:
+        _MODEL_PATHS.pop(key, None)
+    else:
+        _MODEL_PATHS[key] = Path(path).expanduser()
+
+
+def model_path_override(key: str) -> Path | None:
+    return _MODEL_PATHS.get(key)
+
+
+def all_model_paths() -> dict[str, str]:
+    return {k: str(v) for k, v in _MODEL_PATHS.items()}
+
 
 _SHARD_RE = re.compile(r"^(?P<stem>.+)-(?P<index>\d{5})-of-(?P<total>\d{5})\.gguf$")
 
@@ -90,8 +111,8 @@ class ModelSpec:
         return 0
 
     @property
-    def expected_model_path(self) -> Path:
-        """The exact file the launch script opens, absolute.
+    def script_model_path(self) -> Path:
+        """The file the launch script hardcodes, absolute.
 
         Authoritative for where a download must end up: the script is what
         actually loads the weights, so anything else is a guess that can drift.
@@ -107,6 +128,17 @@ class ModelSpec:
                 return Path(part.replace("$BASE", str(MODELS_ROOT)))
         return Path()
 
+    @property
+    def model_path(self) -> Path:
+        """Where the weights actually are.
+
+        A user-chosen location wins over the script's default. The override is
+        applied by passing ``--model`` as an extra argument at launch — the
+        scripts forward ``"$@"`` and llama.cpp takes the last occurrence — so
+        the script itself is never rewritten and keeps its tuning.
+        """
+        return model_path_override(self.key) or self.script_model_path
+
     def expected_files(self) -> dict[str, Path]:
         """Map each repo file to the absolute path the script needs it at.
 
@@ -116,7 +148,7 @@ class ModelSpec:
         per-model folder the launch scripts use and silently misplace every
         sharded model.
         """
-        first = self.expected_model_path
+        first = self.model_path
         # Path() is PosixPath('.'), which is truthy — a bare falsiness check
         # here silently produced relative targets and would have written the
         # weights into the current working directory.
@@ -125,6 +157,20 @@ class ModelSpec:
         folder = first.parent
         return {name: folder / Path(name).name for name in self.files}
 
+    def missing_shards(self, primary: Path) -> list[Path]:
+        """Which sibling shards are absent beside ``primary``.
+
+        Used when a user points at weights they already have: a single shard
+        selected out of a set loads with an opaque llama.cpp error, so the
+        gap is worth reporting before it becomes a failed launch.
+        """
+        primary = Path(primary).expanduser()
+        return [
+            primary.parent / Path(name).name
+            for name in self.files
+            if not (primary.parent / Path(name).name).is_file()
+        ]
+
     def is_available(self) -> bool:
         """True when the launch script exists and its weights have been downloaded."""
         if not self.script_path.is_file():
@@ -132,24 +178,13 @@ class ModelSpec:
         return bool(self._model_arg_exists())
 
     def _model_arg_exists(self) -> bool:
-        """Parse the --model line out of the script and check the weights are complete.
+        """Check the effective weight path, and every shard beside it.
 
-        Large quants ship as ``…-00001-of-00003.gguf`` shard sets. Checking only
-        the first shard reports a half-downloaded model as ready, and llama.cpp
-        then fails at load with an unhelpful error — so every shard is verified.
+        Large quants ship as ``…-00001-of-00003.gguf`` sets. Checking only the
+        first shard reports a half-downloaded model as ready and llama.cpp then
+        fails at load with an unhelpful error, so every shard is verified.
         """
-        try:
-            text = self.script_path.read_text(encoding="utf-8")
-        except OSError:
-            return False
-        for line in text.splitlines():
-            line = line.strip()
-            if not line.startswith("--model"):
-                continue
-            # --model "$BASE/gguf/foo.gguf" \
-            part = line.split(maxsplit=1)[1].strip().rstrip("\\").strip().strip('"').strip("'")
-            return _weights_complete(Path(part.replace("$BASE", str(MODELS_ROOT))))
-        return False
+        return _weights_complete(self.model_path)
 
 
 # Mirrors ~/.claude/models/scripts/. Ports match the --port in each script.
@@ -309,6 +344,9 @@ class Settings:
         "result rather than guessing. Prefer showing code over describing it."
     )
     max_tool_iterations: int = 12
+    # Absolute path to each model's primary weight file, when the user has
+    # put it somewhere other than the launch script's default.
+    model_paths: dict[str, str] = field(default_factory=dict)
     effort_level: int = 2      # core.effort.Effort
     autonomy_level: int = 2    # core.autonomy.Autonomy
     custom_base_url: str = ""
@@ -320,9 +358,13 @@ class Settings:
         except (OSError, json.JSONDecodeError):
             return cls()
         known = {f for f in cls.__dataclass_fields__}
-        return cls(**{k: v for k, v in data.items() if k in known})
+        settings = cls(**{k: v for k, v in data.items() if k in known})
+        for key, path in (settings.model_paths or {}).items():
+            set_model_path(key, path)
+        return settings
 
     def save(self) -> None:
+        self.model_paths = all_model_paths()
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         tmp = CONFIG_FILE.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(asdict(self), indent=2), encoding="utf-8")

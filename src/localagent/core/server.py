@@ -65,7 +65,17 @@ class ServerManager:
         if not script.is_file():
             raise ServerError(f"launch script not found: {script}")
         if not os.access(script, os.X_OK):
-            raise ServerError(f"launch script is not executable: {script}")
+            # A missing +x bit is trivially fixable and not worth failing on —
+            # three shipped scripts were mode 644 for weeks and simply could
+            # not be launched. Repair it, and only give up if that fails too.
+            try:
+                script.chmod(script.stat().st_mode | 0o111)
+                report(f"made {script.name} executable")
+            except OSError as exc:
+                raise ServerError(
+                    f"launch script is not executable and could not be fixed: "
+                    f"{script} ({exc}). Run: chmod +x {script}"
+                ) from exc
 
         self.stop()
         self.log_tail.clear()
@@ -73,8 +83,19 @@ class ServerManager:
 
         # start_new_session so we can signal the whole process group; the scripts
         # exec llama-server, but a shell may sit in between.
+        # A user-chosen weight location is applied as an extra --model argument
+        # rather than by editing the script: the scripts forward "$@" and
+        # llama.cpp takes the last occurrence, so per-model tuning is preserved.
+        command = [str(script)]
+        from ..config import model_path_override
+
+        override = model_path_override(spec.key)
+        if override is not None:
+            command += ["--model", str(override)]
+            report(f"using weights at {override}")
+
         self._proc = subprocess.Popen(
-            [str(script)],
+            command,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

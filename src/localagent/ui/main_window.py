@@ -350,6 +350,19 @@ class MainWindow(QMainWindow):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
+        # "I already have it" — record the location and skip the download.
+        located = dialog.located_path()
+        if located is not None:
+            config.set_model_path(spec.key, located)
+            self.settings.save()
+            self._refresh_models()
+            index = self.model_combo.findData(spec.key)
+            if index >= 0:
+                self.model_combo.setCurrentIndex(index)
+            self.download_note.setText(f"{spec.label} located at {located}")
+            self.download_note.setVisible(True)
+            return
+
         worker = DownloadWorker(spec, dialog.destination(), self,
                                 targets=spec.expected_files())
         worker.progress.connect(self._on_download_progress)
@@ -376,17 +389,23 @@ class MainWindow(QMainWindow):
 
     def _on_download_done(self, spec: ModelSpec, destination: str) -> None:
         self.download_progress.setVisible(False)
-        self.download_note.setText(f"{spec.label} downloaded to {destination}")
+        # Record where the weights actually landed, so the launch gets a
+        # --model override and the user's disk choice survives a restart.
+        primary = Path(destination) / Path(spec.files[0])
+        if primary.is_file():
+            config.set_model_path(spec.key, primary)
+            self.settings.save()
         self._refresh_models()
         if spec.is_available():
+            self.download_note.setText(f"{spec.label} ready — weights at {primary.parent}")
             index = self.model_combo.findData(spec.key)
             if index >= 0:
                 self.model_combo.setCurrentIndex(index)
         else:
+            missing = spec.missing_shards(primary)
             self.download_note.setText(
-                f"Files are in {destination}, but the launch script points "
-                f"elsewhere. Move them under ~/.claude/models/gguf/, or edit "
-                f"{spec.script}."
+                f"Downloaded to {destination}, but {len(missing)} file(s) are "
+                f"still missing: {', '.join(m.name for m in missing[:3])}"
             )
 
     def _on_download_failed(self, message: str) -> None:

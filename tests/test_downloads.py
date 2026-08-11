@@ -106,7 +106,7 @@ class TestDestinationMatchesTheLaunchScript:
         targets = spec.expected_files()
         assert len(targets) == 3
         for path in targets.values():
-            assert path.parent == spec.expected_model_path.parent
+            assert path.parent == spec.model_path.parent
 
     def test_shards_are_siblings(self):
         """llama.cpp finds shard 2 and 3 beside shard 1."""
@@ -119,7 +119,7 @@ class TestDestinationMatchesTheLaunchScript:
             targets = m.expected_files()
             if not targets:
                 continue
-            assert targets[m.files[0]] == m.expected_model_path, m.key
+            assert targets[m.files[0]] == m.model_path, m.key
 
     def test_subdirectory_in_the_repo_path_is_not_carried_into_the_target(self):
         """UD-Q5_K_XL/ is a repo folder; the script uses its own layout."""
@@ -158,3 +158,88 @@ class TestLinkIntoPlace:
         downloads._link_into_place(old, expected)
         downloads._link_into_place(new, expected)
         assert expected.read_bytes() == b"new"
+
+
+class TestUserChosenLocation:
+    """Weights may live anywhere; the app remembers where."""
+
+    def setup_method(self):
+        config._MODEL_PATHS.clear()
+
+    def teardown_method(self):
+        config._MODEL_PATHS.clear()
+
+    def test_override_changes_the_effective_path(self, tmp_path):
+        spec = config.by_key("write-big")
+        assert spec.model_path == spec.script_model_path
+        config.set_model_path("write-big", tmp_path / "m.gguf")
+        assert spec.model_path == tmp_path / "m.gguf"
+
+    def test_override_can_be_cleared(self, tmp_path):
+        config.set_model_path("write", tmp_path / "m.gguf")
+        config.set_model_path("write", None)
+        spec = config.by_key("write")
+        assert spec.model_path == spec.script_model_path
+
+    def test_availability_follows_the_override(self, tmp_path):
+        spec = config.by_key("uncensored-big")
+        weights = tmp_path / Path(spec.files[0]).name
+        weights.write_bytes(b"x")
+        config.set_model_path("uncensored-big", weights)
+        assert spec.is_available()
+
+    def test_shards_are_looked_for_beside_the_override(self, tmp_path):
+        spec = config.by_key("write-big")
+        first = tmp_path / Path(spec.files[0]).name
+        first.write_bytes(b"x")
+        config.set_model_path("write-big", first)
+        assert not spec.is_available(), "one shard of three is not enough"
+        for name in spec.files[1:]:
+            (tmp_path / Path(name).name).write_bytes(b"x")
+        assert spec.is_available()
+
+    def test_settings_roundtrip_restores_the_path(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
+        monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "settings.json")
+        config.set_model_path("agentic", "/mnt/big/minimax/shard1.gguf")
+        config.Settings().save()
+        config._MODEL_PATHS.clear()
+        assert config.by_key("agentic").model_path == config.by_key("agentic").script_model_path
+        config.Settings.load()
+        assert str(config.model_path_override("agentic")) == "/mnt/big/minimax/shard1.gguf"
+
+    def test_launch_passes_the_override_as_an_argument(self, tmp_path, monkeypatch):
+        """The scripts forward "$@" and llama.cpp takes the last --model."""
+        import subprocess
+        from localagent.core.server import ServerManager
+
+        seen = {}
+
+        class FakePopen:
+            def __init__(self, cmd, **kw):
+                seen["cmd"] = cmd
+                self.stdout = None
+            def poll(self): return 0
+            def wait(self, timeout=None): return 0
+
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+        config.set_model_path("write", tmp_path / "custom.gguf")
+        mgr = ServerManager()
+        try:
+            mgr.start(config.by_key("write"), timeout=0.01)
+        except Exception:
+            pass
+        assert "--model" in seen.get("cmd", [])
+        assert str(tmp_path / "custom.gguf") in seen["cmd"]
+
+
+class TestMissingShards:
+    def test_reports_every_absent_sibling(self, tmp_path):
+        spec = config.by_key("write-big")
+        assert len(spec.missing_shards(tmp_path / "a.gguf")) == 3
+
+    def test_empty_when_all_present(self, tmp_path):
+        spec = config.by_key("code-q6")
+        for name in spec.files:
+            (tmp_path / Path(name).name).write_bytes(b"x")
+        assert spec.missing_shards(tmp_path / Path(spec.files[0]).name) == []

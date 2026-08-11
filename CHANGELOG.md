@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.8.0
+
+Weights can live anywhere; the app remembers where.
+
+- `Settings.model_paths` stores an absolute path per model. Availability
+  checks, shard verification and launching all follow it.
+- The override is applied by passing `--model` as an extra argument to the
+  launch script — the scripts forward `"$@"` and llama.cpp takes the last
+  occurrence — so the script keeps its per-model tuning and is never rewritten.
+  This replaces the 0.7.1 symlink, which worked but was indirect.
+- **"I already have it…"** in the download dialog points the app at weights
+  copied from another machine or fetched outside it. Selecting one shard of a
+  set is rejected with the specific siblings that are missing, rather than
+  failing later inside llama.cpp.
+- After a download the destination is recorded automatically, so a chosen disk
+  survives a restart.
+
+Also fixes three launch scripts (`write.sh`, `code.sh`, `code-heavy.sh`) that
+were mode 644 on disk and in git and therefore could never be started. The
+server now repairs a missing `+x` rather than refusing.
+
 ## 0.7.1
 
 Fixes downloaded models reporting themselves as not downloaded.
