@@ -186,8 +186,16 @@ def download(
     destination: Path,
     on_progress=None,
     cancel=None,
+    targets: dict[str, Path] | None = None,
 ) -> list[Path]:
     """Fetch ``filenames`` from ``repo`` into ``destination``.
+
+    ``targets`` maps each repo file to the absolute path the launch script will
+    open. When ``destination`` is elsewhere — the point of letting the user pick
+    a disk — the bytes land there and a symlink is created at the expected path,
+    so the script needs no editing. Without this the subdirectory in a sharded
+    repo path was dropped and three of the four sharded models were written
+    somewhere llama.cpp never looks.
 
     Resumes a partial file with a Range request rather than restarting — at
     87 GB over a link that has been measured between 3 and 29 MB/s here, losing
@@ -202,11 +210,15 @@ def download(
     written: list[Path] = []
 
     with httpx.Client(timeout=TIMEOUT, follow_redirects=True) as client:
-        for index, (name, expected) in enumerate(zip(filenames, sizes)):
-            target = destination / Path(name).name
+        for index, (name, expected_size) in enumerate(zip(filenames, sizes)):
+            expected_path = (targets or {}).get(name)
+            # Preserve the repo's own folder structure under the chosen root so
+            # shards stay siblings, which is how llama.cpp finds them.
+            target = destination / Path(name)
+            target.parent.mkdir(parents=True, exist_ok=True)
             partial = target.with_suffix(target.suffix + ".part")
 
-            if target.is_file() and (not expected or target.stat().st_size == expected):
+            if target.is_file() and (not expected_size or target.stat().st_size == expected_size):
                 overall_done += target.stat().st_size
                 written.append(target)
                 continue
@@ -234,7 +246,7 @@ def download(
                             if on_progress:
                                 on_progress(Progress(
                                     index + 1, len(filenames), Path(name).name,
-                                    done, expected or done,
+                                    done, expected_size or done,
                                     overall_done + done, overall_total or done,
                                 ))
             except httpx.HTTPError as exc:
@@ -243,5 +255,29 @@ def download(
             partial.replace(target)
             overall_done += target.stat().st_size
             written.append(target)
+            if expected_path:
+                _link_into_place(target, expected_path)
 
     return written
+
+
+def _link_into_place(actual: Path, expected: Path) -> None:
+    """Make ``expected`` resolve to ``actual`` without copying 87 GB.
+
+    A symlink rather than editing the launch script: the script carries tuning
+    that should not be rewritten by the app, and a link is trivially reversible.
+    """
+    if actual == expected or expected.exists() and expected.resolve() == actual.resolve():
+        return
+    expected.parent.mkdir(parents=True, exist_ok=True)
+    if expected.is_symlink() or expected.exists():
+        expected.unlink()
+    try:
+        expected.symlink_to(actual)
+    except OSError:
+        # Filesystems without symlink support (some network mounts) — fall back
+        # to a hard link, and if that fails leave it for the caller to report.
+        try:
+            os.link(actual, expected)
+        except OSError:
+            pass

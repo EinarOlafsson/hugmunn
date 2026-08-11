@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.7.1
+
+Fixes downloaded models reporting themselves as not downloaded.
+
+The downloader wrote every file as `destination / basename`, dropping the
+subdirectory in the repo path. `write-big`, `code-q6` and `agentic` therefore
+landed beside `gguf/` instead of inside the folder their launch script opens,
+so `is_available()` stayed false after a successful download. Only
+`uncensored-big` worked, being a single file with no subdirectory.
+
+- Destinations now come from the launch script — `expected_model_path` parses
+  its `--model`, and shards are placed beside it as llama.cpp expects. The
+  script loads the weights, so it is the authority on where they go.
+- Downloading to another disk still works: bytes land there and a symlink is
+  created at the expected path, so the script needs no editing.
+- With nothing downloaded, the picker now selects the *smallest* model rather
+  than index 0. Previously a fresh machine reported the 27B missing while the
+  user had a 122B on disk.
+- Fixed a latent bug the new tests caught: `Path()` is `PosixPath('.')` and
+  therefore truthy, so a missing script produced relative targets and would
+  have written weights into the current working directory.
+
 ## 0.7.0
 
 In-app model downloads, and the resource meters move to the bottom.

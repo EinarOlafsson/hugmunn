@@ -89,6 +89,42 @@ class ModelSpec:
                     return int(parts[1])
         return 0
 
+    @property
+    def expected_model_path(self) -> Path:
+        """The exact file the launch script opens, absolute.
+
+        Authoritative for where a download must end up: the script is what
+        actually loads the weights, so anything else is a guess that can drift.
+        """
+        try:
+            text = self.script_path.read_text(encoding="utf-8")
+        except OSError:
+            return Path()
+        for line in text.splitlines():
+            line = line.strip()
+            if line.startswith("--model"):
+                part = line.split(maxsplit=1)[1].strip().rstrip("\\").strip().strip('"').strip("'")
+                return Path(part.replace("$BASE", str(MODELS_ROOT)))
+        return Path()
+
+    def expected_files(self) -> dict[str, Path]:
+        """Map each repo file to the absolute path the script needs it at.
+
+        Shards live beside the first file under llama.cpp's convention, so the
+        directory comes from the script and the names from the repo listing.
+        Reconstructing the directory from the repo path instead would drop the
+        per-model folder the launch scripts use and silently misplace every
+        sharded model.
+        """
+        first = self.expected_model_path
+        # Path() is PosixPath('.'), which is truthy — a bare falsiness check
+        # here silently produced relative targets and would have written the
+        # weights into the current working directory.
+        if not first.is_absolute() or not self.files:
+            return {}
+        folder = first.parent
+        return {name: folder / Path(name).name for name in self.files}
+
     def is_available(self) -> bool:
         """True when the launch script exists and its weights have been downloaded."""
         if not self.script_path.is_file():

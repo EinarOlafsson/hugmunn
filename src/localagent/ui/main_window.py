@@ -350,7 +350,8 @@ class MainWindow(QMainWindow):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
-        worker = DownloadWorker(spec, dialog.destination(), self)
+        worker = DownloadWorker(spec, dialog.destination(), self,
+                                targets=spec.expected_files())
         worker.progress.connect(self._on_download_progress)
         worker.finished_ok.connect(lambda d, s=spec: self._on_download_done(s, d))
         worker.failed.connect(self._on_download_failed)
@@ -563,6 +564,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------- model list
 
     def _refresh_models(self) -> None:
+        spec_zero = config.ModelSpec("", "", "", 0, "")  # sort key fallback
         self.model_combo.blockSignals(True)
         self.model_combo.clear()
         for spec in config.REGISTRY:
@@ -589,7 +591,14 @@ class MainWindow(QMainWindow):
         elif downloaded:
             self.model_combo.setCurrentIndex(downloaded[0])
         elif self.model_combo.count():
-            self.model_combo.setCurrentIndex(0)
+            # Nothing downloaded at all. Land on the smallest model rather than
+            # whatever happens to be first, so a fresh install is offered the
+            # cheapest useful download instead of a 102 GB one.
+            smallest = min(
+                range(self.model_combo.count()),
+                key=lambda i: (config.by_key(self.model_combo.itemData(i)) or spec_zero).download_gb,
+            )
+            self.model_combo.setCurrentIndex(smallest)
         self.model_combo.blockSignals(False)
         self._on_model_changed()
 

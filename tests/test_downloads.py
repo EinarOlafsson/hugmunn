@@ -95,3 +95,66 @@ class TestProgress:
 
     def test_zero_total_does_not_divide_by_zero(self):
         assert downloads.Progress(1, 1, "a", 0, 0, 0, 0).percent == 0.0
+
+
+class TestDestinationMatchesTheLaunchScript:
+    """The bug: repo paths were flattened, so 3 of 4 sharded models landed
+    where llama.cpp never looks and reported themselves not-downloaded."""
+
+    def test_expected_files_use_the_script_directory(self):
+        spec = config.by_key("write-big")
+        targets = spec.expected_files()
+        assert len(targets) == 3
+        for path in targets.values():
+            assert path.parent == spec.expected_model_path.parent
+
+    def test_shards_are_siblings(self):
+        """llama.cpp finds shard 2 and 3 beside shard 1."""
+        for key in ("write-big", "code-q6", "agentic"):
+            parents = {p.parent for p in config.by_key(key).expected_files().values()}
+            assert len(parents) == 1, key
+
+    def test_first_file_maps_to_the_model_argument(self):
+        for m in config.REGISTRY:
+            targets = m.expected_files()
+            if not targets:
+                continue
+            assert targets[m.files[0]] == m.expected_model_path, m.key
+
+    def test_subdirectory_in_the_repo_path_is_not_carried_into_the_target(self):
+        """UD-Q5_K_XL/ is a repo folder; the script uses its own layout."""
+        spec = config.by_key("write-big")
+        assert "UD-Q5_K_XL" in spec.files[0]
+        target = spec.expected_files()[spec.files[0]]
+        assert target.name == Path(spec.files[0]).name
+        assert "qwen3.5-122b" in str(target)
+
+    def test_missing_script_yields_no_targets(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(config, "MODELS_ROOT", tmp_path)
+        spec = config.ModelSpec("k", "L", "nope.sh", 1, "b",
+                                repo="r", files=("a.gguf",), download_gb=1)
+        assert spec.expected_files() == {}
+
+
+class TestLinkIntoPlace:
+    def test_links_when_paths_differ(self, tmp_path):
+        actual = tmp_path / "elsewhere" / "m.gguf"
+        actual.parent.mkdir()
+        actual.write_bytes(b"weights")
+        expected = tmp_path / "gguf" / "sub" / "m.gguf"
+        downloads._link_into_place(actual, expected)
+        assert expected.exists() and expected.read_bytes() == b"weights"
+
+    def test_noop_when_paths_are_the_same(self, tmp_path):
+        path = tmp_path / "m.gguf"
+        path.write_bytes(b"x")
+        downloads._link_into_place(path, path)
+        assert path.read_bytes() == b"x"
+
+    def test_replaces_a_stale_link(self, tmp_path):
+        old = tmp_path / "old.gguf"; old.write_bytes(b"old")
+        new = tmp_path / "new.gguf"; new.write_bytes(b"new")
+        expected = tmp_path / "link.gguf"
+        downloads._link_into_place(old, expected)
+        downloads._link_into_place(new, expected)
+        assert expected.read_bytes() == b"new"

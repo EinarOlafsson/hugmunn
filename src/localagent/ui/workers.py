@@ -118,10 +118,11 @@ class DownloadWorker(QThread):
     finished_ok = pyqtSignal(str)   # destination
     failed = pyqtSignal(str)
 
-    def __init__(self, spec, destination, parent=None) -> None:
+    def __init__(self, spec, destination, parent=None, targets=None) -> None:
         super().__init__(parent)
         self._spec = spec
         self._destination = destination
+        self._targets = targets
         self._cancel = threading.Event()
 
     def cancel(self) -> None:
@@ -134,6 +135,7 @@ class DownloadWorker(QThread):
             downloads.download(
                 self._spec.repo, list(self._spec.files), self._destination,
                 on_progress=self.progress.emit, cancel=self._cancel,
+                targets=self._targets,
             )
         except downloads.DownloadError as exc:
             self.failed.emit(str(exc))
