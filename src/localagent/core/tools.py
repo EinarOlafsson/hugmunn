@@ -339,11 +339,184 @@ TOOLS: tuple[Tool, ...] = (
     ),
 )
 
-BY_NAME: dict[str, Tool] = {t.name: t for t in TOOLS}
+
+def _p(props: dict[str, Any], required: list[str]) -> dict[str, Any]:
+    return {"type": "object", "properties": props, "required": required}
+
+
+# Registered after TOOLS is defined so devtools/research can import helpers from
+# this module without a circular import.
+def _late_tools() -> tuple["Tool", ...]:
+    from . import devtools, research
+
+    S = lambda d: {"type": "string", "description": d}  # noqa: E731
+    I = lambda d: {"type": "integer", "description": d}  # noqa: E731
+
+    return (
+        Tool(
+            name="edit_file",
+            description=(
+                "Replace an exact substring in a file. Prefer this over "
+                "write_file for any change to an existing file — it does not "
+                "require reproducing the whole file, and it fails loudly if the "
+                "target text is missing or ambiguous instead of corrupting "
+                "silently. Read the file first so `old` matches exactly."
+            ),
+            parameters=_p({
+                "path": S("File to edit, relative to the working directory."),
+                "old": S("Exact text to replace, including indentation."),
+                "new": S("Replacement text."),
+                "count": I("Expected number of occurrences. Default 1."),
+            }, ["path", "old", "new"]),
+            run=devtools.edit_file,
+            requires_approval=True,
+        ),
+        Tool(
+            name="glob_files",
+            description=(
+                "Find files by glob pattern (e.g. '**/*.py', 'data/*.csv'), "
+                "newest first. Use to orient in an unfamiliar tree before reading."
+            ),
+            parameters=_p({
+                "pattern": S("Glob pattern. Default '**/*.py'."),
+                "max_results": I("Cap on results. Default 200."),
+            }, []),
+            run=devtools.glob_files,
+        ),
+        Tool(
+            name="diff_files",
+            description="Unified diff between two files. Use to compare versions or verify an edit.",
+            parameters=_p({"path_a": S("First file."), "path_b": S("Second file.")},
+                          ["path_a", "path_b"]),
+            run=devtools.diff_files,
+        ),
+        Tool(
+            name="python_exec",
+            description=(
+                "Run a Python snippet in the working directory and return its "
+                "output. Use for calculations, data inspection, and quick checks "
+                "you cannot do reliably in your head. Print what you want back. "
+                "Requires user approval."
+            ),
+            parameters=_p({
+                "code": S("Python source to execute."),
+                "timeout": I("Seconds before it is killed. Default 60."),
+            }, ["code"]),
+            run=devtools.python_exec,
+            requires_approval=True,
+        ),
+        Tool(
+            name="sql_schema",
+            description=(
+                "List the tables, columns, and row counts of a SQLite database. "
+                "Always call this before sql_query — guessing column names wastes "
+                "a round trip."
+            ),
+            parameters=_p({"database": S("Path to the .db file.")}, ["database"]),
+            run=devtools.sql_schema,
+        ),
+        Tool(
+            name="sql_query",
+            description=(
+                "Run a read-only SQL query against a SQLite database and return "
+                "rows as a table. The connection is opened read-only, so writes "
+                "are rejected."
+            ),
+            parameters=_p({
+                "database": S("Path to the .db file."),
+                "query": S("SQL SELECT statement."),
+                "max_rows": I("Cap on rows returned. Default 100."),
+            }, ["database", "query"]),
+            run=devtools.sql_query,
+        ),
+        Tool(
+            name="pubmed_search",
+            description=(
+                "Search PubMed and return structured records — title, authors, "
+                "journal, year, PMID, DOI, abstract. Use this rather than "
+                "web_search for any literature question: the fields are real, so "
+                "a citation built from them is real."
+            ),
+            parameters=_p({
+                "query": S("Search terms, e.g. 'Toxoplasma bradyzoite differentiation'."),
+                "max_results": I("How many records. Default 8."),
+            }, ["query"]),
+            run=research.pubmed_search,
+        ),
+        Tool(
+            name="arxiv_search",
+            description=(
+                "Search arXiv and return structured records with abstracts and "
+                "direct PDF links. Use for preprints, methods, and computational work."
+            ),
+            parameters=_p({
+                "query": S("Search terms."),
+                "max_results": I("How many records. Default 8."),
+            }, ["query"]),
+            run=research.arxiv_search,
+        ),
+        Tool(
+            name="read_pdf",
+            description=(
+                "Extract the text of a local PDF. Pairs with download_pdfs: "
+                "collect papers, then actually read them."
+            ),
+            parameters=_p({
+                "path": S("PDF file, relative to the working directory."),
+                "max_chars": I("Truncate to this length. Default 12000."),
+            }, ["path"]),
+            run=research.read_pdf,
+        ),
+        Tool(
+            name="image_info",
+            description=(
+                "Report dimensions, bit depth, channel mode, frame count, and "
+                "metadata of a local image. Use on microscopy files to check "
+                "acquisition settings before analysing — multi-frame TIFFs are "
+                "z-stacks or time series."
+            ),
+            parameters=_p({"path": S("Image file, relative to the working directory.")},
+                          ["path"]),
+            run=research.image_info,
+        ),
+    )
+
+
+_CORE_TOOLS = TOOLS
+del TOOLS  # rebuilt lazily below
+
+_ALL: tuple[Tool, ...] | None = None
+
+
+def _all_tools() -> tuple[Tool, ...]:
+    """Build the full registry on first use.
+
+    ``devtools`` and ``research`` import helpers from this module, so importing
+    them at module scope makes the import order load-bearing: importing
+    ``research`` first raised a partially-initialised-module error while
+    importing ``tools`` first quietly worked. Deferring to first attribute
+    access removes the ordering dependency entirely.
+    """
+    global _ALL
+    if _ALL is None:
+        _ALL = _CORE_TOOLS + _late_tools()
+    return _ALL
+
+
+def __getattr__(name: str):  # PEP 562
+    if name == "TOOLS":
+        return _all_tools()
+    if name == "BY_NAME":
+        return {t.name: t for t in _all_tools()}
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+def by_name() -> dict[str, Tool]:
+    """Name -> Tool for the full registry. ``tools.BY_NAME`` is the lazy alias."""
+    return {t.name: t for t in _all_tools()}
 
 
 def schemas() -> list[dict[str, Any]]:
-    return [t.schema() for t in TOOLS]
+    return [t.schema() for t in _all_tools()]
 
 
 def execute(
@@ -353,9 +526,10 @@ def execute(
     extra: dict[str, Tool] | None = None,
 ) -> str:
     """Run a tool. ``extra`` holds user plugins; built-ins always win a name clash."""
-    tool = BY_NAME.get(name) or (extra or {}).get(name)
+    registry = by_name()
+    tool = registry.get(name) or (extra or {}).get(name)
     if tool is None:
-        known = ", ".join(sorted(set(BY_NAME) | set(extra or {})))
+        known = ", ".join(sorted(set(registry) | set(extra or {})))
         return f"Error: no such tool {name!r}. Available: {known}"
     try:
         return tool.run(workdir, **arguments)

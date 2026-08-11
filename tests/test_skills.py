@@ -117,3 +117,24 @@ class TestShippedSkills:
     def test_keys_unique(self):
         keys = [s.key for s in skills.load_all()]
         assert len(keys) == len(set(keys))
+
+
+class TestShippedInventory:
+    """Guard the properties the sidebar and context budget depend on."""
+
+    def test_every_skill_has_a_known_category(self):
+        allowed = {"Core", "Coding", "Science", "Web", "Writing", "Meta"}
+        bad = {s.name: s.category for s in skills.load_all() if s.category not in allowed}
+        assert not bad, f"unexpected categories: {bad}"
+
+    def test_every_skill_has_a_description(self):
+        missing = [s.name for s in skills.load_all() if not s.description.strip()]
+        assert not missing, f"missing description: {missing}"
+
+    def test_no_single_skill_dominates_the_context(self):
+        """A 16K window still needs room for the conversation."""
+        fat = {s.name: s.approx_tokens for s in skills.load_all() if s.approx_tokens > 1200}
+        assert not fat, f"too large: {fat}"
+
+    def test_enabling_everything_stays_under_a_quarter_of_16k(self):
+        assert skills.total_tokens(skills.load_all()) < 12_000
