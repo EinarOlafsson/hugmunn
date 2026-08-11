@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localagent"
-version = "0.1.0"
+version = "0.5.0"
 description = "Qt desktop client for locally-hosted LLMs served by llama.cpp"
 readme = "README.md"
 requires-python = ">=3.10"

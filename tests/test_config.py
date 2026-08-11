@@ -134,3 +134,25 @@ class TestSettings:
         monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "settings.json")
         config.Settings().save()
         assert not list(tmp_path.glob("*.tmp"))  # temp file renamed away
+
+
+class TestVersion:
+    def test_package_and_pyproject_agree(self):
+        """A version bumped in one place and not the other ships a lie."""
+        import re
+        from pathlib import Path
+
+        import localagent
+
+        pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject.read_text(), re.M)
+        assert match, "no version in pyproject.toml"
+        assert match.group(1) == localagent.__version__
+
+    def test_changelog_documents_the_current_version(self):
+        from pathlib import Path
+
+        import localagent
+
+        changelog = Path(__file__).resolve().parent.parent / "CHANGELOG.md"
+        assert f"## {localagent.__version__}" in changelog.read_text()
