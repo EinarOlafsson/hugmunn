@@ -39,6 +39,7 @@ def window(qt_app, tmp_path, monkeypatch):
 
     importlib.reload(mw)
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_runtime_setup", lambda self: None)
 
@@ -186,6 +187,7 @@ def test_the_meters_stop_polling_when_the_window_closes(qt_app, tmp_path, monkey
 
     importlib.reload(mw)
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_runtime_setup", lambda self: None)
 

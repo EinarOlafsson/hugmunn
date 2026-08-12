@@ -56,6 +56,7 @@ def window(qt_app, tmp_path, monkeypatch):
 
     importlib.reload(mw)
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_runtime_setup", lambda self: None)
 
@@ -186,3 +187,158 @@ def test_every_sidebar_control_survives_a_turn(window, qt_app):
     window.prompt_combo.setCurrentIndex(1)
     window.tools_check.setChecked(True)
     assert run_turn(window, qt_app)
+
+
+# ------------------------------------------------------------ crash recovery
+#
+# The scenario, end to end: a conversation happens, the process disappears
+# without closing anything, and the next launch offers the work back.
+
+
+def test_a_turn_is_saved_as_it_happens(window, qt_app):
+    """Not on exit — a save-on-quit never runs when the process dies."""
+    from localagent.core import sessions
+
+    run_turn(window, qt_app, "how does the vacuole form?")
+    saved = sessions.load(window.session.path)
+    assert saved is not None
+    assert saved.turns == 1
+    assert any("vacuole" in str(m.get("content") or "") for m in saved.messages)
+
+
+def test_the_question_survives_a_crash_during_generation(window, qt_app):
+    """The expensive part to reconstruct is usually the question."""
+    from localagent.core import sessions
+
+    window.composer.setPlainText("a long carefully worded question")
+    # Persist happens before the worker starts; simulate dying right there.
+    window.transcript.add(__import__(
+        "localagent.ui.chat", fromlist=["UserBubble"]).UserBubble("x"))
+    window.history.append({"role": "user", "content": "a long carefully worded question"})
+    window._persist()
+
+    saved = sessions.load(window.session.path)
+    assert saved is not None
+    assert not saved.closed_cleanly
+    assert "carefully worded" in str(saved.messages[-1]["content"])
+
+
+def test_a_crashed_session_is_offered_back_on_the_next_launch(qt_app, tmp_path,
+                                                              monkeypatch):
+    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
+    from localagent import config
+
+    importlib.reload(config)
+    from localagent.core import sessions
+
+    importlib.reload(sessions)
+    from localagent.ui import main_window as mw
+
+    importlib.reload(mw)
+    monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
+    # NOT stubbed here: _offer_restore is what this test exercises.
+    monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_runtime_setup", lambda self: None)
+
+    # A previous run that never closed cleanly.
+    sessions.save(sessions.Session(
+        id="20260101-120000-999", started=0, updated=__import__("time").time(),
+        messages=[{"role": "user", "content": "the lost question"},
+                  {"role": "assistant", "content": "the lost answer"}],
+        closed_cleanly=False))
+
+    from PyQt6.QtWidgets import QMessageBox
+
+    asked = []
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: asked.append(a)
+                                     or QMessageBox.StandardButton.Yes))
+    window = mw.MainWindow()
+    try:
+        window._offer_restore()
+        assert asked, "an unclean session should be offered back"
+        assert "the lost question" in str(asked[0])
+        # And accepting really loads it.
+        assert any("lost question" in str(m.get("content") or "")
+                   for m in window.history)
+    finally:
+        window.server.stop()
+        window.close()
+
+
+def test_declining_the_restore_does_not_ask_again(qt_app, tmp_path, monkeypatch):
+    """Asked once. Repeating it every launch is how a prompt gets ignored."""
+    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
+    from localagent import config
+
+    importlib.reload(config)
+    from localagent.core import sessions
+
+    importlib.reload(sessions)
+    from localagent.ui import main_window as mw
+
+    importlib.reload(mw)
+    for name in ("_offer_download", "_sign_in", "_offer_runtime_setup"):
+        monkeypatch.setattr(mw.MainWindow, name, lambda self, *a: None)
+
+    sessions.save(sessions.Session(
+        id="20260101-120000-998", started=0, updated=__import__("time").time(),
+        messages=[{"role": "user", "content": "q"}, {"role": "assistant", "content": "a"}],
+        closed_cleanly=False))
+
+    from PyQt6.QtWidgets import QMessageBox
+
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.StandardButton.No))
+    window = mw.MainWindow()
+    try:
+        window._offer_restore()
+        assert sessions.unfinished() is None, "declining must settle it"
+    finally:
+        window.server.stop()
+        window.close()
+
+
+def test_a_clean_quit_is_not_offered_back(window, qt_app):
+    from localagent.core import sessions
+
+    run_turn(window, qt_app)
+    window.close()
+    assert sessions.load(window.session.path).closed_cleanly
+    assert sessions.unfinished() is None
+
+
+def test_restoring_rebuilds_the_transcript_not_just_the_history(window, qt_app):
+    """A restore whose messages are present and whose window is empty looks
+    like it failed."""
+    from localagent.core import sessions
+    from localagent.ui.chat import AssistantBlock, ToolCard, UserBubble
+
+    saved = sessions.Session(
+        id="20260101-130000-1", started=0, updated=__import__("time").time(),
+        messages=[
+            {"role": "user", "content": "read it"},
+            {"role": "assistant", "content": None, "tool_calls": [
+                {"id": "c1", "type": "function",
+                 "function": {"name": "read_file", "arguments": '{"path": "a.txt"}'}}]},
+            {"role": "tool", "tool_call_id": "c1", "content": "the file contents"},
+            {"role": "assistant", "content": "It says hello."},
+        ])
+    sessions.save(saved)
+
+    window._restore(saved)
+    qt_app.processEvents()
+
+    kinds = [type(window.transcript._layout.itemAt(i).widget()).__name__
+             for i in range(window.transcript._layout.count() - 1)]
+    assert "UserBubble" in kinds
+    assert "ToolCard" in kinds
+    assert "AssistantBlock" in kinds
+
+
+def test_a_new_conversation_starts_a_new_session(window, qt_app):
+    run_turn(window, qt_app)
+    first = window.session.id
+    window._new_conversation()
+    assert window.session.id != first
+    assert window.history == []

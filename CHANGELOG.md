@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.14.0
+
+Conversations survive a crash.
+
+The save has to happen *during* the conversation. A clean shutdown is exactly
+the case that does not need recovering; the one that does is the process
+disappearing, and a save-on-quit never runs then.
+
+- Every turn is written as it completes, and the user's message is written
+  **before** generation starts — a crash mid-reply should still leave the
+  question behind, which is usually the expensive part to reconstruct.
+- Writes are atomic (temp file, rename). The file that would be corrupted by a
+  crash mid-write is the one holding the work worth recovering.
+- A clean exit is recorded, so the next launch can tell "you quit" from "it
+  died" and only offers back the second. Offering to restore something the
+  user deliberately finished trains them to dismiss the prompt, which is
+  precisely when it will matter. Declining settles it rather than asking again
+  every launch.
+- Restoring rebuilds the **transcript**, not just the history — user bubbles,
+  assistant blocks, and tool cards with their results matched back to their
+  calls by id. A restore whose messages are present but whose window is empty
+  looks like it failed.
+- **localagent → Recent conversations** lists the last 20 by first line, turn
+  count and age. Pruned to 50 by count, not age.
+
+### Fixed on the way
+
+- **Session ids collided within a process.** The id was timestamp plus pid,
+  and the pid is constant inside one process — so pressing Ctrl+L and typing
+  again inside a second wrote the new conversation over the previous one's
+  file. Found by a test asserting a new conversation gets a new id. A counter
+  now covers the case neither of the other two parts can.
+- The two startup prompts are scheduled on timers, and a timer outlives the
+  widget that set it — closing the window inside the delay is an ordinary
+  thing to do, and a modal opened from a dead window is a hang rather than a
+  dialog. Both now check first.
+- `pytest-timeout` is a dev dependency. A GUI test that opens an unexpected
+  modal hangs forever, and a suite that hangs gets killed rather than read.
+
 ## 0.13.1
 
 Fixes a crash during shutdown, found by a flaky test rather than by reading.

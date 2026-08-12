@@ -157,6 +157,7 @@ def test_the_sidebar_headings_sit_on_the_sidebar(themed, qt_app, tmp_path,
 
     importlib.reload(mw)
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_runtime_setup", lambda self: None)
 

@@ -49,6 +49,7 @@ def window(app, tmp_path, monkeypatch):
     # Never open a modal during a test: a missing local model offers a
     # download, and an unsigned provider offers a sign-in.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, spec: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, provider: None)
 
     win = mw.MainWindow()
@@ -266,6 +267,7 @@ def test_cancelling_the_sign_in_dialog_does_not_reopen_it_forever(app, tmp_path,
 
     importlib.reload(mw)
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, spec: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
 
     opened = []
 

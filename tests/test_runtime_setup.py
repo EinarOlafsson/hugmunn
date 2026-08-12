@@ -303,6 +303,7 @@ def test_the_app_offers_setup_on_launch_when_that_is_the_blocker(qt_app, tmp_pat
 
     importlib.reload(mw)
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, spec: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
     monkeypatch.setattr(cfg, "find_runtime", lambda: None)
 
@@ -340,6 +341,7 @@ def test_no_offer_when_nothing_is_downloaded(qt_app, tmp_path, monkeypatch):
 
     importlib.reload(mw)
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, spec: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
     monkeypatch.setattr(cfg, "find_runtime", lambda: None)
 
@@ -428,6 +430,7 @@ def test_the_status_line_reports_where_the_model_ran(qt_app, tmp_path, monkeypat
 
     importlib.reload(mw)
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
+    monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_runtime_setup", lambda self: None)
 

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import html as html_mod
+import json
+import time
 from pathlib import Path
 from typing import Any
 
+from PyQt6 import sip
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QColor, QKeySequence, QShortcut, QTextOption
 from PyQt6.QtWidgets import (
@@ -25,7 +28,9 @@ from ..core import effort as effortkit
 from ..core import context as contextkit
 from ..core import prompts as promptkit
 from ..core import providers
+from ..core import sessions as sessionkit
 from ..core import setup_llama
+from ..core import tools as toolkit
 from ..config import ModelSpec, Settings
 from ..core import plugins
 from ..core import skills as skillkit
@@ -111,6 +116,8 @@ class MainWindow(QMainWindow):
         self.settings = Settings.load()
         self.server = ServerManager()
         self.history: list[dict[str, Any]] = []
+        self.session = sessionkit.Session(
+            id=sessionkit.new_id(), started=time.time(), updated=time.time())
 
         self._skills = skillkit.load_all()
         # First run (None) takes the default-on set; an explicit empty list is
@@ -139,7 +146,8 @@ class MainWindow(QMainWindow):
         self._sync_controls()
         # Deferred so the window is on screen before anything modal appears:
         # a dialog over a blank grey rectangle reads as a crash on startup.
-        QTimer.singleShot(400, self._offer_runtime_setup)
+        QTimer.singleShot(300, self._offer_restore)
+        QTimer.singleShot(700, self._offer_runtime_setup)
 
     # ------------------------------------------------------------------ UI
 
@@ -164,6 +172,10 @@ class MainWindow(QMainWindow):
         settings.setShortcut(QKeySequence("Ctrl+,"))
         settings.triggered.connect(self._open_settings)
         app_menu.addAction(settings)
+        self.recent_menu = app_menu.addMenu("Recent conversations")
+        self.recent_menu.aboutToShow.connect(self._fill_recent_menu)
+        app_menu.addSeparator()
+
         runtime = QAction("Set up llama-server…", self)
         runtime.setToolTip("Point localagent at the binary that serves local "
                            "models, or find out how to build one.")
@@ -987,11 +999,16 @@ class MainWindow(QMainWindow):
     def _offer_runtime_setup(self) -> None:
         """On a machine with weights and no binary, offer to build one.
 
+        Same guard as _offer_restore: scheduled on a timer, so it can fire
+        after the window is gone.
+
         Asked once per launch and only when it is actually the blocker: there
         are weights to run, and nothing to run them with. Staying silent would
         leave the user with a model list where nothing starts and no
         indication of why.
         """
+        if sip.isdeleted(self):
+            return
         if self._is_cloud() or config.find_runtime() is not None:
             return
         if not any(spec.has_weights() for spec in config.REGISTRY):
@@ -1249,6 +1266,146 @@ class MainWindow(QMainWindow):
             + autonomykit.cloud_note(level, self._provider().value)
         )
 
+    # ------------------------------------------------------------ sessions
+
+    def _persist(self) -> None:
+        """Write the conversation as it stands.
+
+        Called after the user's message and again after the reply, not only at
+        the end of a turn: a crash during generation should still leave the
+        question behind, and the question is often the expensive part to
+        reconstruct.
+        """
+        if not self.history:
+            return
+        spec = self._current_spec()
+        self.session.messages = list(self.history)
+        self.session.provider = self._provider().value
+        self.session.model_key = spec.key if spec else ""
+        self.session.model_label = spec.label if spec else ""
+        sessionkit.save(self.session)
+
+    def _offer_restore(self) -> None:
+        """On launch, offer back a conversation the process did not survive.
+
+        Guarded against firing into a window that has already gone: this is
+        scheduled on a timer, and a timer outlives the widget that set it —
+        closing the window inside the delay is an ordinary thing to do. A
+        modal opened from a dead window is a hang, not a dialog.
+
+        Only when it ended *uncleanly*. Offering to restore something the user
+        deliberately finished teaches them to dismiss the dialog without
+        reading it, which is exactly when it will matter.
+        """
+        if sip.isdeleted(self):
+            return
+        previous = sessionkit.unfinished()
+        if previous is None or previous.id == self.session.id:
+            return
+        answer = QMessageBox.question(
+            self, "Restore the last conversation?",
+            f"localagent did not shut down cleanly last time, and this "
+            f"conversation was still open:\n\n<b>{html_mod.escape(previous.title)}</b>\n"
+            f"{previous.turns} turn(s), {previous.age_phrase()}"
+            + (f"\n{html_mod.escape(previous.model_label)}" if previous.model_label else "")
+            + "\n\nReload it?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self._restore(previous)
+        else:
+            # Answered once; do not ask again on the next launch.
+            sessionkit.mark_closed(previous)
+
+    def _fill_recent_menu(self) -> None:
+        self.recent_menu.clear()
+        found = [s for s in sessionkit.recent(20) if s.id != self.session.id]
+        if not found:
+            act = QAction("Nothing saved yet", self)
+            act.setEnabled(False)
+            self.recent_menu.addAction(act)
+            return
+        for session in found:
+            act = QAction(session.summary(), self)
+            act.triggered.connect(lambda _=False, s=session: self._restore(s))
+            self.recent_menu.addAction(act)
+
+    def _restore(self, session) -> None:
+        """Load a saved conversation and rebuild the transcript from it.
+
+        The history alone is not enough: the transcript is widgets, and a
+        restored conversation whose messages are present but whose window is
+        empty looks like the restore failed.
+        """
+        if self._agent_worker is not None:
+            return
+        self.history = list(session.messages)
+        self.session = session
+        self.session.closed_cleanly = False
+        self.transcript.clear()
+        self.stats.clear()
+        self._rebuild_transcript(self.history)
+
+        # Put the model back too, when it is still available.
+        if session.provider and session.provider != self._provider().value:
+            index = self.provider_combo.findData(session.provider)
+            if index >= 0:
+                self.provider_combo.setCurrentIndex(index)
+        if session.model_key:
+            index = self.model_combo.findData(session.model_key)
+            if index >= 0:
+                self.model_combo.setCurrentIndex(index)
+
+        self.transcript.add(Notice(
+            f"Restored {session.turns} turn(s) from {session.age_phrase()}.",
+            theme.active()["fg_dim"]))
+        self.transcript.follow()
+        self._update_context_meter()
+        sessionkit.save(self.session)
+
+    def _rebuild_transcript(self, messages: list[dict[str, Any]]) -> None:
+        """Redraw saved messages as the widgets they were.
+
+        Tool results are matched to their call by id, which is why the
+        compression rules keep the two together — a restored transcript with
+        an orphaned result would render a call that never returned.
+        """
+        cards: dict[str, ToolCard] = {}
+        for message in messages:
+            role = message.get("role")
+            content = message.get("content")
+
+            if role == "user":
+                text = str(content or "")
+                if text.startswith("[Earlier in this conversation"):
+                    self.transcript.add(Notice(text, theme.active()["fg_dim"]))
+                else:
+                    self.transcript.add(UserBubble(text))
+            elif role == "assistant":
+                if content:
+                    block = AssistantBlock()
+                    self.transcript.add(block)
+                    block.append(str(content))
+                    block.restyle()
+                    block.finish()
+                for call in message.get("tool_calls") or []:
+                    function = call.get("function") or {}
+                    name = function.get("name", "?")
+                    try:
+                        args = json.loads(function.get("arguments") or "{}")
+                    except json.JSONDecodeError:
+                        args = {}
+                    summary = toolkit.summarize_call(name, args if isinstance(args, dict) else {})
+                    card = ToolCard(name, summary)
+                    self.transcript.add(card)
+                    cards[call.get("id", "")] = card
+            elif role == "tool":
+                card = cards.get(message.get("tool_call_id", ""))
+                if card is not None:
+                    card.set_result(str(content or ""))
+        self.transcript.scroll_to_bottom()
+
     # ----------------------------------------------------------- reasoning
 
     def _thinking_enabled(self) -> bool | None:
@@ -1422,7 +1579,11 @@ class MainWindow(QMainWindow):
     def _new_conversation(self) -> None:
         if self._agent_worker is not None:
             return
+        if self.history:
+            sessionkit.mark_closed(self.session)
         self.history.clear()
+        self.session = sessionkit.Session(
+            id=sessionkit.new_id(), started=time.time(), updated=time.time())
         self.transcript.clear()
         self.stats.clear()
         self._update_context_meter()
@@ -1488,6 +1649,9 @@ class MainWindow(QMainWindow):
 
         self.transcript.add(UserBubble(text))
         self.history.append({"role": "user", "content": text})
+        # Saved before generation starts: a crash mid-reply should still leave
+        # the question behind.
+        self._persist()
 
         # Fit the conversation before sending. Doing it here rather than
         # inside the agent means the transcript can say what was lost, which
@@ -1619,6 +1783,7 @@ class MainWindow(QMainWindow):
             self._agent_worker.provide_approval(allowed)
 
     def _on_turn_finished(self, timings: dict) -> None:
+        self._persist()
         self._update_context_meter()
         if self._thinking is not None:
             self._thinking.finish()
@@ -1657,4 +1822,9 @@ class MainWindow(QMainWindow):
             self._agent_worker.wait(3000)
         self.server.stop()
         self.settings.save()
+        # The flag that tells the next launch this was a quit and not a crash.
+        if self.history:
+            self._persist()
+            sessionkit.mark_closed(self.session)
+        sessionkit.prune()
         super().closeEvent(event)
