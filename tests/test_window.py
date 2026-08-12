@@ -19,8 +19,8 @@ pytest.importorskip("PyQt6.QtWidgets")
 
 from PyQt6.QtWidgets import QApplication  # noqa: E402
 
-from localagent.core.providers import Provider  # noqa: E402
-from localagent.ui import theme  # noqa: E402
+from hugmunn.core.providers import Provider  # noqa: E402
+from hugmunn.ui import theme  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -32,20 +32,22 @@ def app():
 @pytest.fixture()
 def window(app, tmp_path, monkeypatch):
     """A window with its own config directory, so the real one is untouched."""
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     import importlib
 
-    from localagent import config
-    from localagent.core import credentials
+    from hugmunn import config
+    from hugmunn.core import credentials
 
     importlib.reload(config)
     importlib.reload(credentials)
 
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     # Never open a modal during a test: a missing local model offers a
     # download, and an unsigned provider offers a sign-in.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, spec: None)
@@ -131,7 +133,7 @@ def test_sending_is_blocked_until_a_cloud_provider_is_signed_in(window):
 
 
 def test_signing_in_unblocks_sending_and_builds_the_right_client(window, monkeypatch):
-    from localagent.core import cloud, credentials
+    from hugmunn.core import cloud, credentials
 
     credentials.store(Provider.ANTHROPIC, "sk-ant-test-key-abcdefgh")
     try:
@@ -144,7 +146,7 @@ def test_signing_in_unblocks_sending_and_builds_the_right_client(window, monkeyp
 
 
 def test_the_effort_tier_reaches_the_client_as_a_thinking_budget(window):
-    from localagent.core import credentials, effort as effortkit
+    from hugmunn.core import credentials, effort as effortkit
 
     credentials.store(Provider.ANTHROPIC, "sk-ant-test-key-abcdefgh")
     try:
@@ -192,7 +194,7 @@ def test_every_theme_applies_to_a_live_window(window, name):
 
 def test_a_theme_change_repaints_a_transcript_that_already_has_content(window):
     """Rendered markdown carries its CSS inline, so it has to be re-rendered."""
-    from localagent.ui.chat import AssistantBlock, Notice, ToolCard, UserBubble
+    from hugmunn.ui.chat import AssistantBlock, Notice, ToolCard, UserBubble
 
     window.transcript.add(UserBubble("hello"))
     block = window.transcript.add(AssistantBlock())
@@ -208,7 +210,7 @@ def test_a_theme_change_repaints_a_transcript_that_already_has_content(window):
 
 def test_the_menu_bar_carries_settings_cleanup_and_quit(window):
     titles = [a.text() for a in window.menuBar().actions()]
-    assert any("localagent" in t for t in titles)
+    assert any("hugmunn" in t for t in titles)
     entries = [a.text() for a in window.menuBar().actions()[0].menu().actions()]
     assert any("Settings" in e for e in entries)
     assert any("Quit" in e for e in entries)
@@ -216,7 +218,7 @@ def test_the_menu_bar_carries_settings_cleanup_and_quit(window):
 
 
 def test_the_settings_dialog_builds(window):
-    from localagent.ui.settings_dialog import SettingsDialog
+    from hugmunn.ui.settings_dialog import SettingsDialog
 
     dialog = SettingsDialog(window)
     assert dialog.theme_combo.count() == len(theme.THEMES) + 1
@@ -224,7 +226,7 @@ def test_the_settings_dialog_builds(window):
 
 
 def test_the_login_dialog_builds_for_both_providers(window):
-    from localagent.ui.login_dialog import LoginDialog
+    from hugmunn.ui.login_dialog import LoginDialog
 
     for provider in (Provider.ANTHROPIC, Provider.OPENAI):
         dialog = LoginDialog(provider, window)
@@ -254,18 +256,20 @@ def test_cancelling_the_sign_in_dialog_does_not_reopen_it_forever(app, tmp_path,
     offers the dialog, so a cancelled sign-in re-entered the same path and
     the user could not get out of the modal.
     """
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     import importlib
 
-    from localagent import config
-    from localagent.core import credentials
+    from hugmunn import config
+    from hugmunn.core import credentials
 
     importlib.reload(config)
     importlib.reload(credentials)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, spec: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
 

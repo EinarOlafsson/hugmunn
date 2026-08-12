@@ -23,7 +23,7 @@ pytest.importorskip("PyQt6.QtWidgets")
 
 from PyQt6.QtWidgets import QLabel  # noqa: E402
 
-from localagent.ui import theme  # noqa: E402
+from hugmunn.ui import theme  # noqa: E402
 
 
 def render(widget):
@@ -114,7 +114,7 @@ def test_the_stylesheet_does_not_blanket_paint_every_widget():
 
 
 def test_a_label_in_a_user_bubble_sits_on_the_bubble(themed):
-    from localagent.ui.chat import UserBubble
+    from hugmunn.ui.chat import UserBubble
 
     bubble = UserBubble("hello there")
     label = bubble.findChild(QLabel)
@@ -126,7 +126,7 @@ def test_a_label_in_a_user_bubble_sits_on_the_bubble(themed):
 
 
 def test_a_label_in_a_tool_card_sits_on_the_card(themed):
-    from localagent.ui.chat import ToolCard
+    from hugmunn.ui.chat import ToolCard
 
     card = ToolCard("read_file", "/tmp/example.txt")
     labels = card.findChildren(QLabel)
@@ -149,13 +149,15 @@ def test_the_sidebar_headings_sit_on_the_sidebar(themed, qt_app, tmp_path,
     """The sidebar is the largest run of text in the app."""
     import importlib
 
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)

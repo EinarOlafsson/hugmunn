@@ -18,8 +18,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from localagent.core import cloud
-from localagent.core.providers import CloudModel, Provider
+from hugmunn.core import cloud
+from hugmunn.core.providers import CloudModel, Provider
 
 CLAUDE = CloudModel("claude-opus-5", "Opus 5", Provider.ANTHROPIC,
                     thinking=True, max_output=16000)
@@ -244,7 +244,7 @@ def test_openai_sends_a_bearer_token_and_reasoning_effort(stub):
 
 
 def test_the_agent_loop_runs_a_tool_round_trip_over_anthropic(stub, tmp_path):
-    from localagent.core.agent import Agent
+    from hugmunn.core.agent import Agent
 
     target = tmp_path / "one.txt"
     target.write_text("file contents here", encoding="utf-8")

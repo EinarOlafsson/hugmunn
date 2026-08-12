@@ -6,9 +6,9 @@ import json
 
 import pytest
 
-from localagent.core import effort as effortkit
-from localagent.core.cloud import AnthropicClient, OpenAIClient, _explain
-from localagent.core.providers import CloudModel, Provider
+from hugmunn.core import effort as effortkit
+from hugmunn.core.cloud import AnthropicClient, OpenAIClient, _explain
+from hugmunn.core.providers import CloudModel, Provider
 
 MODEL = CloudModel("claude-opus-5", "Opus 5", Provider.ANTHROPIC, thinking=True,
                    max_output=16000)
@@ -225,7 +225,7 @@ def test_effort_budgets_increase_with_the_tier():
 
 def test_openai_client_sends_reasoning_effort_not_temperature():
     """A reasoning model rejects temperature outright."""
-    from localagent.core import cloud
+    from hugmunn.core import cloud
 
     built = cloud.build(GPT, "sk-test", effort_level=3)
     assert isinstance(built, OpenAIClient)
@@ -233,7 +233,7 @@ def test_openai_client_sends_reasoning_effort_not_temperature():
 
 
 def test_build_picks_the_client_from_the_model_provider():
-    from localagent.core import cloud
+    from hugmunn.core import cloud
 
     assert isinstance(cloud.build(MODEL, "k", 2), AnthropicClient)
     assert isinstance(cloud.build(GPT, "k", 2), OpenAIClient)

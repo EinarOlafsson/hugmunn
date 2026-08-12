@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import pytest
 
-from localagent.core import agent as agentkit
-from localagent.core.agent import Agent
-from localagent.core.client import Event
+from hugmunn.core import agent as agentkit
+from hugmunn.core.agent import Agent
+from hugmunn.core.client import Event
 
 
 class _Call:
@@ -77,7 +77,7 @@ def run(client, **kwargs):
 
 
 def test_the_default_budget_is_sized_for_work_not_one_question():
-    from localagent.config import Settings
+    from hugmunn.config import Settings
 
     assert Settings().max_tool_iterations >= 40
 

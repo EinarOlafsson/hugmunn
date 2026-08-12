@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from localagent.core import cleanup
-from localagent.ui import theme
+from hugmunn.core import cleanup
+from hugmunn.ui import theme
 
 
 # ------------------------------------------------------------------ themes
@@ -65,7 +65,7 @@ def test_style_proxy_tracks_the_live_theme():
     A module-level constant captured into an f-string is how spaCR ended up
     painting dark chrome on its light theme.
     """
-    from localagent.ui import style
+    from hugmunn.ui import style
 
     previous = theme.active_name()
     try:
@@ -93,12 +93,12 @@ def test_css_emits_plain_hex_when_opaque():
 
 @pytest.fixture()
 def isolated_config(tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     import importlib
 
-    from localagent.core import credentials
+    from hugmunn.core import credentials
 
     importlib.reload(credentials)
     # Force the file backend so the test never writes to a real keyring.
@@ -108,7 +108,7 @@ def isolated_config(tmp_path, monkeypatch):
 
 def test_a_key_round_trips(isolated_config):
     credentials, _ = isolated_config
-    from localagent.core.providers import Provider
+    from hugmunn.core.providers import Provider
 
     credentials.store(Provider.ANTHROPIC, "sk-ant-secret-value-1234")
     assert credentials.load(Provider.ANTHROPIC) == "sk-ant-secret-value-1234"
@@ -117,7 +117,7 @@ def test_a_key_round_trips(isolated_config):
 
 def test_the_key_file_is_not_readable_by_anybody_else(isolated_config):
     credentials, tmp_path = isolated_config
-    from localagent.core.providers import Provider
+    from hugmunn.core.providers import Provider
 
     credentials.store(Provider.OPENAI, "sk-secret-value-5678")
     mode = (tmp_path / "credentials.json").stat().st_mode & 0o777
@@ -129,8 +129,8 @@ def test_the_key_never_lands_in_settings_json(isolated_config, monkeypatch):
     credentials, tmp_path = isolated_config
     import importlib
 
-    from localagent import config
-    from localagent.core.providers import Provider
+    from hugmunn import config
+    from hugmunn.core.providers import Provider
 
     importlib.reload(config)
     credentials.store(Provider.ANTHROPIC, "sk-ant-do-not-leak-me")
@@ -140,7 +140,7 @@ def test_the_key_never_lands_in_settings_json(isolated_config, monkeypatch):
 
 def test_the_environment_wins_over_stored_state(isolated_config, monkeypatch):
     credentials, _ = isolated_config
-    from localagent.core.providers import Provider
+    from hugmunn.core.providers import Provider
 
     credentials.store(Provider.ANTHROPIC, "sk-ant-stored-value-000")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-from-the-env-111")
@@ -150,7 +150,7 @@ def test_the_environment_wins_over_stored_state(isolated_config, monkeypatch):
 
 def test_clearing_removes_the_key(isolated_config):
     credentials, _ = isolated_config
-    from localagent.core.providers import Provider
+    from hugmunn.core.providers import Provider
 
     credentials.store(Provider.OPENAI, "sk-value-to-remove-99")
     credentials.clear(Provider.OPENAI)
@@ -159,7 +159,7 @@ def test_clearing_removes_the_key(isolated_config):
 
 def test_storing_an_empty_key_clears_rather_than_saving_blank(isolated_config):
     credentials, _ = isolated_config
-    from localagent.core.providers import Provider
+    from hugmunn.core.providers import Provider
 
     credentials.store(Provider.OPENAI, "sk-something-real-123")
     credentials.store(Provider.OPENAI, "   ")
@@ -168,7 +168,7 @@ def test_storing_an_empty_key_clears_rather_than_saving_blank(isolated_config):
 
 def test_masking_shows_enough_to_identify_and_not_enough_to_use(isolated_config):
     credentials, _ = isolated_config
-    from localagent.core.providers import Provider
+    from hugmunn.core.providers import Provider
 
     credentials.store(Provider.ANTHROPIC, "sk-ant-api03-abcdefghijklmnop4f2a")
     shown = credentials.masked(Provider.ANTHROPIC)

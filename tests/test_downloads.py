@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from localagent import config
-from localagent.core import downloads
-from localagent.core.downloads import DiskReport, evaluate_disk
+from hugmunn import config
+from hugmunn.core import downloads
+from hugmunn.core.downloads import DiskReport, evaluate_disk
 
 
 class TestDiskEvaluation:
@@ -211,7 +211,7 @@ class TestUserChosenLocation:
     def test_launch_passes_the_override_as_an_argument(self, tmp_path, monkeypatch):
         """The scripts forward "$@" and llama.cpp takes the last --model."""
         import subprocess
-        from localagent.core.server import ServerManager
+        from hugmunn.core.server import ServerManager
 
         seen = {}
 

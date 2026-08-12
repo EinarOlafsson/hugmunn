@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from localagent.core import skills
+from hugmunn.core import skills
 
 
 def write_skill(tmp_path, key, *, name="X", category="Core", default=False, body="Body."):

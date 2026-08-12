@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from localagent import config
+from hugmunn import config
 
 
 def touch(path, size=1):
@@ -44,7 +44,7 @@ class TestWeightsComplete:
 
 class TestModelSpec:
     def _spec(self, tmp_path, monkeypatch, model_line):
-        monkeypatch.setattr(config, "MODELS_ROOT", tmp_path)
+        monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path))
         script = tmp_path / "scripts" / "fake.sh"
         script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text(
@@ -72,7 +72,7 @@ class TestModelSpec:
         assert not spec.is_available()
 
     def test_unavailable_when_script_missing(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(config, "MODELS_ROOT", tmp_path)
+        monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path))
         assert not config.ModelSpec("k", "L", "nope.sh", 1, "b").is_available()
 
     def test_base_url_uses_port(self):
@@ -106,32 +106,30 @@ class TestRegistry:
 
 class TestSettings:
     def test_roundtrip(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
-        monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "settings.json")
+        monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
         original = config.Settings(model_key="write", workdir="/tmp", tools_enabled=False)
         original.save()
         assert config.Settings.load().model_key == "write"
         assert config.Settings.load().tools_enabled is False
 
     def test_missing_file_gives_defaults(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "absent.json")
+        monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "nothing-here"))
         assert config.Settings.load().model_key == config.Settings().model_key
 
     def test_corrupt_file_gives_defaults(self, tmp_path, monkeypatch):
         bad = tmp_path / "settings.json"
         bad.write_text("{not json", encoding="utf-8")
-        monkeypatch.setattr(config, "CONFIG_FILE", bad)
+        monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(bad.parent))
         assert config.Settings.load().model_key == config.Settings().model_key
 
     def test_unknown_keys_ignored(self, tmp_path, monkeypatch):
         path = tmp_path / "settings.json"
         path.write_text(json.dumps({"model_key": "code", "removed_option": 1}), encoding="utf-8")
-        monkeypatch.setattr(config, "CONFIG_FILE", path)
+        monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(path.parent))
         assert config.Settings.load().model_key == "code"
 
     def test_save_is_atomic(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
-        monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "settings.json")
+        monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
         config.Settings().save()
         assert not list(tmp_path.glob("*.tmp"))  # temp file renamed away
 
@@ -142,20 +140,20 @@ class TestVersion:
         import re
         from pathlib import Path
 
-        import localagent
+        import hugmunn
 
         pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
         match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject.read_text(), re.M)
         assert match, "no version in pyproject.toml"
-        assert match.group(1) == localagent.__version__
+        assert match.group(1) == hugmunn.__version__
 
     def test_changelog_documents_the_current_version(self):
         from pathlib import Path
 
-        import localagent
+        import hugmunn
 
         changelog = Path(__file__).resolve().parent.parent / "CHANGELOG.md"
-        assert f"## {localagent.__version__}" in changelog.read_text()
+        assert f"## {hugmunn.__version__}" in changelog.read_text()
 
 
 class TestContextSize:
@@ -181,5 +179,5 @@ class TestContextSize:
                 assert spec.context_tokens == spec.ctx_size, spec.key
 
     def test_missing_script_returns_zero(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(config, "MODELS_ROOT", tmp_path)
+        monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path))
         assert config.ModelSpec("k", "L", "nope.sh", 1, "b").context_tokens == 0

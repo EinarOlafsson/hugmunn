@@ -1,5 +1,94 @@
 # Changelog
 
+## 0.0.0.1
+
+Renamed to **hugmunn**, and versioned from the start.
+
+Huginn and Muninn are Odin's ravens — *hugr*, thought, and *munr*, memory.
+They fly out at dawn and return at dusk to report what the world is doing,
+which is close enough to what this does.
+
+Version reset to 0.0.0.1: the previous numbers described a thing called
+something else, and starting a public repository at 0.15 implies a history
+nobody can read.
+
+Old settings are kept. `~/.config/localagent` is still read when the new
+directory does not exist, and `LOCALAGENT_*` environment variables still work
+— a rename should not look like losing every saved conversation.
+
+### Five features
+
+**Prompt-cache-aware trimming.** llama.cpp caches the processed prompt by
+prefix: appending reuses all of it, changing anything early throws all of it
+away. Trimming "just enough to fit" therefore pays a full reprocess, then pays
+it again next turn, and the turn after. It now trims to about 60% and buys a
+run of append-only turns — measured at nine turns of headroom where there had
+been one.
+
+**A tool-result store.** One `read_file` on a real source file is several
+thousand tokens, and the model usually wanted one function. Large results are
+kept whole and the conversation gets a digest — head, tail, size, and a handle
+— with a `recall` tool that can search or page through the rest. Small results
+pass through untouched: a model that learns tool output is sometimes truncated
+starts hedging about everything it reads.
+
+**Bench-on-download.** Published tok/s figures are for other hardware. Each
+model is timed once on this machine and the number is stored and shown.
+
+**A `/diff` review flow.** The approval dialog used to show the whole new file
+for an edit — three hundred lines of which four differ, which nobody reads and
+everybody clicks Allow on. It now shows a unified diff, coloured, with the
+headline stating *"Edit config.py — 3 added, 1 removed"* before the dialog is
+read. New files still show their content; a no-op write says so.
+
+**NCPUMOE auto-tuning.** `--n-cpu-moe` decides how a mixture-of-experts model
+splits between VRAM and RAM, and the shipped 999 means *all experts on the
+CPU* — always safe, always slow. A sweep tries values from aggressive to safe
+and stops at the first that loads and serves, which is the fastest this card
+can hold. Both this and the benchmark refuse to run while somebody else is
+using the GPU.
+
+### The window
+
+- **Settings are in tabs** — Model, Run, Context, Tools, Sessions, System —
+  rather than one column fifteen sections tall that had to be scrolled past to
+  reach anything.
+- **The meters stay outside the tabs**, pinned below them. They are not a
+  setting; they are what tells you whether the machine can take another model,
+  and status you have to go and find is status nobody looks at.
+- **The message box is resizable** by dragging its top edge, and remembers its
+  height. A fixed 150px is fine for a question and cramped for a stack trace.
+- **A Sessions tab.** Every conversation is saved as it happens; resuming one
+  restores the settings it ran under — model, autonomy, effort, persistence,
+  reasoning, context size, skills, system prompt, working directory — because
+  restoring the words without the settings gives something that reads the same
+  and behaves differently, and the difference does not show until an answer is
+  wrong.
+
+### Models
+
+**24 models**, verified file by file against the Hugging Face API, grouped and
+**colour-coded by how much alignment is left in the weights**: green for stock,
+blue for tuned, red for unlocked. The text glows on hover and selection, drawn
+by a delegate because Qt's stylesheet has no text-shadow. Colours are palette
+roles, so they work on all eight themes and still clear AA.
+
+### Fixed
+
+- **Two Qt bindings in one process.** pytest-qt loads a binding at configure
+  time and prefers PySide6, which is installed here because spaCR shares the
+  environment. Two bindings own separate copies of the C++ runtime and neither
+  knows about the other's widgets; it segfaulted with no Python traceback
+  inside an application-wide `setStyleSheet`. The plugin is disabled and the
+  app warns if it ever sees PySide6 loaded.
+- **Reloading a Qt module in tests.** Fixtures reloaded `main_window` to pick
+  up a fresh config, which redefines every QWidget subclass while old
+  instances are still alive. Every test file passed alone and the suite
+  crashed in combination — the most confusing shape a bug can take. Config
+  paths resolve on access now, so there is nothing to reload.
+- **Widgets were closed but never destroyed**, so every window ever built
+  stayed alive for the whole run and `setStyleSheet` walked all of them.
+
 ## 0.15.1
 
 A stability sweep. Three faults, none of them reported yet — which is the
@@ -169,7 +258,7 @@ disappearing, and a save-on-quit never runs then.
   assistant blocks, and tool cards with their results matched back to their
   calls by id. A restore whose messages are present but whose window is empty
   looks like it failed.
-- **localagent → Recent conversations** lists the last 20 by first line, turn
+- **hugmunn → Recent conversations** lists the last 20 by first line, turn
   count and age. Pruned to 50 by count, not age.
 
 ### Fixed on the way
@@ -385,7 +474,7 @@ intersecting rectangles.
 ### "It works but it is extremely slow"
 
 The app could not answer whether a model was on the GPU, which is the first
-thing worth knowing — and localagent may itself have built a CPU-only binary,
+thing worth knowing — and hugmunn may itself have built a CPU-only binary,
 if the CUDA toolkit was absent at build time.
 
 - The server status now reads **"all 49 layers on GPU"**, or **"0 layers on
@@ -399,7 +488,7 @@ if the CUDA toolkit was absent at build time.
 
 ## 0.10.0
 
-localagent sets up llama.cpp itself, on any machine.
+hugmunn sets up llama.cpp itself, on any machine.
 
 0.9.3 could tell you a binary was missing and show you the commands. That is
 still two manual steps, and the second one — running a script inside the models
@@ -425,7 +514,7 @@ often not cloned there.
 - **Download a prebuilt** for machines with no toolchain, labelled CPU-only on
   Linux because llama.cpp publishes CUDA builds for Windows and not for Linux.
   The confirmation says what that costs rather than presenting it as equivalent.
-- Installs to `~/.local/share/localagent/`, so none of it depends on the models
+- Installs to `~/.local/share/hugmunn/`, so none of it depends on the models
   repo existing. Capped at 16 cores — this machine runs other people's jobs.
 
 ## 0.9.3
@@ -438,7 +527,7 @@ why it is gitignored inside the models repo. So a second machine reliably ends
 up with correct weights and nothing to run them with, and *"build llama.cpp or
 set LLAMA_SERVER"* is accurate without being any help.
 
-- **localagent → Set up llama-server…** searches the conventional locations,
+- **hugmunn → Set up llama-server…** searches the conventional locations,
   reports what each build says about itself (`--version` tells you whether it
   has CUDA), lets you browse to one, and otherwise gives the exact build
   commands — with the CUDA architecture filled in for the GPU present.
@@ -583,13 +672,13 @@ the moment a model requests two tools at once.
 ### Release resources
 
 Adapted from spaCR's `resource_cleanup`, including its refusal: no process is
-killed, nothing needs root, no `drop_caches`. Reachable from the localagent
+killed, nothing needs root, no `drop_caches`. Reachable from the hugmunn
 menu and from Settings, each behind a confirmation that names what will happen
 rather than asking "are you sure?".
 
 The VRAM button differs from spaCR's and the difference is the honest part.
 spaCR holds VRAM through torch in its own process, so clearing it is
-`empty_cache()`. localagent holds none — llama-server does, in a child
+`empty_cache()`. hugmunn holds none — llama-server does, in a child
 process, and 20 GB of weights is the whole of it. So the button stops the
 server, says that unloading is all-or-nothing, and leaves an *adopted* server
 alone: somebody else started it, and stopping it is not this button's call.
@@ -727,8 +816,8 @@ Ten tools and nine skills; a latent circular import fixed.
 
 Models can author their own skills and tools.
 
-- User skills in `~/.config/localagent/skills/`, user tools in
-  `~/.config/localagent/tools/`.
+- User skills in `~/.config/hugmunn/skills/`, user tools in
+  `~/.config/hugmunn/tools/`.
 - Plugins are opt-in: a human reads the file and switches it on. `run_command`
   is already arbitrary execution, so this is not a new capability class — but a
   plugin runs unreviewed after the first approval, where `run_command` is

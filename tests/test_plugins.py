@@ -6,7 +6,7 @@ must not run until it has been explicitly enabled.
 
 from __future__ import annotations
 
-from localagent.core import plugins, tools
+from hugmunn.core import plugins, tools
 
 GOOD = '''\
 NAME = "shout"
@@ -129,25 +129,25 @@ class TestFullRegistry:
     def test_import_order_does_not_matter(self):
         """research/devtools import helpers from tools; tools registers them."""
         import importlib, sys
-        for first in ("localagent.core.research", "localagent.core.devtools", "localagent.core.tools"):
-            for mod in [m for m in list(sys.modules) if m.startswith("localagent.core")]:
+        for first in ("hugmunn.core.research", "hugmunn.core.devtools", "hugmunn.core.tools"):
+            for mod in [m for m in list(sys.modules) if m.startswith("hugmunn.core")]:
                 del sys.modules[mod]
             importlib.import_module(first)
-            from localagent.core import tools
+            from hugmunn.core import tools
             assert len(tools.BY_NAME) == 19, f"{first} first -> {len(tools.BY_NAME)}"
 
     def test_every_mutating_tool_requires_approval(self):
-        from localagent.core import tools
+        from hugmunn.core import tools
         for name in ("write_file", "run_command", "edit_file", "python_exec", "download_pdfs"):
             assert tools.BY_NAME[name].requires_approval, name
 
     def test_read_only_tools_do_not(self):
-        from localagent.core import tools
+        from hugmunn.core import tools
         for name in ("read_file", "search_text", "web_search", "sql_query", "pubmed_search"):
             assert not tools.BY_NAME[name].requires_approval, name
 
     def test_every_tool_schema_is_wellformed(self):
-        from localagent.core import tools
+        from hugmunn.core import tools
         for schema in tools.schemas():
             fn = schema["function"]
             assert fn["name"] and fn["description"]

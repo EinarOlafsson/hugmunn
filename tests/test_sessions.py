@@ -20,11 +20,11 @@ import pytest
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.core import sessions
+    from hugmunn.core import sessions
 
     importlib.reload(sessions)
     return sessions, tmp_path

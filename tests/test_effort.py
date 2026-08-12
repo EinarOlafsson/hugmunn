@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from localagent.core import effort as effortkit
-from localagent.core import subagent
-from localagent.core.effort import Effort
-from localagent.core.tools import ToolError
+from hugmunn.core import effort as effortkit
+from hugmunn.core import subagent
+from hugmunn.core.effort import Effort
+from hugmunn.core.tools import ToolError
 
 
 class TestTiers:
@@ -57,7 +57,7 @@ class TestSubagentGrant:
             self._spawn()("/tmp", task="x" * (subagent.MAX_TASK_CHARS + 1))
 
     def test_grantable_set_is_read_only(self):
-        from localagent.core import tools
+        from hugmunn.core import tools
         for name in subagent.GRANTABLE:
             assert not tools.BY_NAME[name].requires_approval, name
 
@@ -68,19 +68,19 @@ class TestSubagentGrant:
 
 class TestAgentWiring:
     def test_effort_text_reaches_the_system_prompt(self):
-        from localagent.core.agent import Agent
+        from hugmunn.core.agent import Agent
         a = Agent(client=None, workdir="/tmp", system_prompt="base", effort=Effort.THOROUGH)
         assert "Verify rather than assume" in a.system_prompt
 
     def test_spawn_agent_appears_only_at_tier_four(self):
-        from localagent.core.agent import Agent
+        from hugmunn.core.agent import Agent
         for level in Effort:
             a = Agent(client=None, workdir="/tmp", system_prompt="b", effort=level)
             names = {t.name for t in a.extra_tools}
             assert ("spawn_agent" in names) == (level is Effort.EXHAUSTIVE), level
 
     def test_subagent_depth_never_gets_the_tool(self):
-        from localagent.core.agent import Agent
+        from hugmunn.core.agent import Agent
         a = Agent(client=None, workdir="/tmp", system_prompt="b",
                   effort=Effort.EXHAUSTIVE, depth=1)
         assert "spawn_agent" not in {t.name for t in a.extra_tools}

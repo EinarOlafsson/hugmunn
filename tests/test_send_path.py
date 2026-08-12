@@ -23,7 +23,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 pytest.importorskip("PyQt6.QtWidgets")
 
-from localagent.core.client import Event  # noqa: E402
+from hugmunn.core.client import Event  # noqa: E402
 
 
 class FakeClient:
@@ -48,13 +48,15 @@ class FakeClient:
 
 @pytest.fixture()
 def window(qt_app, tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
@@ -112,7 +114,7 @@ def test_no_method_is_shadowed_by_an_instance_attribute():
     ``self._thinking()`` uncallable. Python gives no warning for this and the
     failure appears only when the method is called.
     """
-    import localagent.ui.main_window as mw
+    import hugmunn.ui.main_window as mw
 
     source = pathlib.Path(mw.__file__).read_text(encoding="utf-8")
     for node in ast.walk(ast.parse(source)):
@@ -146,7 +148,7 @@ def test_the_reasoning_setting_reaches_the_client(window, qt_app):
 
 
 def test_the_system_prompt_preset_reaches_the_client(window, qt_app):
-    from localagent.core import prompts as promptkit
+    from hugmunn.core import prompts as promptkit
 
     window.prompt_combo.setCurrentIndex(window.prompt_combo.findData("none"))
     sent = run_turn(window, qt_app)[0]["messages"]
@@ -197,7 +199,7 @@ def test_every_sidebar_control_survives_a_turn(window, qt_app):
 
 def test_a_turn_is_saved_as_it_happens(window, qt_app):
     """Not on exit — a save-on-quit never runs when the process dies."""
-    from localagent.core import sessions
+    from hugmunn.core import sessions
 
     run_turn(window, qt_app, "how does the vacuole form?")
     saved = sessions.load(window.session.path)
@@ -208,12 +210,12 @@ def test_a_turn_is_saved_as_it_happens(window, qt_app):
 
 def test_the_question_survives_a_crash_during_generation(window, qt_app):
     """The expensive part to reconstruct is usually the question."""
-    from localagent.core import sessions
+    from hugmunn.core import sessions
 
     window.composer.setPlainText("a long carefully worded question")
     # Persist happens before the worker starts; simulate dying right there.
     window.transcript.add(__import__(
-        "localagent.ui.chat", fromlist=["UserBubble"]).UserBubble("x"))
+        "hugmunn.ui.chat", fromlist=["UserBubble"]).UserBubble("x"))
     window.history.append({"role": "user", "content": "a long carefully worded question"})
     window._persist()
 
@@ -225,16 +227,18 @@ def test_the_question_survives_a_crash_during_generation(window, qt_app):
 
 def test_a_crashed_session_is_offered_back_on_the_next_launch(qt_app, tmp_path,
                                                               monkeypatch):
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.core import sessions
+    from hugmunn.core import sessions
 
     importlib.reload(sessions)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
     # NOT stubbed here: _offer_restore is what this test exercises.
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
@@ -268,16 +272,18 @@ def test_a_crashed_session_is_offered_back_on_the_next_launch(qt_app, tmp_path,
 
 def test_declining_the_restore_does_not_ask_again(qt_app, tmp_path, monkeypatch):
     """Asked once. Repeating it every launch is how a prompt gets ignored."""
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.core import sessions
+    from hugmunn.core import sessions
 
     importlib.reload(sessions)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     for name in ("_offer_download", "_sign_in", "_offer_runtime_setup"):
         monkeypatch.setattr(mw.MainWindow, name, lambda self, *a: None)
 
@@ -300,7 +306,7 @@ def test_declining_the_restore_does_not_ask_again(qt_app, tmp_path, monkeypatch)
 
 
 def test_a_clean_quit_is_not_offered_back(window, qt_app):
-    from localagent.core import sessions
+    from hugmunn.core import sessions
 
     run_turn(window, qt_app)
     window.close()
@@ -311,8 +317,8 @@ def test_a_clean_quit_is_not_offered_back(window, qt_app):
 def test_restoring_rebuilds_the_transcript_not_just_the_history(window, qt_app):
     """A restore whose messages are present and whose window is empty looks
     like it failed."""
-    from localagent.core import sessions
-    from localagent.ui.chat import AssistantBlock, ToolCard, UserBubble
+    from hugmunn.core import sessions
+    from hugmunn.ui.chat import AssistantBlock, ToolCard, UserBubble
 
     saved = sessions.Session(
         id="20260101-130000-1", started=0, updated=__import__("time").time(),

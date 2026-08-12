@@ -7,8 +7,8 @@ instead.
 
 from __future__ import annotations
 
-from localagent.core import resources
-from localagent.core.resources import Sampler, Snapshot
+from hugmunn.core import resources
+from hugmunn.core.resources import Sampler, Snapshot
 
 
 class TestSampling:
@@ -76,7 +76,7 @@ class TestWarnings:
     """The note should name the specific problem, not say 'high usage'."""
 
     def _warn(self, **kw):
-        from localagent.ui.resource_bar import ResourceBar
+        from hugmunn.ui.resource_bar import ResourceBar
         return ResourceBar._warning(Snapshot(**kw))
 
     def test_swap_in_use_is_reported_first(self):

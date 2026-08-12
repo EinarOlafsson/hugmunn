@@ -18,11 +18,11 @@ import pytest
 
 @pytest.fixture()
 def clean_config(tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALAGENT_MODELS_ROOT", str(tmp_path / "models"))
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path / "models"))
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.delenv("LLAMA_SERVER", raising=False)
     monkeypatch.setattr("shutil.which", lambda name: None)
-    from localagent import config
+    from hugmunn import config
 
     importlib.reload(config)
     return config, tmp_path
@@ -94,7 +94,7 @@ def test_a_non_executable_file_is_not_accepted(clean_config, tmp_path):
 
 
 def test_the_search_list_covers_the_usual_places():
-    from localagent.ui.runtime_dialog import SEARCH_ROOTS
+    from hugmunn.ui.runtime_dialog import SEARCH_ROOTS
 
     joined = " ".join(SEARCH_ROOTS)
     for expected in ("~/.local/bin", "/usr/local/bin", "llama.cpp/build/bin"):
@@ -102,7 +102,7 @@ def test_the_search_list_covers_the_usual_places():
 
 
 def test_the_dialog_still_shows_manual_steps_as_a_fallback():
-    from localagent.ui.runtime_dialog import BUILD_STEPS
+    from hugmunn.ui.runtime_dialog import BUILD_STEPS
 
     assert "git clone" in BUILD_STEPS and "cmake" in BUILD_STEPS
     # An architecture is not optional: without it the build compiles for every
@@ -112,21 +112,21 @@ def test_the_dialog_still_shows_manual_steps_as_a_fallback():
 
 def test_describe_answers_whether_the_gpu_is_usable(tmp_path):
     """Not the version string: that reports the compiler, not the backend."""
-    from localagent.ui.runtime_dialog import describe
+    from hugmunn.ui.runtime_dialog import describe
 
     binary = make_binary(tmp_path / "llama-server")   # prints only a version
     assert "CPU-only" in describe(binary)
 
 
 def test_describe_does_not_raise_on_a_binary_that_will_not_run(tmp_path):
-    from localagent.ui.runtime_dialog import describe
+    from hugmunn.ui.runtime_dialog import describe
 
     missing = tmp_path / "not-there"
     assert describe(missing) == "could not be run"
 
 
 def test_the_dialog_builds_and_validates(qt_app, clean_config, tmp_path):
-    from localagent.ui.runtime_dialog import RuntimeDialog
+    from hugmunn.ui.runtime_dialog import RuntimeDialog
 
     config, _ = clean_config
     dialog = RuntimeDialog()
@@ -142,7 +142,7 @@ def test_the_dialog_builds_and_validates(qt_app, clean_config, tmp_path):
 
 
 def test_the_dialog_rejects_a_path_that_is_not_executable(qt_app, clean_config, tmp_path):
-    from localagent.ui.runtime_dialog import RuntimeDialog
+    from hugmunn.ui.runtime_dialog import RuntimeDialog
 
     path = tmp_path / "llama-server"
     path.write_text("#!/bin/sh\n", encoding="utf-8")
@@ -160,9 +160,9 @@ def test_weights_in_the_repo_would_not_be_committed():
     have tried to stage it."""
     from pathlib import Path
 
-    import localagent
+    import hugmunn
 
-    repo = Path(localagent.__file__).resolve().parents[2]
+    repo = Path(hugmunn.__file__).resolve().parents[2]
     assert "*.gguf" in (repo / ".gitignore").read_text(encoding="utf-8")
 
 
@@ -173,7 +173,7 @@ def test_weights_in_the_repo_would_not_be_committed():
 
 
 def test_preflight_reads_the_machine_without_changing_it():
-    from localagent.core import setup_llama
+    from hugmunn.core import setup_llama
 
     checks = setup_llama.preflight()
     assert isinstance(checks.can_build, bool)
@@ -182,7 +182,7 @@ def test_preflight_reads_the_machine_without_changing_it():
 
 
 def test_preflight_names_what_is_missing(monkeypatch):
-    from localagent.core import setup_llama
+    from hugmunn.core import setup_llama
 
     monkeypatch.setattr("shutil.which", lambda name: None)
     checks = setup_llama.preflight()
@@ -193,7 +193,7 @@ def test_preflight_names_what_is_missing(monkeypatch):
 
 def test_a_gpu_without_the_cuda_toolkit_is_called_out(monkeypatch):
     """Silently building CPU-only on a machine with a 3090 wastes the GPU."""
-    from localagent.core import setup_llama
+    from hugmunn.core import setup_llama
 
     checks = setup_llama.Preflight(
         git="/g", cmake="/c", compiler="/cc", nvcc="",
@@ -204,7 +204,7 @@ def test_a_gpu_without_the_cuda_toolkit_is_called_out(monkeypatch):
 
 
 def test_the_cuda_build_targets_the_card_that_is_present():
-    from localagent.core import setup_llama
+    from hugmunn.core import setup_llama
 
     checks = setup_llama.Preflight(
         git="/g", cmake="/c", compiler="/cc", nvcc="/nvcc",
@@ -215,21 +215,21 @@ def test_the_cuda_build_targets_the_card_that_is_present():
 
 def test_install_goes_to_our_own_directory_not_the_models_repo():
     """The machine that needs a build is the one where that repo is absent."""
-    from localagent.core import setup_llama
+    from hugmunn.core import setup_llama
 
-    assert "localagent" in str(setup_llama.INSTALL_ROOT)
+    assert "hugmunn" in str(setup_llama.INSTALL_ROOT)
     assert ".claude/models" not in str(setup_llama.INSTALL_ROOT)
 
 
 def test_the_build_never_takes_more_than_sixteen_cores():
     """This machine runs other people's jobs."""
-    from localagent.core import setup_llama
+    from hugmunn.core import setup_llama
 
     assert setup_llama.DEFAULT_JOBS <= 16
 
 
 def test_a_build_on_a_machine_that_cannot_build_fails_with_advice(monkeypatch):
-    from localagent.core import setup_llama
+    from hugmunn.core import setup_llama
 
     monkeypatch.setattr("shutil.which", lambda name: None)
     with pytest.raises(setup_llama.SetupError) as caught:
@@ -242,9 +242,9 @@ def test_what_the_installer_produces_is_what_find_runtime_looks_for(clean_config
                                                                     monkeypatch):
     """Building and then not finding it would be a quiet, baffling failure."""
     config, _ = clean_config
-    monkeypatch.setenv("LOCALAGENT_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("HUGMUNN_DATA_DIR", str(tmp_path / "data"))
     importlib.reload(config)
-    from localagent.core import setup_llama
+    from hugmunn.core import setup_llama
 
     importlib.reload(setup_llama)
     binary = make_binary(setup_llama.BIN_DIR / "llama-server")
@@ -257,9 +257,9 @@ def test_a_purpose_built_binary_outranks_a_generic_one_on_path(clean_config,
                                                                monkeypatch):
     """Ours is built for this GPU; whatever is on PATH probably is not."""
     config, _ = clean_config
-    monkeypatch.setenv("LOCALAGENT_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("HUGMUNN_DATA_DIR", str(tmp_path / "data"))
     importlib.reload(config)
-    from localagent.core import setup_llama
+    from hugmunn.core import setup_llama
 
     importlib.reload(setup_llama)
     ours = make_binary(setup_llama.BIN_DIR / "llama-server")
@@ -269,7 +269,7 @@ def test_a_purpose_built_binary_outranks_a_generic_one_on_path(clean_config,
 
 
 def test_a_prebuilt_asset_is_named_for_this_platform():
-    from localagent.core import setup_llama
+    from hugmunn.core import setup_llama
 
     name = setup_llama.prebuilt_asset_name()
     assert name is None or any(
@@ -277,8 +277,8 @@ def test_a_prebuilt_asset_is_named_for_this_platform():
 
 
 def test_the_setup_worker_reports_failure_rather_than_raising(qt_app, monkeypatch):
-    from localagent.core import setup_llama
-    from localagent.ui.workers import SetupWorker
+    from hugmunn.core import setup_llama
+    from hugmunn.ui.workers import SetupWorker
 
     monkeypatch.setattr(shutil := __import__("shutil"), "which", lambda name: None)
     worker = SetupWorker("build")
@@ -291,17 +291,19 @@ def test_the_setup_worker_reports_failure_rather_than_raising(qt_app, monkeypatc
 def test_the_app_offers_setup_on_launch_when_that_is_the_blocker(qt_app, tmp_path,
                                                                  monkeypatch):
     """Weights present, no binary: say so rather than presenting a dead list."""
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path / "cfg"))
-    monkeypatch.setenv("LOCALAGENT_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setenv("LOCALAGENT_MODELS_ROOT", str(tmp_path / "models"))
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setenv("HUGMUNN_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path / "models"))
     from PyQt6.QtWidgets import QMessageBox
 
-    from localagent import config as cfg
+    from hugmunn import config as cfg
 
     importlib.reload(cfg)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, spec: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
@@ -330,16 +332,18 @@ def test_the_app_offers_setup_on_launch_when_that_is_the_blocker(qt_app, tmp_pat
 
 def test_no_offer_when_nothing_is_downloaded(qt_app, tmp_path, monkeypatch):
     """A fresh install has no weights; the binary is not what is missing."""
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path / "cfg"))
-    monkeypatch.setenv("LOCALAGENT_MODELS_ROOT", str(tmp_path / "models"))
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path / "models"))
     from PyQt6.QtWidgets import QMessageBox
 
-    from localagent import config as cfg
+    from hugmunn import config as cfg
 
     importlib.reload(cfg)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, spec: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
@@ -366,7 +370,7 @@ def test_no_offer_when_nothing_is_downloaded(qt_app, tmp_path, monkeypatch):
 
 
 def test_a_cuda_build_is_recognised_as_gpu_capable():
-    from localagent.core.setup_llama import RuntimeInfo
+    from hugmunn.core.setup_llama import RuntimeInfo
     from pathlib import Path
 
     info = RuntimeInfo(Path("/x"), "version: 1",
@@ -376,7 +380,7 @@ def test_a_cuda_build_is_recognised_as_gpu_capable():
 
 
 def test_a_cpu_only_build_says_so_and_says_what_to_do():
-    from localagent.core.setup_llama import RuntimeInfo
+    from hugmunn.core.setup_llama import RuntimeInfo
     from pathlib import Path
 
     info = RuntimeInfo(Path("/x"), "version: 1", ())
@@ -387,14 +391,14 @@ def test_a_cpu_only_build_says_so_and_says_what_to_do():
 
 def test_a_version_string_alone_does_not_imply_a_gpu():
     """The build log saying 'built with GNU 13.3.0' tells you nothing."""
-    from localagent.core.setup_llama import RuntimeInfo
+    from hugmunn.core.setup_llama import RuntimeInfo
     from pathlib import Path
 
     assert not RuntimeInfo(Path("/x"), "built with GNU 13.3.0", ()).has_gpu
 
 
 def test_offload_is_read_out_of_the_startup_log():
-    from localagent.core.setup_llama import offload_from_log
+    from hugmunn.core.setup_llama import offload_from_log
 
     assert offload_from_log(
         ["load_tensors: offloaded 49/49 layers to GPU"]) == "all 49 layers on GPU"
@@ -407,7 +411,7 @@ def test_offload_is_read_out_of_the_startup_log():
 
 def test_the_last_offload_line_wins():
     """A server that reloads logs twice; the current load is the answer."""
-    from localagent.core.setup_llama import offload_from_log
+    from hugmunn.core.setup_llama import offload_from_log
 
     assert offload_from_log([
         "load_tensors: offloaded 0/49 layers to GPU",
@@ -416,19 +420,21 @@ def test_the_last_offload_line_wins():
 
 
 def test_a_log_that_says_nothing_gives_nothing():
-    from localagent.core.setup_llama import offload_from_log
+    from hugmunn.core.setup_llama import offload_from_log
 
     assert offload_from_log(["starting", "listening on 127.0.0.1:8080"]) == ""
 
 
 def test_the_status_line_reports_where_the_model_ran(qt_app, tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config as cfg
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config as cfg
 
     importlib.reload(cfg)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)

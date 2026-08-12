@@ -11,9 +11,9 @@ import urllib.request
 
 import pytest
 
-from localagent.core import commands as commandkit
-from localagent.core import persistence as persistkit
-from localagent.core import remote as remotekit
+from hugmunn.core import commands as commandkit
+from hugmunn.core import persistence as persistkit
+from hugmunn.core import remote as remotekit
 
 
 # ------------------------------------------------------------- recognition
@@ -104,7 +104,7 @@ def test_relentless_names_the_only_reasons_to_stop_early():
 
 
 def test_the_tier_reaches_the_agent():
-    from localagent.core.agent import Agent
+    from hugmunn.core.agent import Agent
 
     for level in persistkit.Persistence:
         agent = Agent(client=None, workdir="/tmp", system_prompt="",
@@ -115,7 +115,7 @@ def test_the_tier_reaches_the_agent():
 
 
 def test_an_explicit_budget_still_wins_for_subagents():
-    from localagent.core.agent import Agent
+    from hugmunn.core.agent import Agent
 
     assert Agent(client=None, workdir="/tmp", system_prompt="",
                  max_iterations=3).max_iterations == 3
@@ -166,7 +166,7 @@ def test_binding_to_every_interface_says_so_plainly():
 
 
 def test_tunnels_are_offered_rather_than_implemented():
-    """localagent should not be running a tunnel daemon; these do it better."""
+    """hugmunn should not be running a tunnel daemon; these do it better."""
     options = remotekit.tunnel_options(8770)
     names = {o["name"] for o in options}
     assert "Tailscale" in names and "Cloudflare Tunnel" in names
@@ -204,7 +204,7 @@ class StubBridge:
 
 @pytest.fixture()
 def server():
-    from localagent.core.webserver import RemoteServer
+    from hugmunn.core.webserver import RemoteServer
 
     bridge = StubBridge()
     instance = RemoteServer(bridge, host="127.0.0.1", port=0)
@@ -229,7 +229,7 @@ def fetch(server, path, token=None, body=None):
 def test_the_server_serves_a_page_with_the_token(server):
     instance, _ = server
     body = fetch(instance, "/", instance.token).read().decode()
-    assert "<html" in body and "localagent" in body
+    assert "<html" in body and "hugmunn" in body
 
 
 def test_no_token_is_refused(server):
@@ -300,8 +300,8 @@ def test_rotating_the_token_invalidates_the_old_one(server):
 
 
 def test_the_url_carries_the_token_and_the_page_strips_it():
-    from localagent.core.webserver import RemoteServer
-    from localagent.core.webui import PAGE
+    from hugmunn.core.webserver import RemoteServer
+    from hugmunn.core.webui import PAGE
 
     instance = RemoteServer(StubBridge(), port=8770, token="abc")
     assert "?t=abc" in instance.url()
@@ -311,6 +311,6 @@ def test_the_url_carries_the_token_and_the_page_strips_it():
 
 
 def test_the_server_binds_loopback_by_default():
-    from localagent.core.webserver import RemoteServer
+    from hugmunn.core.webserver import RemoteServer
 
     assert RemoteServer(StubBridge()).host == "127.0.0.1"

@@ -19,10 +19,10 @@ import pytest
 @pytest.fixture()
 def fake_root(tmp_path, monkeypatch):
     """A models root we control, with nothing in it yet."""
-    monkeypatch.setenv("LOCALAGENT_MODELS_ROOT", str(tmp_path))
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path))
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.delenv("LLAMA_SERVER", raising=False)
-    from localagent import config
+    from hugmunn import config
 
     importlib.reload(config)
     (tmp_path / "gguf").mkdir()
@@ -148,7 +148,7 @@ def test_a_direct_command_loads_the_right_weights(fake_root):
     binary = write_runtime(root)
     config.set_model_path("uncensored", root / "gguf" / "model.gguf")
 
-    from localagent.core.server import ServerManager
+    from hugmunn.core.server import ServerManager
 
     command = ServerManager()._direct_command(spec_for(config, root))
     assert command is not None
@@ -163,7 +163,7 @@ def test_a_direct_command_loads_the_right_weights(fake_root):
 def test_no_direct_command_without_weights(fake_root):
     config, root = fake_root
     write_runtime(root)
-    from localagent.core.server import ServerManager
+    from hugmunn.core.server import ServerManager
 
     assert ServerManager()._direct_command(spec_for(config, root)) is None
 
@@ -173,7 +173,7 @@ def test_a_missing_script_and_no_binary_raises_something_actionable(fake_root):
     (root / "gguf" / "model.gguf").write_bytes(b"weights")
     config.set_model_path("uncensored", root / "gguf" / "model.gguf")
 
-    from localagent.core.server import ServerError, ServerManager
+    from hugmunn.core.server import ServerError, ServerManager
 
     with pytest.raises(ServerError) as caught:
         ServerManager().start(spec_for(config, root), timeout=0.1)
@@ -192,7 +192,7 @@ def test_the_shipped_scripts_do_not_hardcode_a_home_directory():
     """
     # Reload rather than importing the cached module: the fixtures above
     # reload config against a temporary root, and that leaks.
-    from localagent import config
+    from hugmunn import config
 
     importlib.reload(config)
     scripts = sorted((config.MODELS_ROOT / "scripts").glob("*.sh"))

@@ -13,7 +13,7 @@ import importlib
 
 import pytest
 
-from localagent import config
+from hugmunn import config
 
 
 # ---------------------------------------------------------- identification
@@ -121,7 +121,7 @@ def test_the_dialog_records_a_file_belonging_to_another_model(qt_app, weights_fo
                                                               monkeypatch):
     from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
-    from localagent.ui.download_dialog import DownloadDialog
+    from hugmunn.ui.download_dialog import DownloadDialog
 
     target = weights_folder / (
         "Qwen3.6-27B-uncensored-heretic-v2-Native-MTP-Preserved-Q5_K_M.gguf")
@@ -141,7 +141,7 @@ def test_the_dialog_records_a_file_belonging_to_another_model(qt_app, weights_fo
 def test_the_dialog_refuses_a_file_it_does_not_recognise(qt_app, tmp_path, monkeypatch):
     from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
-    from localagent.ui.download_dialog import DownloadDialog
+    from hugmunn.ui.download_dialog import DownloadDialog
 
     stray = tmp_path / "some-unknown-model-Q8.gguf"
     stray.write_bytes(b"x")
@@ -164,7 +164,7 @@ def test_scanning_from_the_dialog_records_every_model_found(qt_app, weights_fold
                                                             monkeypatch):
     from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
-    from localagent.ui.download_dialog import DownloadDialog
+    from hugmunn.ui.download_dialog import DownloadDialog
 
     monkeypatch.setattr(QFileDialog, "getExistingDirectory",
                         staticmethod(lambda *a, **k: str(weights_folder)))
@@ -182,15 +182,17 @@ def test_find_my_models_is_reachable_from_the_menu(qt_app, weights_folder, tmp_p
     """Without having to open a download dialog for the wrong model first."""
     import importlib
 
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "cfg"))
     from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
-    from localagent import config as cfg
+    from hugmunn import config as cfg
 
     importlib.reload(cfg)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, spec: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, provider: None)

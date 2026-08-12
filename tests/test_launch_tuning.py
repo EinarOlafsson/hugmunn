@@ -23,8 +23,8 @@ from pathlib import Path
 
 import pytest
 
-from localagent import config
-from localagent.core.server import ServerManager
+from hugmunn import config
+from hugmunn.core.server import ServerManager
 
 
 def flags(key):

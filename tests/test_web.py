@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from localagent.core import web
+from hugmunn.core import web
 
 
 class TestSSRFGuard:
@@ -84,20 +84,20 @@ class TestClipping:
 
 class TestToolRegistration:
     def test_web_tools_registered(self):
-        from localagent.core import tools
+        from hugmunn.core import tools
 
         assert "web_search" in tools.BY_NAME
         assert "web_fetch" in tools.BY_NAME
 
     def test_web_tools_do_not_require_approval(self):
-        from localagent.core import tools
+        from hugmunn.core import tools
 
         assert not tools.BY_NAME["web_fetch"].requires_approval
         assert not tools.BY_NAME["web_search"].requires_approval
 
     def test_ssrf_error_is_recoverable_not_raised(self):
         """A blocked URL must come back as a string the model can react to."""
-        from localagent.core import tools
+        from hugmunn.core import tools
 
         out = tools.execute("web_fetch", {"url": "http://127.0.0.1/"}, "/tmp")
         assert out.startswith("Error:")
@@ -125,7 +125,7 @@ class TestPdfLinkDetection:
 class TestDownloadDestination:
     def test_traversal_rejected_before_any_request(self, tmp_path):
         """Must fail on the path alone — not only when the page has PDF links."""
-        from localagent.core import tools
+        from hugmunn.core import tools
         out = tools.execute(
             "download_pdfs",
             {"url": "https://example.com/", "subdir": "../../etc"},
@@ -134,18 +134,18 @@ class TestDownloadDestination:
         assert out.startswith("Error:") and "outside the working directory" in out
 
     def test_absolute_destination_rejected(self, tmp_path):
-        from localagent.core import tools
+        from hugmunn.core import tools
         out = tools.execute(
             "download_pdfs", {"url": "https://example.com/", "subdir": "/etc"}, str(tmp_path)
         )
         assert out.startswith("Error:")
 
     def test_download_pdfs_requires_approval(self):
-        from localagent.core import tools
+        from hugmunn.core import tools
         assert tools.BY_NAME["download_pdfs"].requires_approval
 
     def test_image_search_registered(self):
-        from localagent.core import tools
+        from hugmunn.core import tools
         assert "image_search" in tools.BY_NAME
 
 
@@ -153,21 +153,21 @@ class TestHttpErrorMessages:
     """A raw 'HTTP 400: {...}' tells the user nothing actionable."""
 
     def test_context_overflow_is_explained(self):
-        from localagent.core.client import _explain_http
+        from hugmunn.core.client import _explain_http
         msg = _explain_http(400, '{"error":{"message":"the request exceeds the available context size"}}')
         assert "context window" in msg
         assert "Disable some skills" in msg
 
     def test_loading_server_is_explained(self):
-        from localagent.core.client import _explain_http
+        from hugmunn.core.client import _explain_http
         assert "still loading" in _explain_http(503, "loading model")
 
     def test_unknown_status_still_reports_the_body(self):
-        from localagent.core.client import _explain_http
+        from hugmunn.core.client import _explain_http
         msg = _explain_http(418, "teapot")
         assert "418" in msg and "teapot" in msg
 
     def test_unrelated_400_is_not_mislabelled(self):
-        from localagent.core.client import _explain_http
+        from hugmunn.core.client import _explain_http
         msg = _explain_http(400, '{"error":{"message":"invalid tool_choice value"}}')
         assert "context window" not in msg

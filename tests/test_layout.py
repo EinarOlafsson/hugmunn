@@ -31,13 +31,15 @@ HEIGHTS = (1256, 900, 700, 520)
 def window(qt_app, tmp_path, monkeypatch):
     import importlib
 
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
@@ -179,13 +181,15 @@ def test_the_meters_stop_polling_when_the_window_closes(qt_app, tmp_path, monkey
     """
     import importlib
 
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     monkeypatch.setattr(mw.MainWindow, "_offer_download", lambda self, s: None)
     monkeypatch.setattr(mw.MainWindow, "_offer_restore", lambda self: None)
     monkeypatch.setattr(mw.MainWindow, "_sign_in", lambda self, p: None)
@@ -209,7 +213,7 @@ def test_a_tick_after_teardown_does_not_raise(qt_app):
     """
     from PyQt6 import sip
 
-    from localagent.ui.resource_bar import ResourceBar
+    from hugmunn.ui.resource_bar import ResourceBar
 
     meters = ResourceBar()
     assert meters._timer.isActive()

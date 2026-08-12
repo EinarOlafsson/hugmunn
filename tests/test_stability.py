@@ -18,13 +18,15 @@ import pytest
 
 @pytest.fixture()
 def window(qt_app, tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     for name in ("_offer_download", "_offer_restore", "_sign_in", "_offer_runtime_setup"):
         monkeypatch.setattr(mw.MainWindow, name, lambda self, *a: None)
     win = mw.MainWindow()
@@ -38,7 +40,7 @@ def window(qt_app, tmp_path, monkeypatch):
 
 def test_the_desktop_and_the_browser_share_one_turn_lock(window):
     """Two locks that do not know about each other prevent nothing."""
-    from localagent.ui.remote_bridge import RemoteBridge
+    from hugmunn.ui.remote_bridge import RemoteBridge
 
     bridge = RemoteBridge(window)
     assert bridge._turn is window._turn_lock
@@ -46,7 +48,7 @@ def test_the_desktop_and_the_browser_share_one_turn_lock(window):
 
 def test_a_remote_turn_blocks_a_desktop_turn(window, qt_app):
     """Both appending to one history interleaves it into nonsense."""
-    from localagent.ui.remote_bridge import RemoteBridge
+    from hugmunn.ui.remote_bridge import RemoteBridge
 
     bridge = RemoteBridge(window)
     window._turn_lock.acquire()          # stand in for a remote turn in flight
@@ -59,7 +61,7 @@ def test_a_remote_turn_blocks_a_desktop_turn(window, qt_app):
 
 
 def test_a_desktop_turn_blocks_a_remote_turn(window):
-    from localagent.ui.remote_bridge import RemoteBridge
+    from hugmunn.ui.remote_bridge import RemoteBridge
 
     bridge = RemoteBridge(window)
     window._turn_lock.acquire()
@@ -92,7 +94,7 @@ def test_the_lock_is_released_when_no_client_can_be_built(window, monkeypatch):
 
 
 def test_the_lock_is_released_after_a_turn(window, qt_app, monkeypatch):
-    from localagent.core.client import Event
+    from hugmunn.core.client import Event
 
     class Fake:
         def is_ready(self): return True
@@ -111,7 +113,7 @@ def test_the_lock_is_released_after_a_turn(window, qt_app, monkeypatch):
 
 
 def test_the_bridge_releases_the_lock_even_when_a_turn_raises(window, monkeypatch):
-    from localagent.ui.remote_bridge import RemoteBridge
+    from hugmunn.ui.remote_bridge import RemoteBridge
 
     bridge = RemoteBridge(window)
     monkeypatch.setattr(type(window), "build_agent",
@@ -134,13 +136,15 @@ def test_closing_the_window_releases_the_listening_port(qt_app, tmp_path, monkey
     """A daemon thread dies with the process, but the port stays bound until
     then — which is the difference between reopening the app and being told
     the address is in use."""
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     for name in ("_offer_download", "_offer_restore", "_sign_in", "_offer_runtime_setup"):
         monkeypatch.setattr(mw.MainWindow, name, lambda self, *a: None)
 
@@ -184,7 +188,7 @@ def test_the_resource_timer_stops_with_the_window(window):
 def test_summarising_gives_up_rather_than_freezing_the_window(window, monkeypatch):
     """It runs on the thread driving the turn, which on the desktop is the
     GUI thread. An unbounded call there reads as a crash."""
-    from localagent.core.client import Event
+    from hugmunn.core.client import Event
 
     class Slow:
         def is_ready(self): return True
@@ -205,7 +209,7 @@ def test_summarising_gives_up_rather_than_freezing_the_window(window, monkeypatc
 
 
 def test_a_summary_that_finishes_in_time_is_kept(window, monkeypatch):
-    from localagent.core.client import Event
+    from hugmunn.core.client import Event
 
     class Quick:
         def is_ready(self): return True
@@ -219,7 +223,7 @@ def test_a_summary_that_finishes_in_time_is_kept(window, monkeypatch):
 
 
 def test_the_summary_deadline_is_a_bounded_number():
-    from localagent.ui.main_window import MainWindow
+    from hugmunn.ui.main_window import MainWindow
 
     assert 5 <= MainWindow.SUMMARY_TIMEOUT <= 120
 
@@ -229,13 +233,15 @@ def test_the_summary_deadline_is_a_bounded_number():
 
 def test_no_threads_are_left_running_after_a_window_closes(qt_app, tmp_path,
                                                            monkeypatch):
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     for name in ("_offer_download", "_offer_restore", "_sign_in", "_offer_runtime_setup"):
         monkeypatch.setattr(mw.MainWindow, name, lambda self, *a: None)
 
@@ -246,4 +252,4 @@ def test_no_threads_are_left_running_after_a_window_closes(qt_app, tmp_path,
     win.close()
     time.sleep(0.5)
     leaked = {t.name for t in threading.enumerate()} - before
-    assert not any("localagent-remote" in name for name in leaked), leaked
+    assert not any("hugmunn-remote" in name for name in leaked), leaked

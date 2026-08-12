@@ -1,4 +1,4 @@
-# localagent
+# hugmunn
 
 A Qt desktop client for local LLMs and for Claude and ChatGPT — chat,
 streaming, and file/shell tool use, with the same tools and skills whichever
@@ -50,8 +50,8 @@ so it cannot ship with the app and cannot be copied from a machine that works.
 A second machine therefore ends up with correct model weights and nothing to
 run them with.
 
-localagent builds it. On launch, if there are weights and no binary, it offers
-to; **localagent → Set up llama-server…** does the same on demand. It reads the
+hugmunn builds it. On launch, if there are weights and no binary, it offers
+to; **hugmunn → Set up llama-server…** does the same on demand. It reads the
 GPU's compute capability from `nvidia-smi` and builds only for that card —
 targeting every architecture turns a four-minute build into most of an hour —
 and streams the compiler output so a long build is distinguishable from a hang.
@@ -63,27 +63,27 @@ alternative that needs no toolchain, labelled CPU-only on Linux because
 llama.cpp publishes CUDA builds for Windows and not for Linux. You can also
 point at one you already have; the choice is remembered.
 
-Everything lands in `~/.local/share/localagent/`, so none of this depends on
+Everything lands in `~/.local/share/hugmunn/`, so none of this depends on
 the models repo being cloned.
 
 ## Releasing resources
 
-**localagent → Release RAM / VRAM / CPU / Check disk space**, also in Settings.
+**hugmunn → Release RAM / VRAM / CPU / Check disk space**, also in Settings.
 Each names what it will do before doing it and reports what was actually
 freed, measured before and after.
 
-These free what localagent owns and nothing else. No process is killed, nothing
+These free what hugmunn owns and nothing else. No process is killed, nothing
 needs root, and the kernel's page cache is left alone. Releasing VRAM means
 stopping the model server — llama.cpp cannot unload part of a model — and a
-server that was already running when localagent started is left alone, because
+server that was already running when hugmunn started is left alone, because
 stopping it is not this button's decision.
 
 ## Install
 
 ```bash
-cd /mnt/firecuda2/Claude/repo/localagent
+cd /mnt/firecuda2/Claude/repo/hugmunn
 pip install -e .
-localagent
+hugmunn
 ```
 
 `pip install -e .` is a normal editable install — edit the source and rerun, no
@@ -93,8 +93,8 @@ reinstall needed. Dependencies are PyQt6, httpx, markdown and Pygments.
 > point currently points at, but a dedicated environment is tidier if you plan
 > to change dependency versions.
 
-Run it with `localagent`, `localagent-gui` (no console window), or
-`python -m localagent`.
+Run it with `hugmunn`, `hugmunn-gui` (no console window), or
+`python -m hugmunn`.
 
 ## What it does
 
@@ -172,13 +172,13 @@ Defaults cost ~1,060 tokens. **All 27 cost ~12,000, so "Enable all" is a
 category is the intended workflow. `write.sh` and `uncensored.sh` run 16K
 contexts; `code.sh` and `code-glm.sh` run 32K.
 
-Add your own by dropping a `.md` file into `~/.config/localagent/skills/` with
+Add your own by dropping a `.md` file into `~/.config/hugmunn/skills/` with
 frontmatter (`name`, `category`, `description`, `when`, `default`) — a model
 can write one there itself with `write_file`. It is picked up on the next
 launch, and a user skill overrides a shipped one with the same filename. A
 malformed file is skipped rather than crashing the app.
 
-**Custom tools** live in `~/.config/localagent/tools/` as `.py` files declaring
+**Custom tools** live in `~/.config/hugmunn/tools/` as `.py` files declaring
 `NAME`, `DESCRIPTION`, `PARAMETERS`, and `run`. They do not auto-load — enable
 each from the sidebar after reading it. That gate is not about capability
 (`run_command` is already arbitrary execution) but about review posture:
@@ -215,7 +215,7 @@ path or a failing command becomes something it can recover from.
 ## Layout
 
 ```
-src/localagent/
+src/hugmunn/
 ├── config.py          model registry, shard-completeness checks, settings
 ├── core/
 │   ├── client.py      SSE streaming, tool-call reassembly, timings
@@ -258,20 +258,20 @@ unit-tested; smoke-test it with:
 ```bash
 QT_QPA_PLATFORM=offscreen python -c "
 from PyQt6.QtWidgets import QApplication
-from localagent.ui.main_window import MainWindow
+from hugmunn.ui.main_window import MainWindow
 app = QApplication([]); MainWindow().show(); print('ok')"
 ```
 
 ## Configuration
 
-Settings persist to `~/.config/localagent/settings.json` — selected model,
+Settings persist to `~/.config/hugmunn/settings.json` — selected model,
 working directory, tool toggles, and system prompt.
 
 Two environment variables override the defaults:
 
-- `LOCALAGENT_MODELS_ROOT` — where the model scripts and weights live
+- `HUGMUNN_MODELS_ROOT` — where the model scripts and weights live
   (default `~/.claude/models`)
-- `LOCALAGENT_CONFIG_DIR` — settings location
+- `HUGMUNN_CONFIG_DIR` — settings location
 
 To add a model, add a `ModelSpec` to `REGISTRY` in `config.py` pointing at its
 launch script and port. Per-model tuning stays in the shell scripts rather than

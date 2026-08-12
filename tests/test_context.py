@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from localagent.core.context import (
+from hugmunn.core.context import (
     Budget, Result, Strategy, compress, groups, message_tokens,
     summary_request, total_tokens,
 )
@@ -233,6 +233,6 @@ def test_every_strategy_returns_a_usable_history(strategy):
 
 @pytest.mark.parametrize("strategy", list(Strategy))
 def test_every_strategy_has_a_label_and_an_explanation(strategy):
-    from localagent.core.context import BLURBS, LABELS
+    from hugmunn.core.context import BLURBS, LABELS
 
     assert LABELS[strategy] and len(BLURBS[strategy]) > 40

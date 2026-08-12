@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from localagent.core import tools
+from hugmunn.core import tools
 
 
 @pytest.fixture()

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from localagent.core.autonomy import Autonomy, decide
+from hugmunn.core.autonomy import Autonomy, decide
 
 SITE = "/home/u/anaconda3/envs/spacr/lib/python3.10/site-packages/numpy/core.py"
 EDITABLE = "/mnt/firecuda2/Claude/repo/spacr/spacr/utils.py"

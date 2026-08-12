@@ -3,8 +3,8 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "localagent"
-version = "0.15.1"
+name = "hugmunn"
+version = "0.0.0.1"
 description = "Qt desktop client for locally-hosted LLMs served by llama.cpp"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,19 +22,29 @@ dependencies = [
 [project.optional-dependencies]
 # pytest-timeout: a GUI test that opens an unexpected modal hangs forever
 # otherwise, and a suite that hangs gets killed rather than read.
-dev = ["pytest>=7.4", "pytest-qt>=4.4", "pytest-timeout>=2.3"]
+# pytest-qt is deliberately absent: it loads a Qt binding at configure
+# time and prefers PySide6 when installed, which segfaults alongside our
+# PyQt6. Nothing here used its fixtures.
+dev = ["pytest>=7.4", "pytest-timeout>=2.3"]
 # Encrypted API-key storage. Without it keys go to a mode-600 file and the
 # sign-in dialog says so, so this is a real upgrade rather than a requirement.
 keyring = ["keyring>=24.0"]
 
 [project.scripts]
-localagent = "localagent.app:main"
+hugmunn = "hugmunn.app:main"
 
 [project.gui-scripts]
-localagent-gui = "localagent.app:main"
+hugmunn-gui = "hugmunn.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# pytest-qt loads a Qt binding at configure time and prefers PySide6 when it is
+# installed -- which it is here, because spaCR shares this environment. Two Qt
+# bindings in one process is undefined behaviour: they own separate copies of
+# the C++ runtime and neither knows about the other's widgets. It surfaced as a
+# segfault with no Python traceback, inside an application-wide setStyleSheet,
+# which walks every widget Qt knows about. Nothing here uses the plugin.
+addopts = "-p no:pytest-qt"

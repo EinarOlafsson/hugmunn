@@ -19,9 +19,9 @@ import importlib
 
 import pytest
 
-from localagent.core import autonomy as autonomykit
-from localagent.core.agent import Agent
-from localagent.core.client import Event
+from hugmunn.core import autonomy as autonomykit
+from hugmunn.core.agent import Agent
+from hugmunn.core.client import Event
 
 
 class _Call:
@@ -139,7 +139,7 @@ def test_level_four_still_protects_installed_packages():
 def test_an_editable_install_stays_writable_at_level_four():
     """The carve-out that makes level 4 useful rather than merely dangerous."""
     assert not asks(autonomykit.Autonomy.FULL, "write_file",
-                    {"path": "/home/me/repo/localagent/src/localagent/x.py",
+                    {"path": "/home/me/repo/hugmunn/src/hugmunn/x.py",
                      "content": "y"})
 
 
@@ -148,8 +148,8 @@ def test_an_editable_install_stays_writable_at_level_four():
 
 def test_the_old_checkbox_migrates_to_confirm_everything(tmp_path, monkeypatch):
     """Somebody who unticked it meant level 1, and should land there."""
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
     (tmp_path).mkdir(parents=True, exist_ok=True)
@@ -162,8 +162,8 @@ def test_the_old_checkbox_migrates_to_confirm_everything(tmp_path, monkeypatch):
 
 
 def test_a_normal_settings_file_is_left_alone(tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
     (tmp_path / "settings.json").write_text(
@@ -173,13 +173,15 @@ def test_a_normal_settings_file_is_left_alone(tmp_path, monkeypatch):
 
 def test_the_window_has_one_control_for_this_decision(qt_app, tmp_path, monkeypatch):
     """Two controls for one decision is what produced the report."""
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path))
-    from localagent import config
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.ui import main_window as mw
+    from hugmunn.ui import main_window as mw
 
-    importlib.reload(mw)
+    # NOT reloaded: config resolves its paths on access now, so there is
+    # nothing to refresh -- and reloading a module that defines QWidget
+    # subclasses makes new Qt types while old instances are still alive.
     for name in ("_offer_download", "_offer_restore", "_sign_in", "_offer_runtime_setup"):
         monkeypatch.setattr(mw.MainWindow, name, lambda self, *a: None)
 
@@ -197,7 +199,7 @@ def test_the_agent_no_longer_consults_the_deprecated_flag():
     """Checked in the source, so it cannot creep back into the gate."""
     import pathlib
 
-    import localagent.core.agent as agent_module
+    import hugmunn.core.agent as agent_module
 
     source = pathlib.Path(agent_module.__file__).read_text(encoding="utf-8")
     gate = [line for line in source.splitlines()

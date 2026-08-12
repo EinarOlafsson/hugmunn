@@ -13,8 +13,8 @@ import json
 import httpx
 import pytest
 
-from localagent.core import prompts as promptkit
-from localagent.core.client import LlamaClient
+from hugmunn.core import prompts as promptkit
+from hugmunn.core.client import LlamaClient
 
 
 # ------------------------------------------------------------ the presets
@@ -57,7 +57,7 @@ def test_whitespace_does_not_break_recognition():
 
 
 def test_the_default_setting_is_one_of_the_presets():
-    from localagent.config import Settings
+    from hugmunn.config import Settings
 
     assert promptkit.match(Settings().system_prompt) != "custom"
 
@@ -116,7 +116,7 @@ def test_saying_nothing_sends_nothing(captured):
 
 
 def test_the_agent_passes_thinking_through(captured):
-    from localagent.core.agent import Agent
+    from hugmunn.core.agent import Agent
 
     agent = Agent(client=LlamaClient("http://x"), workdir="/tmp",
                   system_prompt="", use_tools=False, thinking=False)
@@ -128,7 +128,7 @@ def test_the_cloud_clients_accept_the_argument_without_choking():
     """Their thinking is the effort tier; the agent still passes the keyword."""
     import inspect
 
-    from localagent.core.cloud import AnthropicClient, OpenAIClient
+    from hugmunn.core.cloud import AnthropicClient, OpenAIClient
 
     for client in (AnthropicClient, OpenAIClient):
         assert "thinking" in inspect.signature(client.stream).parameters
@@ -136,14 +136,14 @@ def test_the_cloud_clients_accept_the_argument_without_choking():
 
 def test_the_uncensored_models_default_to_thinking_off():
     """What the user found the hard way, recorded where it takes effect."""
-    from localagent import config
+    from hugmunn import config
 
     for key in ("uncensored", "uncensored-big"):
         assert config.by_key(key).reasoning == "off"
 
 
 def test_the_uncensored_blurbs_say_why():
-    from localagent import config
+    from hugmunn import config
 
     for key in ("uncensored", "uncensored-big"):
         assert "refusal" in config.by_key(key).blurb.lower()

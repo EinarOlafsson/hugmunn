@@ -19,8 +19,8 @@ import pytest
 @pytest.fixture()
 def root(tmp_path, monkeypatch):
     """A models tree with a binary and one model's weights, and no scripts."""
-    monkeypatch.setenv("LOCALAGENT_MODELS_ROOT", str(tmp_path))
-    monkeypatch.setenv("LOCALAGENT_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path))
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.delenv("LLAMA_SERVER", raising=False)
     (tmp_path / "gguf").mkdir()
     (tmp_path / "bin").mkdir()
@@ -29,10 +29,10 @@ def root(tmp_path, monkeypatch):
     binary.chmod(binary.stat().st_mode | stat.S_IXUSR)
     (tmp_path / "gguf" / "w.gguf").write_bytes(b"x")
 
-    from localagent import config
+    from hugmunn import config
 
     importlib.reload(config)
-    from localagent.core import scripts
+    from hugmunn.core import scripts
 
     importlib.reload(scripts)
     return config, scripts, tmp_path
@@ -109,7 +109,7 @@ def test_the_script_does_not_hardcode_a_home_directory(root):
 
 
 def test_arguments_are_forwarded_so_overrides_still_work(root):
-    """localagent appends --model and --ctx-size; llama.cpp takes the last."""
+    """hugmunn appends --model and --ctx-size; llama.cpp takes the last."""
     config, scripts, path = root
     assert '"$@"' in scripts.write(prepared(config, path)).read_text()
 
@@ -162,7 +162,7 @@ def test_every_registered_model_generates_a_valid_script(root):
 def test_the_server_writes_a_script_rather_than_launching_invisibly(root):
     config, scripts, path = root
     spec = prepared(config, path)
-    from localagent.core.server import ServerError, ServerManager
+    from hugmunn.core.server import ServerError, ServerManager
 
     said = []
     try:

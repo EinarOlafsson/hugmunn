@@ -6,7 +6,7 @@ index, with the JSON arguments split across arbitrary chunk boundaries.
 
 from __future__ import annotations
 
-from localagent.core.client import LlamaClient, ToolCall
+from hugmunn.core.client import LlamaClient, ToolCall
 
 
 def consume(chunks):
