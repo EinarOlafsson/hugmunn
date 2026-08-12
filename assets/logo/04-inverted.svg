@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"
+     width="256" height="256" role="img" aria-label="Two ravens, white on black">
+  <title>Two ravens, white on black</title>
+  <rect width="256" height="256" fill="#000000"/>
+  <g fill="#ffffff">
+    <path d="M110 70c-16-12-38-9-49 7-9 13-6 30 5 39l-22 7 25 5-14 15 23-7 6 48h16l-5-50 15-9z"/>
+    <path d="M146 70c16-12 38-9 49 7 9 13 6 30-5 39l22 7-25 5 14 15-23-7-6 48h-16l5-50-15-9z"/>
+  </g>
+  <circle cx="86" cy="86" r="5" fill="#e01b1b"/>
+  <circle cx="170" cy="86" r="5" fill="#e01b1b"/>
+</svg>

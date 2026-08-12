@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"
+     width="256" height="256" role="img" aria-label="Two ravens, app icon">
+  <title>Two ravens, app icon</title>
+  <rect width="256" height="256" fill="#ffffff"/>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#000000"/>
+  <g fill="#ffffff">
+    <path d="M116 76c-14-12-36-9-46 6-8 13-4 30 8 38l-19 6 24 4-12 13 21-7 5 50h16l-5-52 18-10z"/>
+    <path d="M140 76c14-12 36-9 46 6 8 13 4 30-8 38l19 6-24 4 12 13-21-7-5 50h-16l5-52-18-10z"/>
+  </g>
+  <circle cx="92" cy="92" r="6" fill="#e01b1b"/>
+  <circle cx="164" cy="92" r="6" fill="#e01b1b"/>
+</svg>

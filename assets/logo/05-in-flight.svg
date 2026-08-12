@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"
+     width="256" height="256" role="img" aria-label="Two ravens in flight, wings spread">
+  <title>Two ravens in flight, wings spread</title>
+  <rect width="256" height="256" fill="#ffffff"/>
+  <g fill="#000000">
+    <path d="M128 96c-10 0-18 8-18 18v46h36v-46c0-10-8-18-18-18z"/>
+    <path d="M110 108 26 76l16 30-30 4 40 20-14 16 72-22z"/>
+    <path d="M146 108l84-32-16 30 30 4-40 20 14 16-72-22z"/>
+    <path d="M120 96c0-14 4-24 8-24s8 10 8 24z"/>
+  </g>
+  <circle cx="122" cy="80" r="4" fill="#e01b1b"/>
+  <circle cx="134" cy="80" r="4" fill="#e01b1b"/>
+</svg>

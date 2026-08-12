@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"
+     width="256" height="256" role="img" aria-label="Two ravens, runic">
+  <title>Two ravens, runic</title>
+  <rect width="256" height="256" fill="#ffffff"/>
+  <g fill="none" stroke="#000000" stroke-width="11" stroke-linecap="square">
+    <path d="M74 208V96l-32-32M74 132l-32 26M74 96l38-40"/>
+    <path d="M182 208V96l32-32M182 132l32 26M182 96l-38-40"/>
+  </g>
+  <rect x="66" y="52" width="16" height="16" fill="#e01b1b"/>
+  <rect x="174" y="52" width="16" height="16" fill="#e01b1b"/>
+</svg>

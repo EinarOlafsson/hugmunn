@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"
+     width="256" height="256" role="img" aria-label="Two ravens, geometric">
+  <title>Two ravens, geometric</title>
+  <rect width="256" height="256" fill="#ffffff"/>
+  <g fill="#000000">
+    <circle cx="92" cy="96" r="34"/><circle cx="164" cy="96" r="34"/>
+    <path d="M58 96 22 84l36-14z"/><path d="M198 96l36-12-36-14z"/>
+    <path d="M78 128h28l-6 62H84z"/><path d="M150 128h28l-6 62h-16z"/>
+  </g>
+  <circle cx="80" cy="88" r="6" fill="#e01b1b"/>
+  <circle cx="176" cy="88" r="6" fill="#e01b1b"/>
+</svg>

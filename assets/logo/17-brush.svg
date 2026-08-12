@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"
+     width="256" height="256" role="img" aria-label="Two ravens, brush strokes">
+  <title>Two ravens, brush strokes</title>
+  <rect width="256" height="256" fill="#ffffff"/>
+  <g fill="none" stroke="#000000" stroke-linecap="round">
+    <path d="M112 196c-4-40-6-70-14-86-10-20-34-26-52-14" stroke-width="20"/>
+    <path d="M144 196c4-40 6-70 14-86 10-20 34-26 52-14" stroke-width="20"/>
+    <path d="M46 96 20 104l26 10" stroke-width="12"/>
+    <path d="M210 96l26 8-26 10" stroke-width="12"/>
+  </g>
+  <circle cx="62" cy="94" r="6" fill="#e01b1b"/>
+  <circle cx="194" cy="94" r="6" fill="#e01b1b"/>
+</svg>

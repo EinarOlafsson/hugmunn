@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"
+     width="256" height="256" role="img" aria-label="Two raven heads, close crop">
+  <title>Two raven heads, close crop</title>
+  <rect width="256" height="256" fill="#ffffff"/>
+  <g fill="#000000">
+    <path d="M124 200c-46 0-84-34-84-72 0-30 24-52 56-52 26 0 46 14 54 34l-6 90z"/>
+    <path d="M40 118 4 128l36 14z"/>
+    <path d="M132 200c46 0 84-34 84-72 0-30-24-52-56-52-26 0-46 14-54 34l6 90z"/>
+    <path d="M216 118l36 10-36 14z"/>
+  </g>
+  <circle cx="74" cy="118" r="8" fill="#e01b1b"/>
+  <circle cx="182" cy="118" r="8" fill="#e01b1b"/>
+</svg>

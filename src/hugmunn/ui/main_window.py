@@ -48,7 +48,7 @@ from .login_dialog import LoginDialog
 from .model_picker import describe, paint_item, style_closed_combo, text_colour
 from .resource_bar import ResourceBar
 from .chat import AssistantBlock, Notice, ThinkingCard, ToolCard, Transcript, UserBubble
-from .workers import AgentWorker, DownloadWorker, ServerWorker
+from .workers import AgentWorker, CatalogueWorker, DownloadWorker, ServerWorker
 
 
 class ApprovalDialog(QDialog):
@@ -177,6 +177,7 @@ class MainWindow(QMainWindow):
         self._turn_lock = threading.Lock()
         self._remote = None          # core.webserver.RemoteServer, when on
         self._bridge = None          # ui.remote_bridge.RemoteBridge
+        self._catalogue_worker = None
 
         # Restore any cloud catalogue we can reach without blocking startup —
         # the stored list is refreshed in Settings, not on every launch.
@@ -257,6 +258,11 @@ class MainWindow(QMainWindow):
             act = QAction(f"Sign in to {providers.LABELS[provider]}…", self)
             act.triggered.connect(lambda _=False, p=provider: self._sign_in(p))
             accounts.addAction(act)
+        accounts.addSeparator()
+        refresh = QAction("Refresh model lists", self)
+        refresh.setToolTip("Ask each provider what your key can reach now.")
+        refresh.triggered.connect(self._refresh_catalogues)
+        accounts.addAction(refresh)
 
     def _build_sidebar(self) -> QWidget:
         """Tabs for the controls, with the meters pinned below them.
@@ -1230,6 +1236,14 @@ class MainWindow(QMainWindow):
         self._sync_controls()
 
     # -------------------------------------------------- accounts and themes
+
+    def _refresh_catalogues(self) -> None:
+        for provider in providers.CLOUD:
+            if credentials.is_signed_in(provider):
+                providers.clear_catalogue(provider)
+        current = self._provider()
+        if current in providers.CLOUD:
+            self._fetch_catalogue(current)
 
     def _sign_in(self, provider: Provider) -> None:
         dialog = LoginDialog(provider, self)

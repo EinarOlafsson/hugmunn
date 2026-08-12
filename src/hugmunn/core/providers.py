@@ -139,6 +139,20 @@ def set_catalogue(provider: Provider, models: tuple[CloudModel, ...]) -> None:
         _LIVE[provider] = models
 
 
+def has_live_catalogue(provider: Provider) -> bool:
+    """Whether this provider's real list has been fetched this session.
+
+    The shipped list is a placeholder so the dropdown is not empty. Anything
+    relying on it is showing the user models chosen when this file was
+    written, which is not the same as the models their key can reach.
+    """
+    return bool(_LIVE.get(provider))
+
+
+def clear_catalogue(provider: Provider) -> None:
+    _LIVE.pop(provider, None)
+
+
 def by_id(model_id: str) -> CloudModel | None:
     for provider in CLOUD:
         for model in models_for(provider):
