@@ -135,13 +135,130 @@ CELL = {
     ),
 }
 
-THEMES = ("dark", "light", "glass", "cell")
+# ---------------------------------------------------------------- imitations
+#
+# Two families that copy a familiar app rather than expressing a taste of
+# their own. Both ship light and dark, because that is the pairing each is
+# actually recognised by -- Claude reads as the warm cream page, ChatGPT as
+# the near-black column -- and offering only one half of each would look like
+# a mistake rather than a choice.
+#
+# The hues are matched to the originals; the *values* are then adjusted where
+# they had to be, because these palettes drive a different layout and every
+# one still has to clear AA on every surface it can appear on. Where a colour
+# moved, it moved as little as the rule allowed.
+
+CLAUDE = {
+    "bg": "#262624",
+    "page": "#1f1e1d",
+    "surface": "#30302e",
+    "surface_alt": "#3a3a37",
+    "surface_hi": "#454542",
+    "border": "#4a4a46",
+    "border_soft": "#383835",
+    "fg": "#f5f4ef",
+    "fg_muted": "#d6d3c8",
+    "fg_dim": "#b0aca0",
+    # The coral is the signature. It is lightened from the marketing value so
+    # it clears 4.5:1 as *text* on these surfaces; the original is used at
+    # large sizes and on fills, where 3:1 is the bar.
+    "accent": "#e8a38f",
+    "accent_hi": "#eb9a80",
+    "accent_lo": "#c8704e",
+    "accent_soft": "#43322c",
+    "user": "#3a3a37",
+    "code_bg": "#1c1b1a",
+    "success": "#7fb98a",
+    "warning": "#d8a659",
+    "error": "#e88b7d",
+    "on_accent": "#1f1e1d",
+    "backdrop": "",
+}
+
+CLAUDE_LIGHT = {
+    "bg": "#faf9f7",
+    "page": "#f0eee6",
+    "surface": "#ffffff",
+    "surface_alt": "#f5f3ed",
+    "surface_hi": "#eae7dd",
+    "border": "#ddd9cd",
+    "border_soft": "#eae7dd",
+    "fg": "#1f1e1d",
+    "fg_muted": "#4a4843",
+    "fg_dim": "#5d5a53",
+    "accent": "#a6431d",
+    "accent_hi": "#933a18",
+    "accent_lo": "#722d12",
+    "accent_soft": "#f7e6df",
+    "user": "#f0eee6",
+    "code_bg": "#f5f3ed",
+    "success": "#2f6b3a",
+    "warning": "#7a5310",
+    "error": "#a8332a",
+    "on_accent": "#ffffff",
+    "backdrop": "",
+}
+
+CHATGPT = {
+    "bg": "#212121",
+    "page": "#171717",
+    "surface": "#2f2f2f",
+    "surface_alt": "#383838",
+    "surface_hi": "#424242",
+    "border": "#4d4d4d",
+    "border_soft": "#383838",
+    "fg": "#ececec",
+    "fg_muted": "#c5c5c5",
+    "fg_dim": "#a0a0a0",
+    "accent": "#2bc787",
+    "accent_hi": "#4ad19a",
+    "accent_lo": "#188f5f",
+    "accent_soft": "#1b3a2e",
+    "user": "#303030",
+    "code_bg": "#171717",
+    "success": "#19c37d",
+    "warning": "#e0b341",
+    "error": "#ef6b62",
+    "on_accent": "#0d0d0d",
+    "backdrop": "",
+}
+
+CHATGPT_LIGHT = {
+    "bg": "#ffffff",
+    "page": "#f9f9f9",
+    "surface": "#ffffff",
+    "surface_alt": "#f4f4f4",
+    "surface_hi": "#ececec",
+    "border": "#e3e3e3",
+    "border_soft": "#f0f0f0",
+    "fg": "#0d0d0d",
+    "fg_muted": "#4a4a4a",
+    "fg_dim": "#5d5d5d",
+    "accent": "#0f7a52",
+    "accent_hi": "#0b5e3f",
+    "accent_lo": "#084430",
+    "accent_soft": "#e3f4ec",
+    "user": "#f4f4f4",
+    "code_bg": "#f4f4f4",
+    "success": "#0f7a52",
+    "warning": "#7a5310",
+    "error": "#b3261e",
+    "on_accent": "#ffffff",
+    "backdrop": "",
+}
+
+THEMES = ("dark", "light", "glass", "cell",
+          "claude", "claude-light", "chatgpt", "chatgpt-light")
 
 LABELS = {
     "dark": "Dark",
     "light": "Light",
     "glass": "Glass",
     "cell": "Cell",
+    "claude": "Claude",
+    "claude-light": "Claude light",
+    "chatgpt": "ChatGPT",
+    "chatgpt-light": "ChatGPT light",
     "system": "Match the system",
 }
 
@@ -150,10 +267,18 @@ BLURBS = {
     "light": "For a bright room. Same structure, hover goes darker.",
     "glass": "Layered neutral material over a soft gradient. Tint only on actions.",
     "cell": "Deep teal over a micrograph gradient, cyan accent. From spaCR.",
+    "claude": "Warm greys and the coral accent, after Claude's dark theme.",
+    "claude-light": "The cream page Claude is recognised by.",
+    "chatgpt": "Near-black column and green accent, after ChatGPT's dark theme.",
+    "chatgpt-light": "ChatGPT's white page and light grey chrome.",
     "system": "Follows the desktop's light or dark preference at startup.",
 }
 
-_PALETTES = {"dark": DARK, "light": LIGHT, "glass": GLASS, "cell": CELL}
+_PALETTES = {
+    "dark": DARK, "light": LIGHT, "glass": GLASS, "cell": CELL,
+    "claude": CLAUDE, "claude-light": CLAUDE_LIGHT,
+    "chatgpt": CHATGPT, "chatgpt-light": CHATGPT_LIGHT,
+}
 
 _active = "dark"
 

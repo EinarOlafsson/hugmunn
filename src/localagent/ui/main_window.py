@@ -23,10 +23,12 @@ from PyQt6.QtWidgets import (
 from .. import config
 from ..core import autonomy as autonomykit
 from ..core import cleanup
+from ..core import commands as commandkit
 from ..core import credentials
 from ..core import effort as effortkit
 from ..core import context as contextkit
 from ..core import prompts as promptkit
+from ..core import persistence as persistkit
 from ..core import providers
 from ..core import sessions as sessionkit
 from ..core import setup_llama
@@ -138,6 +140,9 @@ class MainWindow(QMainWindow):
         self._tool_cards: dict[str, ToolCard] = {}
         # Providers we have already offered a sign-in dialog for this session.
         self._offered_login: set[Provider] = set()
+        self._goal: str = ""
+        self._remote = None          # core.webserver.RemoteServer, when on
+        self._bridge = None          # ui.remote_bridge.RemoteBridge
 
         # Restore any cloud catalogue we can reach without blocking startup —
         # the stored list is refreshed in Settings, not on every launch.
@@ -318,6 +323,26 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.effort_blurb)
 
         layout.addSpacing(10)
+        layout.addWidget(self._heading("Persistence"))
+        self.persistence_combo = QComboBox()
+        for level in persistkit.Persistence:
+            self.persistence_combo.addItem(persistkit.LABELS[level], int(level))
+        self.persistence_combo.setCurrentIndex(
+            max(0, self.persistence_combo.findData(self.settings.persistence_level)))
+        self.persistence_combo.setToolTip(
+            "How hard the loop keeps going before it stops.\n\n"
+            "Separate from Effort, which is how carefully the model thinks\n"
+            "inside one answer. A tedious migration is low effort and high\n"
+            "persistence; a hard question is the reverse."
+        )
+        self.persistence_combo.currentIndexChanged.connect(self._on_persistence_changed)
+        layout.addWidget(self.persistence_combo)
+        self.persistence_blurb = QLabel()
+        self.persistence_blurb.setObjectName("blurb")
+        self.persistence_blurb.setWordWrap(True)
+        layout.addWidget(self.persistence_blurb)
+
+        layout.addSpacing(10)
         layout.addWidget(self._heading("Autonomy"))
         self.autonomy_combo = QComboBox()
         for level in autonomykit.Autonomy:
@@ -332,6 +357,7 @@ class MainWindow(QMainWindow):
         self.autonomy_blurb.setWordWrap(True)
         layout.addWidget(self.autonomy_blurb)
         self._on_effort_changed()
+        self._on_persistence_changed()
         self._on_autonomy_changed()
 
         layout.addSpacing(10)
@@ -1249,6 +1275,15 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'skills_summary'):
             self._update_skills_button()
 
+    def _persistence(self) -> persistkit.Persistence:
+        return persistkit.Persistence(self.persistence_combo.currentData())
+
+    def _on_persistence_changed(self) -> None:
+        level = self._persistence()
+        self.settings.persistence_level = int(level)
+        self.settings.save()
+        self.persistence_blurb.setText(persistkit.BLURBS[level])
+
     def _on_autonomy_changed(self) -> None:
         level = self._autonomy()
         self.settings.autonomy_level = int(level)
@@ -1257,6 +1292,248 @@ class MainWindow(QMainWindow):
             autonomykit.BLURBS[level] + "  "
             + autonomykit.cloud_note(level, self._provider().value)
         )
+
+    # ------------------------------------------------------------ commands
+
+    def run_command(self, text: str):
+        """Handle a slash command. Safe to call from any thread for the
+        read-only ones; the mutating ones marshal onto the GUI thread."""
+        name, argument = commandkit.parse(text)
+        handler = getattr(self, f"_cmd_{name.replace('-', '_')}", None)
+        if handler is None:
+            return commandkit.Outcome(message=commandkit.unknown(name))
+        try:
+            return handler(argument)
+        except Exception as exc:  # noqa: BLE001 - a bad command is not a crash
+            return commandkit.Outcome(message=f"/{name} failed: {exc}")
+
+    def _cmd_help(self, argument: str):
+        if argument:
+            detail = commandkit.detail_for(argument.lstrip("/"))
+            return commandkit.Outcome(message=detail or commandkit.unknown(argument))
+        return commandkit.Outcome(message=commandkit.help_text())
+
+    def _cmd_goal(self, argument: str):
+        if argument.lower() in ("off", "clear", "none"):
+            was, self._goal = self._goal, ""
+            return commandkit.Outcome(
+                message=f"Goal cleared: {was}" if was else "No goal was set.")
+        if not argument:
+            return commandkit.Outcome(
+                message=f"Goal: {self._goal}" if self._goal
+                else "No goal set. /goal <objective> to set one.")
+        self._goal = argument
+        return commandkit.Outcome(message=(
+            f"Goal set: {argument}\n\n"
+            f"The agent will work toward this across up to "
+            f"{commandkit.GOAL_MAX_ITERATIONS} tool rounds and report whether "
+            f"it was met, blocked, or partly met. /goal off to clear."))
+
+    def _cmd_remote(self, argument: str):
+        action = (argument or "on").lower()
+        if action in ("off", "stop"):
+            return commandkit.Outcome(message=self.stop_remote())
+        if action in ("url", "status"):
+            if self._remote is None or not self._remote.is_running:
+                return commandkit.Outcome(message="Remote access is off. /remote on")
+            return commandkit.Outcome(message=self._remote_description())
+        return commandkit.Outcome(message=self.start_remote(), refresh=True)
+
+    def _cmd_stop(self, argument: str):
+        self._cancel()
+        if self._bridge is not None:
+            self._bridge.cancel()
+        return commandkit.Outcome(message="Cancelled.")
+
+    def _cmd_clear(self, argument: str):
+        self._new_conversation()
+        return commandkit.Outcome(message="New conversation.")
+
+    def _cmd_save(self, argument: str):
+        self._persist()
+        return commandkit.Outcome(message=f"Saved to {self.session.path}")
+
+    def _cmd_autonomy(self, argument: str):
+        if not argument:
+            return commandkit.Outcome(message="\n".join(
+                ("→ " if int(l) == self.settings.autonomy_level else "  ")
+                + f"{int(l)}  {autonomykit.LABELS[l]}" for l in autonomykit.Autonomy))
+        index = self.autonomy_combo.findData(int(argument))
+        if index < 0:
+            return commandkit.Outcome(message="Autonomy is 1 to 4. /autonomy to list.")
+        self.autonomy_combo.setCurrentIndex(index)
+        return commandkit.Outcome(
+            message=autonomykit.LABELS[self._autonomy()], refresh=True)
+
+    def _cmd_persistence(self, argument: str):
+        if not argument:
+            return commandkit.Outcome(message="\n".join(
+                ("→ " if int(l) == self.settings.persistence_level else "  ")
+                + f"{int(l)}  {persistkit.LABELS[l]:18} {persistkit.summary(l)}"
+                for l in persistkit.Persistence))
+        wanted = argument.strip().lower()
+        by_name = {"light": 1, "normal": 2, "persistent": 3, "relentless": 4}
+        value = by_name.get(wanted, int(wanted) if wanted.isdigit() else 0)
+        index = self.persistence_combo.findData(value)
+        if index < 0:
+            return commandkit.Outcome(
+                message="Persistence is 1-4, or light/normal/persistent/relentless.")
+        self.persistence_combo.setCurrentIndex(index)
+        level = self._persistence()
+        return commandkit.Outcome(
+            message=f"{persistkit.LABELS[level]} — {persistkit.summary(level)}",
+            refresh=True)
+
+    def _cmd_effort(self, argument: str):
+        if not argument:
+            return commandkit.Outcome(message="\n".join(
+                ("→ " if int(l) == self.settings.effort_level else "  ")
+                + f"{int(l)}  {effortkit.LABELS[l]}" for l in effortkit.Effort))
+        index = self.effort_combo.findData(int(argument))
+        if index < 0:
+            return commandkit.Outcome(message="Effort is 1 to 4. /effort to list.")
+        self.effort_combo.setCurrentIndex(index)
+        return commandkit.Outcome(message=effortkit.LABELS[self._effort()], refresh=True)
+
+    def _cmd_think(self, argument: str):
+        if not argument:
+            return commandkit.Outcome(
+                message=f"Reasoning is {'on' if self._thinking_enabled() else 'off'}.")
+        wanted = argument.lower() in ("on", "true", "yes", "1")
+        index = self.thinking_combo.findData(wanted)
+        if index >= 0:
+            self.thinking_combo.setCurrentIndex(index)
+        return commandkit.Outcome(
+            message=f"Reasoning {'on' if wanted else 'off'}.", refresh=True)
+
+    def _cmd_context(self, argument: str):
+        spec = self._current_spec()
+        if not argument:
+            budget = self._context_budget()
+            return commandkit.Outcome(message=(
+                f"{contextkit.total_tokens(self.history):,} used of "
+                f"{budget.available:,} usable "
+                f"({budget.limit:,} window, {budget.preamble:,} preamble)"))
+        self.context_spin.setValue(int(argument))
+        return commandkit.Outcome(
+            message=f"Context set to {int(argument):,} tokens. "
+                    f"Restart the server to apply.", refresh=True)
+
+    def _cmd_theme(self, argument: str):
+        if not argument:
+            return commandkit.Outcome(message="\n".join(
+                ("→ " if n == self.settings.theme else "  ") + f"{n}  ({theme.LABELS[n]})"
+                for n in ("system", *theme.THEMES)))
+        if argument not in theme.THEMES and argument != "system":
+            return commandkit.Outcome(message=f"No theme called {argument}. /theme to list.")
+        self.apply_theme(argument)
+        return commandkit.Outcome(message=f"Theme: {theme.LABELS[argument]}", refresh=True)
+
+    def _cmd_model(self, argument: str):
+        if not argument:
+            return commandkit.Outcome(message="\n".join(
+                ("→ " if s.key == self.settings.model_key else "  ")
+                + f"{s.key:18} {s.label}" for s in config.REGISTRY))
+        index = self.model_combo.findData(argument)
+        if index < 0:
+            return commandkit.Outcome(message=f"No model {argument}. /model to list.")
+        self.model_combo.setCurrentIndex(index)
+        return commandkit.Outcome(message=f"Model: {argument}", refresh=True)
+
+    # -------------------------------------------------------------- remote
+
+    def start_remote(self) -> str:
+        from ..core import remote as remotekit
+        from ..core.webserver import RemoteServer
+
+        from .remote_bridge import RemoteBridge
+
+        if self._remote is not None and self._remote.is_running:
+            return self._remote_description()
+
+        if self._bridge is None:
+            self._bridge = RemoteBridge(self)
+            self._bridge.event.connect(self._on_remote_event)
+            self._bridge.approval.connect(self._on_remote_approval)
+            self._bridge.state_changed.connect(self._sync_controls)
+
+        self._remote = RemoteServer(self._bridge, port=remotekit.DEFAULT_PORT)
+        try:
+            self._remote.start()
+        except OSError as exc:
+            self._remote = None
+            return (f"Could not start on port {remotekit.DEFAULT_PORT}: {exc}\n"
+                    f"Another copy of localagent may already have it.")
+        return self._remote_description()
+
+    def stop_remote(self) -> str:
+        if self._remote is None or not self._remote.is_running:
+            return "Remote access was already off."
+        self._remote.stop()
+        self._remote = None
+        return "Remote access off. The address no longer resolves."
+
+    def _remote_description(self) -> str:
+        from ..core import remote as remotekit
+
+        server = self._remote
+        lines = [
+            "Remote access is on.",
+            "",
+            f"  {server.url()}",
+            "",
+            server.exposure.warning(),
+            "",
+            "The link carries the token. Anyone who has it can run commands "
+            "on this machine, so treat it as a password.",
+            "",
+            "To reach it from another network, run one of these here:",
+        ]
+        for option in remotekit.tunnel_options(server.port):
+            lines += ["", f"  {option['name']}", f"    {option['command']}",
+                      f"    {option['note']}"]
+        return "\n".join(lines)
+
+    def _on_remote_event(self, payload: dict) -> None:
+        """Mirror a browser-driven turn into the desktop transcript."""
+        kind = payload.get("kind")
+        text = payload.get("text", "")
+        if kind == "user":
+            self.transcript.add(UserBubble(text))
+        elif kind == "command":
+            self.transcript.add(UserBubble(text))
+            self.transcript.add(Notice(payload.get("result", ""),
+                                       theme.active()["fg_dim"]))
+        elif kind == "reasoning":
+            self._on_reasoning(text)
+        elif kind == "content":
+            self._on_content(text)
+        elif kind == "tool_start":
+            self._on_tool_start(payload.get("tool_name", ""),
+                                payload.get("tool_summary", ""),
+                                payload.get("tool_id", ""))
+        elif kind == "tool_result":
+            self._on_tool_result(payload.get("tool_name", ""),
+                                 payload.get("tool_summary", ""), text)
+        elif kind == "error":
+            self.transcript.add(Notice(text, theme.active()["error"]))
+        elif kind == "done":
+            self._on_turn_finished({})
+        self.transcript.follow()
+
+    def _on_remote_approval(self, call_id: str, name: str, summary: str,
+                            arguments: dict) -> None:
+        """Show the desktop dialog for a call the browser started.
+
+        Non-modal on purpose: the phone may answer first, and a modal the
+        desktop cannot dismiss would then have to be clicked anyway.
+        """
+        dialog = ApprovalDialog(name, summary, arguments, self)
+        dialog.setModal(False)
+        dialog.finished.connect(
+            lambda result, cid=call_id: self._bridge.resolve_approval(
+                cid, result == QDialog.DialogCode.Accepted))
+        dialog.show()
 
     # ------------------------------------------------------------ sessions
 
@@ -1626,6 +1903,18 @@ class MainWindow(QMainWindow):
         if not text:
             return
 
+        # Resolved here, never sent. A model asked to interpret "/remote"
+        # explains what it thinks the word means.
+        if commandkit.is_command(text):
+            outcome = self.run_command(text)
+            if outcome.handled:
+                self.composer.clear()
+                self.transcript.add(UserBubble(text))
+                self.transcript.add(Notice(outcome.message, theme.active()["fg_dim"]))
+                self.transcript.follow()
+                return
+            text = outcome.send_text or text
+
         client = self._build_client()
         if client is None:
             QMessageBox.warning(
@@ -1658,20 +1947,8 @@ class MainWindow(QMainWindow):
             self.transcript.add(Notice(outcome.note, style.WARN))
             self.transcript.follow()
 
-        spec = self._current_spec()
-        assert spec is not None
-        agent = Agent(
-            client=client,
-            workdir=self.settings.workdir,
-            system_prompt=self.settings.system_prompt,
-            use_tools=self._tools_active(),
-            max_iterations=self.settings.max_tool_iterations,
-            active_skills=self._active_skills(),
-            extra_tools=self._active_plugins(),
-            effort=self._effort(),
-            autonomy=self._autonomy(),
-            thinking=self._thinking_enabled(),
-        )
+        agent = self.build_agent(client)
+        assert agent is not None
 
         self._thinking = None
         self._assistant = None
@@ -1710,6 +1987,38 @@ class MainWindow(QMainWindow):
             elif event.kind == "error":
                 return ""
         return "".join(parts)
+
+    def build_agent(self, client=None):
+        """The one place an Agent is constructed.
+
+        Both the desktop and the remote bridge come through here, so a
+        setting cannot apply to one and not the other -- which is the shape
+        of bug that made the autonomy tier look broken.
+        """
+        client = client or self._build_client()
+        if client is None:
+            return None
+        prompt = self.settings.system_prompt
+        iterations = persistkit.max_rounds(self._persistence())
+        if self._goal:
+            # An objective changes the loop, not only the wording: stopping at
+            # the first plausible answer is the failure it exists to prevent,
+            # and the default round limit is sized for a single question.
+            prompt = f"{prompt}\n\n{commandkit.goal_block(self._goal)}"
+            iterations = max(iterations, commandkit.GOAL_MAX_ITERATIONS)
+        return Agent(
+            client=client,
+            workdir=self.settings.workdir,
+            system_prompt=prompt,
+            use_tools=self._tools_active(),
+            max_iterations=iterations,
+            active_skills=self._active_skills(),
+            extra_tools=self._active_plugins(),
+            effort=self._effort(),
+            persistence=self._persistence(),
+            autonomy=self._autonomy(),
+            thinking=self._thinking_enabled(),
+        )
 
     def _cancel(self) -> None:
         if self._agent_worker is not None:

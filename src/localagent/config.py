@@ -666,7 +666,10 @@ class Settings:
         "user's machine. Be direct and concise. When you use a tool, use its "
         "result rather than guessing. Prefer showing code over describing it."
     )
-    max_tool_iterations: int = 12
+    # Superseded by persistence_level, which owns the round budget. Kept so
+    # an old settings file still loads.
+    max_tool_iterations: int = 40
+    persistence_level: int = 2   # core.persistence.Persistence
     # Absolute path to each model's primary weight file, when the user has
     # put it somewhere other than the launch script's default.
     model_paths: dict[str, str] = field(default_factory=dict)

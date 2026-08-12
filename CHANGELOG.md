@@ -1,5 +1,100 @@
 # Changelog
 
+## 0.15.0
+
+Remote access, slash commands, a persistence tier, and two imitation themes.
+
+### The loop no longer gives up at a round count
+
+Reported: *"I keep getting stopped after 12 rounds without a final answer."*
+Two things were wrong, and the number was the smaller one.
+
+**At the ceiling it discarded everything the run had learned** and reported
+arithmetic. The tools had run, the results were in the history, and the user
+got a message about round counts. It now makes one final pass with the tools
+*withheld* — the only move left is to answer — and reports what was
+established, what was not, and what the next step is.
+
+**It never changed strategy.** Now it escalates:
+
+| when | what it says |
+|---|---|
+| the same call twice | that call returns the same thing; change something real |
+| after a failure | change *one* thing; if two variations failed, change the assumption |
+| every N rounds | **stop. Do not try another fix this round.** State what you know vs. assumed, name what you have not looked at, go and look at it |
+| near the ceiling | stop exploring; answer, or make the one call that settles it |
+
+The step back repeats on a cycle rather than happening once — the second one
+is often where the wrong assumption from the first is finally noticed.
+
+### Persistence
+
+A tier, with **Relentless** at the top. Distinct from effort, which is how
+carefully the model thinks *inside* one answer: a tedious migration is low
+effort and high persistence, a hard question is the reverse.
+
+| tier | rounds | steps back every |
+|---|---|---|
+| 1 · Light | 8 | 6 |
+| 2 · Normal | 25 | 10 |
+| 3 · Persistent | 60 | 10 |
+| 4 · Relentless | 200 | 8 |
+
+Higher tiers get *more* interruption, not less — a run permitted 200 rounds
+will otherwise spend them all down one wrong assumption made in the first five.
+Relentless names the only three things that end a turn early: the objective
+verified, a decision that is the user's, or something destructive that was not
+asked for.
+
+Persistence owns the round budget outright; `max_tool_iterations` is gone from
+the UI. Two controls over one decision is what made the autonomy tier look
+broken in 0.14.1, and making the same mistake twice would be a choice.
+
+### Remote access
+
+**`/remote`** starts a local web server and prints an address. A phone can
+then chat, watch tools run, **answer approval prompts**, and change autonomy,
+effort and reasoning.
+
+There is one conversation, not two kept in sync: a message sent from the phone
+appears in the desktop transcript because both append to the same history.
+Approvals go to both clients and the first answer wins.
+
+The security posture is deliberate, because what this exposes is an agent with
+shell access:
+
+- **A token is always required.** No unauthenticated mode, not even on
+  loopback — an "I'll turn auth on later" setting is one that never gets
+  turned on. Compared in constant time, never logged.
+- **Loopback by default.** Reaching the machine from elsewhere is a tunnel's
+  job, and the reply tells you how — Tailscale (private, nothing published) or
+  Cloudflare Tunnel (public URL, so the token is all that stands between it
+  and a shell).
+- Failed attempts are rate-limited per address; a missing and a wrong token
+  give byte-identical responses.
+- The page strips the token from the URL into memory before doing anything
+  else, and sends no referrer.
+
+### Slash commands
+
+`/help` `/remote` `/goal` `/persistence` `/model` `/autonomy` `/effort`
+`/think` `/context` `/theme` `/clear` `/save` `/stop`
+
+Resolved before the message reaches the model — a model asked to interpret
+`/remote` explains what it thinks the word means. `/usr/local/bin/llama-server`
+is correctly *not* a command; pasting a path as the whole message is ordinary.
+
+`/goal <objective>` makes the agent work toward something across rounds and
+report whether it was met, blocked, or partly met — and say how it verified
+which.
+
+### Two more themes
+
+**Claude** and **ChatGPT**, each in light and dark. Hues matched to the
+originals; values adjusted only where a role had to move to clear AA on the
+surfaces this layout puts it on, and by the smallest step that cleared it.
+Eight themes now, all with zero contrast failures.
+
 ## 0.14.1
 
 Fixes "4 · Full" still asking for permission on every call.

@@ -1,3 +1,3 @@
 """localagent — a Qt desktop client for locally-hosted LLMs served by llama.cpp."""
 
-__version__ = "0.14.1"
+__version__ = "0.15.0"
