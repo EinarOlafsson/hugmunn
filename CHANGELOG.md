@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.0.0.2
+
+Two things from the first version that did not work.
+
+**The dropdown glow looked like a toy.** It was hand-painted by a delegate,
+eight offset passes of text at low alpha. Gone. Rows are plain solid colours
+set on the item, which is what a dropdown normally does and what Qt renders
+consistently: **white on blue** for stock, **red on black** for unlocked, and
+white on dark slate for tuned — the middle band, which had to be chosen.
+
+Those colours are fixed rather than taken from the palette, which is the
+opposite of the rule everywhere else here and deliberate: what a row says is a
+property of the *model*, not of the theme, and a red that becomes maroon on
+one theme and salmon on another has stopped being a signal. Each pair clears
+AA on its own, so no theme can make them unreadable either.
+
+**The message box could not actually be resized.** It had a six-pixel drag
+strip along its own top edge — hard to hit, and in competition with selecting
+the first line of text. It now sits in a splitter below the transcript, so the
+divider between them is the handle. Qt draws it, everyone recognises it, and
+the height is remembered. Measured: 87px to 277px by dragging, restored on the
+next launch, and it cannot be collapsed to nothing.
+
 ## 0.0.0.1
 
 Renamed to **hugmunn**, and versioned from the start.

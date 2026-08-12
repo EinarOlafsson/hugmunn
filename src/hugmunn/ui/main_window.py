@@ -45,7 +45,7 @@ from ..core.server import ServerManager
 from . import style, theme
 from .download_dialog import DownloadDialog
 from .login_dialog import LoginDialog
-from .model_picker import FreedomDelegate, colour_for, describe, style_closed_combo
+from .model_picker import describe, paint_item, style_closed_combo, text_colour
 from .resource_bar import ResourceBar
 from .chat import AssistantBlock, Notice, ThinkingCard, ToolCard, Transcript, UserBubble
 from .workers import AgentWorker, DownloadWorker, ServerWorker
@@ -107,77 +107,23 @@ class ApprovalDialog(QDialog):
 class Composer(QTextEdit):
     """Input box. Enter sends, Shift+Enter inserts a newline.
 
-    Resizable by dragging its top edge, and it remembers the height. A fixed
-    150px is fine for a question and cramped for anything pasted -- a stack
-    trace, a function, a paragraph being revised -- and those are exactly the
-    messages worth being able to see whole before sending.
+    Its height comes from the splitter it lives in rather than from anything
+    here. An earlier version put a six-pixel drag strip along its own top
+    edge, which was both hard to hit and in competition with selecting the
+    first line of text; a splitter handle is a real affordance that Qt already
+    draws, and it is where anyone would look for one.
     """
 
-    MIN_HEIGHT = 60
-    MAX_HEIGHT = 700
-    DEFAULT_HEIGHT = 110
+    MIN_HEIGHT = 56
 
-    #: How close to the top edge counts as grabbing the handle.
-    GRIP = 6
-
-    heightChanged = pyqtSignal(int)
-
-    def __init__(self, on_send, parent=None, height: int = 0) -> None:
+    def __init__(self, on_send, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("composer")
         self.setPlaceholderText("Ask something…   (Enter to send, Shift+Enter for a newline)")
         self.setWordWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.setFixedHeight(self._clamp(height or self.DEFAULT_HEIGHT))
-        self.setMouseTracking(True)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setMinimumHeight(self.MIN_HEIGHT)
         self._on_send = on_send
-        self._dragging = False
-        self._drag_from = 0
-        self._height_at_drag = 0
-
-    def _clamp(self, value: int) -> int:
-        return max(self.MIN_HEIGHT, min(self.MAX_HEIGHT, int(value)))
-
-    def set_height(self, value: int) -> None:
-        self.setFixedHeight(self._clamp(value))
-        self.heightChanged.emit(self.height())
-
-    # ---- dragging the top edge ----
-
-    def _on_grip(self, position) -> bool:
-        return position.y() <= self.GRIP
-
-    def mousePressEvent(self, event):  # noqa: N802 - Qt naming
-        if self._on_grip(event.position()):
-            self._dragging = True
-            self._drag_from = int(event.globalPosition().y())
-            self._height_at_drag = self.height()
-            event.accept()
-            return
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event):  # noqa: N802 - Qt naming
-        if self._dragging:
-            # Dragging up grows it, which is the direction the edge moves.
-            delta = self._drag_from - int(event.globalPosition().y())
-            self.set_height(self._height_at_drag + delta)
-            event.accept()
-            return
-        self.setCursor(Qt.CursorShape.SizeVerCursor if self._on_grip(event.position())
-                       else Qt.CursorShape.IBeamCursor)
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event):  # noqa: N802 - Qt naming
-        if self._dragging:
-            self._dragging = False
-            self.heightChanged.emit(self.height())
-            event.accept()
-            return
-        super().mouseReleaseEvent(event)
-
-    def leaveEvent(self, event):  # noqa: N802 - Qt naming
-        self.unsetCursor()
-        super().leaveEvent(event)
 
     def keyPressEvent(self, event):  # noqa: N802 - Qt naming
         enter = event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
@@ -366,7 +312,6 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self._heading("Model"))
         self.model_combo = QComboBox()
-        self.model_combo.setItemDelegate(FreedomDelegate(self.model_combo))
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         layout.addWidget(self.model_combo)
 
@@ -790,8 +735,16 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        # Transcript above, composer below, with a handle between them. The
+        # handle is how the message box is resized -- drag it up for a stack
+        # trace, down for a one-liner -- and the split is remembered.
+        self.conversation_split = QSplitter(Qt.Orientation.Vertical)
+        self.conversation_split.setChildrenCollapsible(False)
+        self.conversation_split.setHandleWidth(6)
+
         self.transcript = Transcript()
-        layout.addWidget(self.transcript, 1)
+        self.conversation_split.addWidget(self.transcript)
+        layout.addWidget(self.conversation_split, 1)
 
         bar = QFrame()
         bar.setStyleSheet(f"border-top: 1px solid {style.BORDER};")
@@ -800,9 +753,8 @@ class MainWindow(QMainWindow):
         bar_layout.setContentsMargins(16, 10, 16, 12)
         bar_layout.setSpacing(8)
 
-        self.composer = Composer(self._send, height=self.settings.composer_height)
-        self.composer.heightChanged.connect(self._on_composer_resized)
-        self.composer.setToolTip("Drag the top edge to resize.")
+        self.composer = Composer(self._send)
+        self.composer.setToolTip("Drag the divider above to resize.")
         bar_layout.addWidget(self.composer, 1)
 
         buttons = QVBoxLayout()
@@ -819,7 +771,13 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.stop_button)
         bar_layout.addLayout(buttons)
 
-        layout.addWidget(bar)
+        self.conversation_split.addWidget(bar)
+        self.conversation_split.setStretchFactor(0, 1)   # transcript takes the slack
+        self.conversation_split.setStretchFactor(1, 0)
+        bar.setMinimumHeight(Composer.MIN_HEIGHT + 22)
+        remembered = max(Composer.MIN_HEIGHT + 22, self.settings.composer_height)
+        self.conversation_split.setSizes([900, remembered])
+        self.conversation_split.splitterMoved.connect(self._on_composer_resized)
 
         self.stats = QLabel("")
         self.stats.setObjectName("status")
@@ -1128,7 +1086,7 @@ class MainWindow(QMainWindow):
                     f"— {config.FREEDOM_LABELS[spec.freedom].upper()} —", None)
                 heading = self.model_combo.model().item(self.model_combo.count() - 1)
                 heading.setEnabled(False)
-                heading.setData(spec.freedom, Qt.ItemDataRole.UserRole + 1)
+                paint_item(heading, spec.freedom, available=False)
             ready = spec.readiness()
             available = ready.can_launch
             size = f"  ⬇ {spec.download_gb:.0f} GB" if spec.download_gb else ""
@@ -1146,8 +1104,7 @@ class MainWindow(QMainWindow):
             # A disabled item cannot be clicked, so the offer would be
             # unreachable — which is the whole point of listing it.
             item.setEnabled(True)
-            item.setData(spec.freedom, Qt.ItemDataRole.UserRole + 1)
-            item.setData(available, Qt.ItemDataRole.UserRole + 2)
+            paint_item(item, spec.freedom, available)
         # Prefer the remembered model, then any downloaded one, so a fresh
         # install does not open on a model it would immediately offer to fetch.
         wanted = self.model_combo.findData(self.settings.model_key)
@@ -1241,7 +1198,7 @@ class MainWindow(QMainWindow):
         if provider == Provider.LOCAL:
             style_closed_combo(self.model_combo, freedom, spec.is_available())
             self.freedom_label.setText(
-                f"<b style='color:{colour_for(freedom)}'>"
+                f"<b style='color:{text_colour(freedom)}'>"
                 f"{config.FREEDOM_LABELS[freedom]}</b> — {describe(freedom)}")
         else:
             self.model_combo.setStyleSheet("")
@@ -2210,9 +2167,12 @@ class MainWindow(QMainWindow):
         preset = promptkit.BY_KEY.get(key)
         self.prompt_note.setText(preset.note if preset else "Edited by hand.")
 
-    def _on_composer_resized(self, height: int) -> None:
-        self.settings.composer_height = int(height)
-        self.settings.save()
+    def _on_composer_resized(self, *_args) -> None:
+        """Remember how tall the message box was left."""
+        sizes = self.conversation_split.sizes()
+        if len(sizes) == 2 and sizes[1] > 0:
+            self.settings.composer_height = int(sizes[1])
+            self.settings.save()
 
     def _new_conversation(self) -> None:
         if self._agent_worker is not None:
