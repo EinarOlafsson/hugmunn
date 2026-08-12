@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.15.1
+
+A stability sweep. Three faults, none of them reported yet — which is the
+point of sweeping.
+
+**Two clients could run a turn at once.** The desktop tracked its own worker
+and the browser tracked its own lock, and neither knew about the other. A
+message sent from a phone while the desktop was mid-turn had both appending to
+one history, which interleaves into a conversation neither the model nor the
+user can follow. One lock now, held by whichever client started, with the
+other told plainly that a turn is running *here or at the desk*. Released on
+every exit from the send path, including the early returns for commands, an
+unbuildable client, and an overflowing context.
+
+**The web server outlived its window.** Closing the window left the listening
+socket bound — a daemon thread dies with the process, but the port stays held
+until then, which is the difference between reopening the app and being told
+the address is in use.
+
+**Context summarising could freeze the window.** It runs on whichever thread
+drives the turn, which on the desktop is the GUI thread, and it was unbounded:
+a full-context summary on a slow local model is tens of seconds of a frozen
+window, which reads as a crash. Bounded at 45 seconds, after which it gives up
+and the caller falls back to dropping turns — less detail kept, but the
+conversation survives and the app stays alive.
+
 ## 0.15.0
 
 Remote access, slash commands, a persistence tier, and two imitation themes.

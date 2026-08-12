@@ -47,7 +47,10 @@ class RemoteBridge(QObject):
         super().__init__(window)
         self.window = window
         self.approvals = PendingApprovals()
-        self._turn = threading.Lock()
+        # The window's lock, not one of our own: a desktop turn and a remote
+        # turn appending to one history interleave into nonsense, and two
+        # locks that do not know about each other prevent nothing.
+        self._turn = window._turn_lock
         self._cancel = threading.Event()
 
     # ----------------------------------------------------------- read-only
@@ -107,7 +110,8 @@ class RemoteBridge(QObject):
 
         if not self._turn.acquire(blocking=False):
             yield {"kind": "error",
-                   "text": "A turn is already running. Wait for it, or press Stop."}
+                   "text": "A turn is already running, here or at the desk. "
+                           "Wait for it, or press Stop."}
             return
         try:
             self._cancel.clear()

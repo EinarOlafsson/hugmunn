@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html as html_mod
 import json
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -110,6 +111,10 @@ class Composer(QTextEdit):
 
 
 class MainWindow(QMainWindow):
+    #: Seconds a context summary may take before it is abandoned. It runs on
+    #: the thread driving the turn, which on the desktop is the GUI thread.
+    SUMMARY_TIMEOUT = 45.0
+
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("localagent")
@@ -141,6 +146,11 @@ class MainWindow(QMainWindow):
         # Providers we have already offered a sign-in dialog for this session.
         self._offered_login: set[Provider] = set()
         self._goal: str = ""
+        # Held for the length of a turn, whichever client started it. The
+        # desktop tracked its own worker and the browser tracked its own lock,
+        # and neither knew about the other -- so a message sent from a phone
+        # while the desktop was mid-turn had both appending to one history.
+        self._turn_lock = threading.Lock()
         self._remote = None          # core.webserver.RemoteServer, when on
         self._bridge = None          # ui.remote_bridge.RemoteBridge
 
@@ -1899,6 +1909,12 @@ class MainWindow(QMainWindow):
     def _send(self) -> None:
         if self._agent_worker is not None or not self._ready_to_send():
             return
+        if not self._turn_lock.acquire(blocking=False):
+            self.transcript.add(Notice(
+                "A turn started from the remote session is still running.",
+                theme.active()["warning"]))
+            self.transcript.follow()
+            return
         text = self.composer.toPlainText().strip()
         if not text:
             return
@@ -1912,11 +1928,13 @@ class MainWindow(QMainWindow):
                 self.transcript.add(UserBubble(text))
                 self.transcript.add(Notice(outcome.message, theme.active()["fg_dim"]))
                 self.transcript.follow()
+                self._turn_lock.release()
                 return
             text = outcome.send_text or text
 
         client = self._build_client()
         if client is None:
+            self._turn_lock.release()
             QMessageBox.warning(
                 self, "Not signed in",
                 f"Sign in to {providers.LABELS[self._provider()]} before sending.",
@@ -1941,6 +1959,7 @@ class MainWindow(QMainWindow):
             self.transcript.add(Notice(outcome.note, style.ERR))
             self.transcript.follow()
             self._update_context_meter()
+            self._turn_lock.release()
             return
         if outcome.dropped:
             self.history[:] = outcome.history
@@ -1972,21 +1991,32 @@ class MainWindow(QMainWindow):
     def _summarise_span(self, messages: list[dict[str, Any]]) -> str:
         """Ask the current model to summarise the turns being dropped.
 
-        Synchronous and on the GUI thread, which is acceptable only because it
-        happens between turns rather than during one, and a failure falls back
-        to plain dropping rather than losing the message.
+        Runs on whichever thread is driving the turn. On the desktop that is
+        the GUI thread, so it is bounded: a summary of a full context on a
+        slow model is tens of seconds, and a frozen window reads as a crash.
+        Beyond the budget it gives up and the caller falls back to dropping
+        turns, which loses detail but not the conversation.
         """
+        import threading as _threading
+
+        deadline = _threading.Event()
+        timer = _threading.Timer(self.SUMMARY_TIMEOUT, deadline.set)
+        timer.daemon = True
+        timer.start()
         client = self._build_client()
         if client is None:
             return ""
         parts = []
-        for event in client.stream(contextkit.summary_request(messages),
-                                   max_tokens=800):
-            if event.kind == "content":
-                parts.append(event.text)
-            elif event.kind == "error":
-                return ""
-        return "".join(parts)
+        try:
+            for event in client.stream(contextkit.summary_request(messages),
+                                       max_tokens=800, cancel=deadline):
+                if event.kind == "content":
+                    parts.append(event.text)
+                elif event.kind == "error":
+                    return ""
+        finally:
+            timer.cancel()
+        return "" if deadline.is_set() else "".join(parts)
 
     def build_agent(self, client=None):
         """The one place an Agent is constructed.
@@ -2104,6 +2134,8 @@ class MainWindow(QMainWindow):
 
     def _on_worker_done(self) -> None:
         self._agent_worker = None
+        if self._turn_lock.locked():
+            self._turn_lock.release()
         self._sync_controls()
         QTimer.singleShot(0, self.composer.setFocus)
 
@@ -2113,6 +2145,15 @@ class MainWindow(QMainWindow):
         # Before anything else: a one-second timer that fires during teardown
         # reaches widgets Qt has already destroyed.
         self.resources.stop()
+        # The HTTP server holds a listening socket and a thread. Daemon
+        # threads die with the process, but the port stays bound until then --
+        # which is the difference between reopening the app and being told
+        # the address is already in use.
+        if self._remote is not None:
+            self._remote.stop()
+            self._remote = None
+        if self._bridge is not None:
+            self._bridge.cancel()
         if self._agent_worker is not None:
             self._agent_worker.cancel()
             self._agent_worker.wait(3000)
