@@ -651,6 +651,8 @@ class Settings:
     model_key: str = "code-glm"
     workdir: str = str(Path.home())
     tools_enabled: bool = True
+    # Superseded by autonomy_level. Kept only so an old settings file loads
+    # and can be migrated; see load().
     auto_approve_reads: bool = True
     # None means "not chosen yet" — the UI substitutes the skills marked
     # default-on. An empty list is a real choice (everything off) and is
@@ -704,6 +706,12 @@ class Settings:
         settings = cls(**{k: v for k, v in data.items() if k in known})
         for key, path in (settings.model_paths or {}).items():
             set_model_path(key, path)
+        # A user who turned off auto-approval meant "confirm everything",
+        # which is autonomy level 1. Two controls for one decision is what
+        # made level 4 still ask for permission.
+        if not settings.auto_approve_reads:
+            settings.autonomy_level = 1
+            settings.auto_approve_reads = True
         set_runtime(settings.llama_server or None)
         for key, size in (settings.context_sizes or {}).items():
             set_context_size(key, size)

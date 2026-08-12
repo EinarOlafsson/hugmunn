@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.14.1
+
+Fixes "4 · Full" still asking for permission on every call.
+
+Two controls were deciding one thing. **Auto-approve read-only tools** predates
+the autonomy tiers, and the gate read:
+
+```python
+if needs_ok or not self.auto_approve_reads:
+```
+
+So with that checkbox off, every tier confirmed every call and level 4 was
+indistinguishable from level 1. The checkbox silently won, and nothing in the
+UI said it would.
+
+Autonomy already covers what the checkbox meant — level 1 *is* "confirm
+everything, reads included" — so the checkbox is gone and the tier is the only
+authority. An existing settings file with it unticked migrates to level 1,
+which is what the person who unticked it was asking for.
+
+Verified across all four tiers with the deprecated flag set both ways: the
+answers are now identical, and level 4 asks for nothing except the two things
+it never covered — system paths and installed packages. Editable installs stay
+writable, which is the carve-out that makes level 4 useful rather than merely
+dangerous.
+
 ## 0.14.0
 
 Conversations survive a crash.

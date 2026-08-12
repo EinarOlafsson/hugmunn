@@ -41,7 +41,7 @@ class Agent:
         workdir: str,
         system_prompt: str,
         use_tools: bool = True,
-        auto_approve_reads: bool = True,
+        auto_approve_reads: bool = True,   # deprecated; autonomy decides
         max_iterations: int = 12,
         active_skills: list[skillkit.Skill] | None = None,
         extra_tools: list[toolkit.Tool] | None = None,
@@ -56,6 +56,8 @@ class Agent:
         self.client = client
         self.workdir = workdir
         self.use_tools = use_tools
+        # Retained so old callers still construct. It no longer gates
+        # anything: Autonomy.CONFIRM_ALL is what "confirm reads too" means.
         self.auto_approve_reads = auto_approve_reads
         self.max_iterations = max_iterations
         self.active_skills = active_skills or []
@@ -182,8 +184,12 @@ class Agent:
                     call.name, args, self.workdir, self.autonomy,
                     tool_requires_approval=bool(spec and spec.requires_approval),
                 )
-                needs_ok = verdict.needs_approval
-                if needs_ok or not self.auto_approve_reads:
+                # The autonomy level is the only authority. This used to
+                # read `if needs_ok or not self.auto_approve_reads`, which
+                # let a checkbox predating autonomy override every tier --
+                # so "4 · Full" still confirmed every call and the setting
+                # looked broken.
+                if verdict.needs_approval:
                     if not approve(call.name, summary, args):
                         denial = "User denied this tool call. Do not retry it; ask what to do instead."
                         yield AgentEvent(

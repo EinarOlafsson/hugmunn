@@ -302,14 +302,6 @@ class MainWindow(QMainWindow):
         self.tools_check.toggled.connect(self._on_tools_toggled)
         layout.addWidget(self.tools_check)
 
-        self.auto_reads_check = QCheckBox("Auto-approve read-only tools")
-        self.auto_reads_check.setChecked(self.settings.auto_approve_reads)
-        self.auto_reads_check.setToolTip(
-            "Writes and shell commands always ask, regardless of this setting."
-        )
-        self.auto_reads_check.toggled.connect(self._on_auto_reads_toggled)
-        layout.addWidget(self.auto_reads_check)
-
         layout.addSpacing(10)
         layout.addWidget(self._heading("Effort"))
         self.effort_combo = QComboBox()
@@ -1542,10 +1534,6 @@ class MainWindow(QMainWindow):
         self.settings.tools_enabled = enabled
         self.settings.save()
 
-    def _on_auto_reads_toggled(self, enabled: bool) -> None:
-        self.settings.auto_approve_reads = enabled
-        self.settings.save()
-
     def _on_system_changed(self) -> None:
         self.settings.system_prompt = self.system_edit.toPlainText()
         self.settings.save()
@@ -1677,7 +1665,6 @@ class MainWindow(QMainWindow):
             workdir=self.settings.workdir,
             system_prompt=self.settings.system_prompt,
             use_tools=self._tools_active(),
-            auto_approve_reads=self.settings.auto_approve_reads,
             max_iterations=self.settings.max_tool_iterations,
             active_skills=self._active_skills(),
             extra_tools=self._active_plugins(),
