@@ -41,7 +41,9 @@ def window(app, tmp_path, monkeypatch):
     from hugmunn.core import credentials
 
     importlib.reload(config)
-    importlib.reload(credentials)
+    # NOT reloaded: it resolves its path on access now, so there is nothing
+    # to refresh -- and a reloaded module leaves every earlier reference
+    # pointing at the old object, which is what a monkeypatch then misses.
 
     from hugmunn.ui import main_window as mw
 
@@ -264,7 +266,9 @@ def test_cancelling_the_sign_in_dialog_does_not_reopen_it_forever(app, tmp_path,
     from hugmunn.core import credentials
 
     importlib.reload(config)
-    importlib.reload(credentials)
+    # NOT reloaded: it resolves its path on access now, so there is nothing
+    # to refresh -- and a reloaded module leaves every earlier reference
+    # pointing at the old object, which is what a monkeypatch then misses.
     from hugmunn.ui import main_window as mw
 
     # NOT reloaded: config resolves its paths on access now, so there is

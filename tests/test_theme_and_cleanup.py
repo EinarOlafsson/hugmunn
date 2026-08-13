@@ -100,7 +100,9 @@ def isolated_config(tmp_path, monkeypatch):
 
     from hugmunn.core import credentials
 
-    importlib.reload(credentials)
+    # NOT reloaded: it resolves its path on access now, so there is nothing
+    # to refresh -- and a reloaded module leaves every earlier reference
+    # pointing at the old object, which is what a monkeypatch then misses.
     # Force the file backend so the test never writes to a real keyring.
     monkeypatch.setattr(credentials, "_keyring", lambda: None)
     return credentials, tmp_path

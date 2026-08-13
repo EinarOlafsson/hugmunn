@@ -45,7 +45,8 @@ from ..core.server import ServerManager
 from . import style, theme
 from .download_dialog import DownloadDialog
 from .login_dialog import LoginDialog
-from .model_picker import describe, paint_item, style_closed_combo, text_colour
+from .model_picker import (FreedomDelegate, describe, hover_colour,
+                           paint_item, style_closed_combo)
 from .resource_bar import ResourceBar
 from .chat import AssistantBlock, Notice, ThinkingCard, ToolCard, Transcript, UserBubble
 from .workers import AgentWorker, CatalogueWorker, DownloadWorker, ServerWorker
@@ -318,6 +319,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self._heading("Model"))
         self.model_combo = QComboBox()
+        self.model_combo.setItemDelegate(FreedomDelegate(self.model_combo))
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         layout.addWidget(self.model_combo)
 
@@ -1204,7 +1206,7 @@ class MainWindow(QMainWindow):
         if provider == Provider.LOCAL:
             style_closed_combo(self.model_combo, freedom, spec.is_available())
             self.freedom_label.setText(
-                f"<b style='color:{text_colour(freedom)}'>"
+                f"<b style='color:{hover_colour(freedom)}'>"
                 f"{config.FREEDOM_LABELS[freedom]}</b> — {describe(freedom)}")
         else:
             self.model_combo.setStyleSheet("")

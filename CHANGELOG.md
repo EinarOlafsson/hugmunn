@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.0.0.3
+
+A public Python API, a real README, and the dropdown to spec.
+
+### `import hugmunn`
+
+The agent loop is now importable. `hugmunn.api` is the whole public surface;
+`hugmunn.core` and `hugmunn.ui` are implementation and change without notice.
+
+```python
+with hugmunn.agent("code-glm") as a:
+    print(a.ask("what does this repository do?"))
+```
+
+Tools are **off** unless asked for, and when on, anything that changes the
+machine raises `ApprovalRequired` unless an `approve` callback says otherwise.
+A library that runs shell commands the moment it is imported into somebody's
+script deserves the review it would get.
+
+### The dropdown
+
+White on black at rest, for every row. The category colour appears only under
+the cursor and only on the text — **blue** stock, **grey** tuned, **red**
+unlocked — and the background never changes, including under selection. A list
+where every row is a different colour is a list you have to decode.
+
+### Fixed
+
+- **The credentials path was resolved at import**, so it ignored a config
+  directory set afterwards. Invisible on a machine with a working keyring,
+  because the keyring ignores the path entirely; obvious the moment it runs
+  somewhere without one. Found by running the suite under a second Python that
+  happened to have no keyring backend — two tests failed there and passed in
+  isolation, which is the signature of state resolved too early rather than of
+  a version incompatibility.
+- Tests that patch a module the API holds a reference to now patch through
+  that reference. Several tests reload modules to point them at a temporary
+  directory, and a reloaded module leaves every earlier reference pointing at
+  the old object.
+
+### Verified
+
+Full suite run on **Python 3.12.13** as well as 3.10: 821/823 there, and the
+two failures were the credentials bug above rather than anything version
+specific. Syntax parses cleanly on 3.10 through 3.14; 3.9 and below cannot —
+`match` in `workers.py`.
+
 ## 0.0.0.2
 
 Two things from the first version that did not work.
