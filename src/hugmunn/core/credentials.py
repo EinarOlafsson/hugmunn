@@ -25,9 +25,19 @@ from .providers import Provider
 
 SERVICE = "hugmunn"
 
-_CRED_FILE = Path(
-    os.environ.get("HUGMUNN_CONFIG_DIR", Path.home() / ".config" / "hugmunn")
-) / "credentials.json"
+
+def _cred_file() -> Path:
+    """Where the key file lives, resolved on each call.
+
+    This was computed once at import, which meant it ignored a config
+    directory set afterwards -- so the file backend wrote to whatever the
+    environment happened to say when the module first loaded. Invisible on a
+    machine with a working keyring, because the keyring ignores the path
+    entirely; obvious the moment you run somewhere without one.
+    """
+    from ..config import config_dir
+
+    return config_dir() / "credentials.json"
 
 
 def _keyring():
@@ -53,7 +63,7 @@ def backend_name() -> str:
     """What the UI tells the user their key is stored in."""
     keyring = _keyring()
     if keyring is None:
-        return f"a file at {_CRED_FILE} (mode 600)"
+        return f"a file at {_cred_file()} (mode 600)"
     try:
         return type(keyring.get_keyring()).__name__
     except Exception:
@@ -70,22 +80,22 @@ def is_secure() -> bool:
 
 def _read_file() -> dict[str, str]:
     try:
-        data = json.loads(_CRED_FILE.read_text(encoding="utf-8"))
+        data = json.loads(_cred_file().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
     return {k: v for k, v in data.items() if isinstance(v, str)}
 
 
 def _write_file(data: dict[str, str]) -> None:
-    _CRED_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = _CRED_FILE.with_suffix(".json.tmp")
+    _cred_file().parent.mkdir(parents=True, exist_ok=True)
+    tmp = _cred_file().with_suffix(".json.tmp")
     # Create with 0600 from the start. Writing then chmod'ing leaves a
     # window in which the key is world-readable, which is exactly the
     # window somebody's backup daemon runs in.
     handle = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
     with os.fdopen(handle, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2)
-    os.replace(tmp, _CRED_FILE)
+    os.replace(tmp, _cred_file())
 
 
 # ------------------------------------------------------------------- public
