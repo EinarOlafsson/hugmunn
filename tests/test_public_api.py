@@ -42,9 +42,22 @@ def test_the_errors_share_a_base():
 
 
 def test_the_version_is_importable_and_matches_the_package():
-    from importlib.metadata import version
+    """Catches a version bumped in one place and not the other.
 
-    assert hugmunn.__version__ == version("hugmunn")
+    In an editable install the metadata is only rewritten by ``pip install
+    -e .``, so this also fails when the package has been bumped and not
+    reinstalled -- which is worth knowing before a release, and is exactly
+    the state it caught on the way to 0.0.0.3.
+    """
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        installed = version("hugmunn")
+    except PackageNotFoundError:
+        pytest.skip("not installed; nothing to compare against")
+    assert hugmunn.__version__ == installed, (
+        f"package says {hugmunn.__version__}, installed metadata says "
+        f"{installed} — run: pip install -e .")
 
 
 # --------------------------------------------------------------- discovery
