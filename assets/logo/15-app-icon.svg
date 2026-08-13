@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="App icon, the pair">
+  <title>App icon, the pair</title>
+  <rect width="256" height="256" fill="#ffffff"/>
+  <rect x="6" y="6" width="244" height="244" rx="56" fill="#000000"/>
+  <g transform="translate(143.8 57.4) scale(-0.52 0.52)">
+    <path d="M40 134 C68 120 96 110 116 102 C122 88 138 78 158 78 C186 78 208 100 208 130 C208 156 194 176 172 184 L158 200 L152 182 L132 190 L132 172 L116 176 C114 158 116 146 122 136 L118 134 C92 138 66 138 40 134 Z" fill="#ffffff"/>
+    <path d="M42 133 C70 128 96 124 118 121" fill="none" stroke="#000000" stroke-width="9.6"/>
+    <circle cx="152" cy="116" r="9.5" fill="#e01b1b"/>
+  </g>
+  <g transform="translate(112.2 57.4) scale(0.52)">
+    <path d="M40 134 C68 120 96 110 116 102 C122 88 138 78 158 78 C186 78 208 100 208 130 C208 156 194 176 172 184 L158 200 L152 182 L132 190 L132 172 L116 176 C114 158 116 146 122 136 L118 134 C92 138 66 138 40 134 Z" fill="#ffffff"/>
+    <path d="M42 133 C70 128 96 124 118 121" fill="none" stroke="#000000" stroke-width="9.6"/>
+    <circle cx="152" cy="116" r="9.5" fill="#e01b1b"/>
+  </g>
+</svg>
