@@ -1,6 +1,6 @@
 # Desktop installers
 
-The native builders bundle Python, PyQt6, Hugmunn, its skills, and its artwork.
+The native builders bundle Python, PySide6, Hugmunn, its skills, and its artwork.
 Users do not need a separate Python installation to launch these applications.
 Model weights, llama-server, development tools, and GPU drivers remain separate.
 The packaging structure follows the native-build approach used in
@@ -41,7 +41,7 @@ build host’s glibc floor and Qt/X11 runtime dependencies.
 On Debian or Ubuntu, install the matching package with:
 
 ```bash
-sudo apt install ./dist/desktop/hugmunn_0.0.0.8_amd64.deb
+sudo apt install ./dist/desktop/hugmunn_0.0.0.9_amd64.deb
 ```
 
 The application appears as **Hugmunn** in the desktop menu. Remove it with

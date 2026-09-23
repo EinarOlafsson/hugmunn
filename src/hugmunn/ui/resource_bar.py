@@ -11,10 +11,10 @@ red means a launch will disappoint.
 
 from __future__ import annotations
 
-from PyQt6 import sip
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtGui import QColor, QPainter
-from PyQt6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout, QWidget
+from shiboken6 import isValid
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtGui import QColor, QPainter
+from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from ..core.resources import Sampler, Snapshot
 from . import style
@@ -146,7 +146,7 @@ class ResourceBar(QFrame):
         # that window reaches a deleted _Bar and raises. Visible as a
         # traceback on quit, and as an intermittent failure in any test that
         # builds and closes a window.
-        if sip.isdeleted(self) or sip.isdeleted(self.cpu):
+        if not isValid(self) or not isValid(self.cpu):
             self.stop()
             return
         snap = self._sampler.sample()

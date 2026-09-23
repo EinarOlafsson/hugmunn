@@ -152,7 +152,7 @@ def clear_ram() -> Reclaim:
                 continue
 
     try:
-        from PyQt6.QtGui import QPixmapCache
+        from PySide6.QtGui import QPixmapCache
 
         held = int(QPixmapCache.totalUsed())
         if held:
@@ -235,7 +235,7 @@ def clear_cpu() -> Reclaim:
     before = _thread_count()
     details: list[str] = []
     try:
-        from PyQt6.QtCore import QThreadPool
+        from PySide6.QtCore import QThreadPool
 
         pool = QThreadPool.globalInstance()
         if pool is not None:

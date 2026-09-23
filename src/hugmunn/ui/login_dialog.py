@@ -13,10 +13,10 @@ Two things this does that a settings field holding an API key does not:
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtCore import QUrl
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QUrl
+from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QVBoxLayout,
 )

@@ -10,6 +10,7 @@ SetCompressor /SOLID lzma
 !define MUI_ICON "${ICON}"
 !define MUI_UNICON "${ICON}"
 !insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_LICENSE "${SOURCE}\LICENSE"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -37,6 +38,10 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\Hugmunn.lnk"
   Delete "$DESKTOP\Hugmunn.lnk"
   Delete "$INSTDIR\Hugmunn.exe"
+  Delete "$INSTDIR\LICENSE"
+  Delete "$INSTDIR\THIRD_PARTY_NOTICES.md"
+  Delete "$INSTDIR\THIRD_PARTY_VERSIONS.json"
+  RMDir /r "$INSTDIR\licenses"
   RMDir /r "$INSTDIR\_internal"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"

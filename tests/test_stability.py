@@ -83,7 +83,7 @@ def test_the_lock_is_released_when_a_command_is_handled(window):
 def test_the_lock_is_released_when_no_client_can_be_built(window, monkeypatch):
     """This branch shows a modal, which in a headless run has nothing to
     dismiss it — so the dialog is stubbed rather than the behaviour changed."""
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: None))
     monkeypatch.setattr(type(window), "_ready_to_send", lambda self: True)

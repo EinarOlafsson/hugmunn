@@ -18,7 +18,7 @@ a = Analysis(
     hiddenimports=collect_submodules("hugmunn.core"),
     hookspath=[],
     runtime_hooks=[],
-    excludes=["PySide6", "PySide2", "PyQt5", "tkinter", "pytest", "sphinx"],
+    excludes=["PyQt6", "PySide2", "PyQt5", "tkinter", "pytest", "sphinx"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

@@ -294,7 +294,7 @@ def test_the_app_offers_setup_on_launch_when_that_is_the_blocker(qt_app, tmp_pat
     monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.setenv("HUGMUNN_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path / "models"))
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     from hugmunn import config as cfg
 
@@ -334,7 +334,7 @@ def test_no_offer_when_nothing_is_downloaded(qt_app, tmp_path, monkeypatch):
     """A fresh install has no weights; the binary is not what is missing."""
     monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path / "models"))
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     from hugmunn import config as cfg
 

@@ -1,8 +1,8 @@
 """Render the bundled artwork for the active Qt palette."""
 
-from PyQt6.QtCore import QByteArray, Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
-from PyQt6.QtSvg import QSvgRenderer
+from PySide6.QtCore import QByteArray, Qt
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 
 from ..branding import svg
 from . import theme

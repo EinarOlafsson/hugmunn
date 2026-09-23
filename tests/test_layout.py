@@ -18,9 +18,9 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-pytest.importorskip("PyQt6.QtWidgets")
+pytest.importorskip("PySide6.QtWidgets")
 
-from PyQt6.QtWidgets import QFrame, QLabel, QWidget  # noqa: E402
+from PySide6.QtWidgets import QFrame, QLabel, QWidget  # noqa: E402
 
 #: Heights worth checking: the default, a 1080p desktop after chrome, a
 #: laptop, and something deliberately cramped.
@@ -145,7 +145,7 @@ def test_the_sidebar_scrolls_rather_than_compressing(window, qt_app):
     shortfall by compressing children, and the ones that cannot compress get
     drawn over their neighbours.
     """
-    from PyQt6.QtWidgets import QScrollArea
+    from PySide6.QtWidgets import QScrollArea
 
     sidebar = sidebar_of(window)
     scroller = sidebar.parent()
@@ -161,8 +161,8 @@ def test_the_sidebar_scrolls_rather_than_compressing(window, qt_app):
 
 def test_the_sidebar_never_scrolls_sideways(window, qt_app):
     """A horizontal scrollbar in a controls column is a layout bug, not a feature."""
-    from PyQt6.QtCore import Qt
-    from PyQt6.QtWidgets import QScrollArea
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QScrollArea
 
     sidebar = sidebar_of(window)
     scroller = sidebar.parent()
@@ -208,17 +208,17 @@ def test_a_tick_after_teardown_does_not_raise(qt_app):
 
     ``deleteLater`` only posts a DeferredDelete event; ``processEvents`` does
     not deliver it, so the C++ object is still alive afterwards and the test
-    proves nothing. ``sip.delete`` destroys it now, which is what the guard
+    proves nothing. ``shiboken6.delete`` destroys it now, which is what the guard
     is actually defending against.
     """
-    from PyQt6 import sip
+    from shiboken6 import delete, isValid
 
     from hugmunn.ui.resource_bar import ResourceBar
 
     meters = ResourceBar()
     assert meters._timer.isActive()
-    sip.delete(meters.cpu)
-    assert sip.isdeleted(meters.cpu)
+    delete(meters.cpu)
+    assert not isValid(meters.cpu)
 
     meters.refresh()          # must not raise
     assert not meters._timer.isActive(), "a tick on dead widgets must stop the timer"

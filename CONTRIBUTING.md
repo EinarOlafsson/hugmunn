@@ -1,7 +1,7 @@
 # Contributing
 
-Use a dedicated Python 3.10+ environment. Hugmunn uses PyQt6; avoid importing
-PySide6 into the same process.
+Use a dedicated Python 3.10+ environment. Hugmunn uses PySide6; avoid importing
+PyQt6 into the same process.
 
 ```bash
 python -m venv .venv
@@ -39,7 +39,7 @@ corresponding docstrings and examples when behavior changes.
 | --- | --- |
 | `src/hugmunn/api.py` | Public Python interface, re-exported from `hugmunn` |
 | `src/hugmunn/core/` | Model clients, agent loop, tools, sessions, and runtime setup |
-| `src/hugmunn/ui/` | PyQt6 desktop widgets and themes |
+| `src/hugmunn/ui/` | PySide6 desktop widgets and themes |
 | `src/hugmunn/skills/` | Bundled Markdown instruction packs |
 | `src/hugmunn/resources/icons/` | Raven SVGs and generated native icons |
 | `docs/` | User guides and Sphinx API reference |

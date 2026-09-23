@@ -12,7 +12,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 from ..config import ModelSpec
 from ..core.agent import Agent, AgentEvent
@@ -23,9 +23,9 @@ from ..core.server import ServerError, ServerManager
 class ServerWorker(QThread):
     """Starts a llama-server and reports when it is serving."""
 
-    progress = pyqtSignal(str)
-    ready = pyqtSignal(str)      # model name reported by the server
-    failed = pyqtSignal(str)
+    progress = Signal(str)
+    ready = Signal(str)      # model name reported by the server
+    failed = Signal(str)
 
     def __init__(self, manager: ServerManager, spec: ModelSpec, parent=None) -> None:
         super().__init__(parent)
@@ -47,14 +47,14 @@ class ServerWorker(QThread):
 class AgentWorker(QThread):
     """Runs one user turn, including any tool round-trips."""
 
-    reasoning = pyqtSignal(str)
-    content = pyqtSignal(str)
-    tool_start = pyqtSignal(str, str, str)          # name, summary, call_id
-    tool_result = pyqtSignal(str, str, str)         # name, summary, output
-    tool_denied = pyqtSignal(str, str)              # name, summary
-    approval_requested = pyqtSignal(str, str, dict)  # name, summary, arguments
-    turn_finished = pyqtSignal(dict)                # llama.cpp timings
-    failed = pyqtSignal(str)
+    reasoning = Signal(str)
+    content = Signal(str)
+    tool_start = Signal(str, str, str)          # name, summary, call_id
+    tool_result = Signal(str, str, str)         # name, summary, output
+    tool_denied = Signal(str, str)              # name, summary
+    approval_requested = Signal(str, str, dict)  # name, summary, arguments
+    turn_finished = Signal(dict)                # llama.cpp timings
+    failed = Signal(str)
 
     def __init__(self, agent: Agent, history: list[dict[str, Any]], parent=None) -> None:
         super().__init__(parent)
@@ -120,8 +120,8 @@ class CatalogueWorker(QThread):
     frozen sign-in dialog reads as a crash.
     """
 
-    ok = pyqtSignal(object)   # tuple[CloudModel, ...]
-    failed = pyqtSignal(str)
+    ok = Signal(object)   # tuple[CloudModel, ...]
+    failed = Signal(str)
 
     def __init__(self, provider, api_key: str, parent=None) -> None:
         super().__init__(parent)
@@ -147,9 +147,9 @@ class SetupWorker(QThread):
     for four minutes is what makes people kill it.
     """
 
-    line = pyqtSignal(str)
-    ok = pyqtSignal(str)      # path to the binary
-    failed = pyqtSignal(str)
+    line = Signal(str)
+    ok = Signal(str)      # path to the binary
+    failed = Signal(str)
 
     def __init__(self, mode: str = "build", parent=None) -> None:
         super().__init__(parent)
@@ -178,9 +178,9 @@ class SetupWorker(QThread):
 class DownloadWorker(QThread):
     """Fetches a model's weights, reporting byte-level progress."""
 
-    progress = pyqtSignal(object)   # core.downloads.Progress
-    finished_ok = pyqtSignal(str)   # destination
-    failed = pyqtSignal(str)
+    progress = Signal(object)   # core.downloads.Progress
+    finished_ok = Signal(str)   # destination
+    failed = Signal(str)
 
     def __init__(self, spec, destination, parent=None, targets=None) -> None:
         super().__init__(parent)

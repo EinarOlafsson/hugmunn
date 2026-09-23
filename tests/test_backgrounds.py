@@ -19,9 +19,9 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-pytest.importorskip("PyQt6.QtWidgets")
+pytest.importorskip("PySide6.QtWidgets")
 
-from PyQt6.QtWidgets import QLabel  # noqa: E402
+from PySide6.QtWidgets import QLabel  # noqa: E402
 
 from hugmunn.ui import theme  # noqa: E402
 
@@ -30,7 +30,7 @@ def render(widget):
     """Paint the widget offscreen and return its image."""
     widget.resize(widget.sizeHint().expandedTo(widget.minimumSize()))
     widget.show()
-    from PyQt6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication
 
     QApplication.processEvents()
     return widget.grab().toImage()
@@ -86,7 +86,7 @@ def expected(role):
 
 @pytest.fixture(params=list(theme.THEMES))
 def themed(request, qt_app, no_leftover_widgets):
-    from PyQt6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication
 
     previous = theme.active_name()
     theme.set_active(request.param)
@@ -169,7 +169,7 @@ def test_the_sidebar_headings_sit_on_the_sidebar(themed, qt_app, tmp_path,
     window = mw.MainWindow()
     try:
         window.show()
-        from PyQt6.QtWidgets import QApplication, QFrame
+        from PySide6.QtWidgets import QApplication, QFrame
 
         QApplication.processEvents()
         sidebar = next(f for f in window.findChildren(QFrame)

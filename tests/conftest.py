@@ -63,8 +63,8 @@ def model_runtime(model_scripts, monkeypatch):
 def qt_app():
     """One QApplication for the whole session; Qt allows only one."""
     global _APPLICATION
-    pytest.importorskip("PyQt6.QtWidgets")
-    from PyQt6.QtWidgets import QApplication
+    pytest.importorskip("PySide6.QtWidgets")
+    from PySide6.QtWidgets import QApplication
 
     if _APPLICATION is None:
         _APPLICATION = QApplication.instance() or QApplication([])
@@ -91,8 +91,8 @@ def no_leftover_widgets():
 def destroy_widgets():
     """Deliver deferred widget deletions before changing global Qt styles."""
     try:
-        from PyQt6.QtCore import QEvent
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtCore import QEvent
+        from PySide6.QtWidgets import QApplication
 
         app = QApplication.instance()
         if app is None:

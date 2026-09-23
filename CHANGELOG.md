@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.0.0.8 — 2026-09-23
+## 0.0.0.9 — 2026-09-23
+
+- License new releases under PolyForm Noncommercial 1.0.0. Noncommercial use,
+  modification, and redistribution are permitted under its terms; commercial
+  use requires separate permission from Einar Olafsson.
+- Migrate the desktop from PyQt6 to PySide6 Essentials, retain third-party
+  license notices, and document LGPL library replacement and source access.
+- Include the minimal raven icon, emphasizing the heads and joined wings
+  enclosing the eye, across the application and native installers.
+
+## 0.0.0.8 — unreleased
 
 - Further simplify the icon around its essential features: two raven heads,
   joined wings enclosing the all-seeing eye, and large hollow spaces.

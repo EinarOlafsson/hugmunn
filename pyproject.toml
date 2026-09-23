@@ -8,10 +8,10 @@ dynamic = ["version"]
 description = "Desktop application and Python API for local and cloud language models"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "PolyForm-Noncommercial-1.0.0"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/*.txt"]
 authors = [{ name = "Einar Olafsson" }]
-keywords = ["llm", "llama.cpp", "qt", "pyqt6", "local-ai"]
+keywords = ["llm", "llama.cpp", "qt", "pyside6", "local-ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -27,7 +27,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "PyQt6>=6.6",
+    "PySide6-Essentials>=6.6",
     "httpx>=0.27",
     "markdown>=3.5",
     "Pygments>=2.17",
@@ -43,9 +43,7 @@ Changelog = "https://github.com/EinarOlafsson/hugmunn/blob/main/CHANGELOG.md"
 [project.optional-dependencies]
 # pytest-timeout: a GUI test that opens an unexpected modal hangs forever
 # otherwise, and a suite that hangs gets killed rather than read.
-# pytest-qt is deliberately absent: it loads a Qt binding at configure
-# time and prefers PySide6 when installed, which segfaults alongside our
-# PyQt6. Nothing here used its fixtures.
+# Qt fixtures live in tests/conftest.py; no pytest-qt plugin is required.
 dev = ["pytest>=7.4", "pytest-timeout>=2.3"]
 # Encrypted API-key storage. Without it keys go to a mode-600 file and the
 # sign-in dialog says so, so this is a real upgrade rather than a requirement.
@@ -72,10 +70,5 @@ hugmunn = ["skills/*.md", "resources/icons/*.svg", "resources/icons/*.png", "res
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# pytest-qt loads a Qt binding at configure time and prefers PySide6 when it is
-# installed -- which it is here, because spaCR shares this environment. Two Qt
-# bindings in one process is undefined behaviour: they own separate copies of
-# the C++ runtime and neither knows about the other's widgets. It surfaced as a
-# segfault with no Python traceback, inside an application-wide setStyleSheet,
-# which walks every widget Qt knows about. Nothing here uses the plugin.
+# Use the repository's Qt fixtures and avoid auto-loading a second Qt binding.
 addopts = "-p no:pytest-qt"

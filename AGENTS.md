@@ -15,5 +15,8 @@
   Never print or commit credentials.
 - Keep README instructions practical and consistent with the shipped code.
   Update API docstrings and user documentation when behavior changes.
+- New releases use PolyForm Noncommercial 1.0.0; commercial use requires the
+  owner's separate permission. Use PySide6 Essentials, retain LGPL notices and
+  replacement rights, and do not reintroduce a GPL-only PyQt dependency.
 - Use the raven artwork in `src/hugmunn/resources/icons/`, choosing black for
   light backgrounds and white for dark backgrounds.

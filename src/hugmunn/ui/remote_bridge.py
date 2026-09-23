@@ -22,7 +22,7 @@ from __future__ import annotations
 import threading
 from typing import Any, Iterator
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 from ..core import autonomy as autonomykit
 from ..core import commands as commandkit
@@ -37,11 +37,11 @@ class RemoteBridge(QObject):
 
     #: Mirrors a remote turn into the desktop transcript. Queued, because it
     #: is emitted from a request thread and the slot touches widgets.
-    event = pyqtSignal(dict)
+    event = Signal(dict)
     #: A tool call from a remote turn that needs a human. The desktop shows
     #: its own dialog; whichever client answers first releases the agent.
-    approval = pyqtSignal(str, str, str, dict)   # id, name, summary, arguments
-    state_changed = pyqtSignal()
+    approval = Signal(str, str, str, dict)   # id, name, summary, arguments
+    state_changed = Signal()
 
     def __init__(self, window) -> None:
         super().__init__(window)

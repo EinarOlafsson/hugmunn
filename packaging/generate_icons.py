@@ -1,7 +1,7 @@
 """Render desktop icon formats from the supplied SVG mark.
 
 Run ``python packaging/generate_icons.py`` after changing the SVG artwork.
-Requires PyQt6 and Pillow, both included in ``hugmunn[build]``.
+Requires PySide6 and Pillow, both included in ``hugmunn[build]``.
 """
 
 from __future__ import annotations
@@ -12,9 +12,9 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PIL import Image
-from PyQt6.QtCore import QRectF, Qt
-from PyQt6.QtGui import QColor, QGuiApplication, QImage, QPainter
-from PyQt6.QtSvg import QSvgRenderer
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QColor, QGuiApplication, QImage, QPainter
+from PySide6.QtSvg import QSvgRenderer
 
 ICONS = Path(__file__).resolve().parents[1] / "src/hugmunn/resources/icons"
 

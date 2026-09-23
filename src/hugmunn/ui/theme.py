@@ -290,8 +290,8 @@ def resolve(name: str) -> str:
     if name != "system":
         return name if name in _PALETTES else "dark"
     try:
-        from PyQt6.QtCore import Qt
-        from PyQt6.QtGui import QGuiApplication
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QGuiApplication
 
         app = QGuiApplication.instance()
         if app is None:

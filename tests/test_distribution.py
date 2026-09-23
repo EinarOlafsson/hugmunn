@@ -13,7 +13,7 @@ from hugmunn.ui import theme
 
 def test_public_import_does_not_load_qt():
     result = subprocess.run(
-        [sys.executable, "-c", "import hugmunn, sys; assert not any(n.startswith('PyQt6') for n in sys.modules)"],
+        [sys.executable, "-c", "import hugmunn, sys; assert not any(n.startswith(('PySide6', 'PyQt6')) for n in sys.modules)"],
         capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr

@@ -13,6 +13,7 @@ python-api
 api
 configuration
 installers
+licensing
 ```
 
 The [repository](https://github.com/EinarOlafsson/hugmunn) contains the source,

@@ -9,10 +9,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-from PyQt6 import sip
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QKeySequence, QShortcut, QTextOption
-from PyQt6.QtWidgets import (
+from shiboken6 import isValid
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QAction, QColor, QKeySequence, QShortcut, QTextOption
+from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
     QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit,
     QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QSplitter,
@@ -1296,7 +1296,7 @@ class MainWindow(QMainWindow):
         leave the user with a model list where nothing starts and no
         indication of why.
         """
-        if sip.isdeleted(self):
+        if not isValid(self):
             return
         if self._is_cloud() or config.find_runtime() is not None:
             return
@@ -1852,7 +1852,7 @@ class MainWindow(QMainWindow):
         deliberately finished teaches them to dismiss the dialog without
         reading it, which is exactly when it will matter.
         """
-        if sip.isdeleted(self):
+        if not isValid(self):
             return
         previous = sessionkit.unfinished()
         if previous is None or previous.id == self.session.id:

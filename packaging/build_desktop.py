@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import platform
@@ -16,6 +17,7 @@ import runpy
 import shutil
 import subprocess
 import sys
+import sysconfig
 import tarfile
 import tempfile
 
@@ -24,6 +26,38 @@ BUILD = ROOT / "build/desktop"
 DIST = ROOT / "dist/desktop"
 ICONS = ROOT / "src/hugmunn/resources/icons"
 VERSION = runpy.run_path(str(ROOT / "src/hugmunn/_version.py"))["__version__"]
+
+
+def include_license_notices(bundle: Path) -> None:
+    """Ship application terms, LGPL texts, and exact upstream source locations."""
+    from importlib.metadata import version
+    from PySide6.QtCore import qVersion
+
+    target = bundle / "Contents/Resources" if sys.platform == "darwin" else bundle
+    target.mkdir(parents=True, exist_ok=True)
+    for name in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
+        shutil.copy2(ROOT / name, target / name)
+    shutil.copytree(ROOT / "licenses", target / "licenses", dirs_exist_ok=True)
+    python_license = Path(sysconfig.get_path("stdlib")) / "LICENSE.txt"
+    if not python_license.is_file():
+        python_license = Path(sys.base_prefix) / "LICENSE.txt"
+    if not python_license.is_file():
+        raise FileNotFoundError("Python's LICENSE.txt is required in native bundles")
+    shutil.copy2(python_license, target / "licenses/Python-LICENSE.txt")
+    qt = qVersion()
+    pyside = version("PySide6-Essentials")
+    manifest = {
+        "Python": {"version": platform.python_version(),
+                   "source": f"https://www.python.org/ftp/python/{platform.python_version()}/Python-{platform.python_version()}.tar.xz"},
+        "Qt": {"version": qt,
+               "source": f"https://download.qt.io/official_releases/qt/{'.'.join(qt.split('.')[:2])}/{qt}/single/qt-everywhere-src-{qt}.tar.xz"},
+        "PySide6-Essentials": {"version": pyside,
+                              "source": f"https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-{pyside}-src/pyside-setup-everywhere-src-{pyside}.tar.xz"},
+        "shiboken6": {"version": version("shiboken6"),
+                      "source": f"https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-{pyside}-src/pyside-setup-everywhere-src-{pyside}.tar.xz"},
+    }
+    (target / "THIRD_PARTY_VERSIONS.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
 def run(*command: str, **kwargs) -> None:
@@ -138,6 +172,7 @@ def main() -> None:
     executable = bundle / ({"darwin": "Contents/MacOS/Hugmunn", "win32": "Hugmunn.exe"}.get(sys.platform, "Hugmunn"))
     if not executable.is_file():
         parser.error(f"Missing frozen executable: {executable}")
+    include_license_notices(bundle)
     with tempfile.TemporaryDirectory(prefix="hugmunn-smoke-") as temporary:
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen", HUGMUNN_CONFIG_DIR=temporary,
                    HUGMUNN_MODELS_ROOT=str(Path(temporary) / "models"))

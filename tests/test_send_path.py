@@ -21,7 +21,7 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-pytest.importorskip("PyQt6.QtWidgets")
+pytest.importorskip("PySide6.QtWidgets")
 
 from hugmunn.core.client import Event  # noqa: E402
 
@@ -94,8 +94,8 @@ def test_pressing_send_does_not_raise(window, qt_app):
 
 def test_enter_in_the_composer_sends(window, qt_app):
     """The path the traceback came through — keyPressEvent, not the button."""
-    from PyQt6.QtCore import QEvent, Qt
-    from PyQt6.QtGui import QKeyEvent
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QKeyEvent
 
     window.composer.setPlainText("hello")
     window.composer.keyPressEvent(
@@ -251,7 +251,7 @@ def test_a_crashed_session_is_offered_back_on_the_next_launch(qt_app, tmp_path,
                   {"role": "assistant", "content": "the lost answer"}],
         closed_cleanly=False))
 
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     asked = []
     monkeypatch.setattr(QMessageBox, "question",
@@ -292,7 +292,7 @@ def test_declining_the_restore_does_not_ask_again(qt_app, tmp_path, monkeypatch)
         messages=[{"role": "user", "content": "q"}, {"role": "assistant", "content": "a"}],
         closed_cleanly=False))
 
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     monkeypatch.setattr(QMessageBox, "question",
                         staticmethod(lambda *a, **k: QMessageBox.StandardButton.No))

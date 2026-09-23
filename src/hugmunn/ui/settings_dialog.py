@@ -7,8 +7,8 @@ controls, which are part of composing a turn and stay in the sidebar.
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QGridLayout, QHBoxLayout, QLabel,
     QMessageBox, QPushButton, QTabWidget, QVBoxLayout, QWidget,
 )

@@ -19,7 +19,7 @@ what they have seen. Hugmunn takes its name from the pair.
 [![Docs](https://img.shields.io/badge/Docs-Guides%20%26%20API-4A9EFF)](https://github.com/EinarOlafsson/hugmunn/tree/main/docs)
 [![Source](https://img.shields.io/badge/GitHub-Source-181717?logo=github)](https://github.com/EinarOlafsson/hugmunn)
 [![Issues](https://img.shields.io/github/issues/EinarOlafsson/hugmunn)](https://github.com/EinarOlafsson/hugmunn/issues)
-[![License](https://img.shields.io/github/license/EinarOlafsson/hugmunn)](https://github.com/EinarOlafsson/hugmunn/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial-blue)](https://github.com/EinarOlafsson/hugmunn/blob/main/LICENSE)
 
 Hugmunn is a desktop application and Python library for working with language
 models. It connects to local models through [llama.cpp](https://github.com/ggml-org/llama.cpp)
@@ -197,5 +197,12 @@ for changes.
 ## License
 
 Hugmunn’s source and raven artwork are distributed under the
-[MIT license](https://github.com/EinarOlafsson/hugmunn/blob/main/LICENSE).
-Model weights, llama.cpp, Qt, and other dependencies have their own licenses.
+[PolyForm Noncommercial License 1.0.0](https://github.com/EinarOlafsson/hugmunn/blob/main/LICENSE).
+It permits noncommercial use, modification, and redistribution under its terms.
+Commercial use requires separate permission from Einar Olafsson; contact
+[einar.olafsson@gmail.com](mailto:einar.olafsson@gmail.com).
+
+These terms apply to new releases beginning with 0.0.0.9. Previously published
+versions retain the license supplied with those versions. Model weights,
+llama.cpp, Qt, and other dependencies retain their own licenses; see the
+[third-party notices](https://github.com/EinarOlafsson/hugmunn/blob/main/THIRD_PARTY_NOTICES.md).

@@ -10,12 +10,12 @@ import sys
 def _warn_on_mixed_qt_bindings() -> None:
     """Warn when incompatible Qt Python bindings share the application process.
 
-    Plugins can import PySide6 indirectly. Both bindings own Qt objects, and
+    Plugins can import PyQt6 indirectly. Both bindings own Qt objects, and
     mixing them can cause crashes during rendering or application shutdown.
     """
-    if "PySide6" in sys.modules:
+    if "PyQt6" in sys.modules:
         print(
-            "warning: PySide6 is loaded in this process alongside PyQt6.\n"
+            "warning: PyQt6 is loaded in this process alongside PySide6.\n"
             "         Two Qt bindings share no C++ runtime and crash in "
             "unrelated places.\n"
             "         Something imported it -- a plugin, or spaCR. Run "
@@ -41,8 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)
     options, qt_args = parser.parse_known_args(args[1:])
 
-    from PyQt6.QtCore import QTimer
-    from PyQt6.QtWidgets import QApplication
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication
 
     from .config import Settings
     from .ui import theme

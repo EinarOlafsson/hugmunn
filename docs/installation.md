@@ -1,7 +1,7 @@
 # Installation
 
 Hugmunn requires Python 3.10 or newer. Use a dedicated virtual environment,
-especially if you also use software based on PySide6: Hugmunn uses PyQt6, and
+especially if you also use software based on PyQt6: Hugmunn uses PySide6, and
 loading both bindings into one process can crash Qt.
 
 ## Install with pip
@@ -21,11 +21,11 @@ For development, clone the repository and install it with
 `python -m pip install -e .`. To install a built wheel:
 
 ```bash
-python -m pip install /path/to/hugmunn-0.0.0.8-py3-none-any.whl
+python -m pip install /path/to/hugmunn-0.0.0.9-py3-none-any.whl
 ```
 
 The wheel includes Python modules, skill packs, and artwork. It does not include
-model weights or llama-server. PyQt6 is currently a dependency even for library
+model weights or llama-server. PySide6 is currently a dependency even for library
 use, though importing `hugmunn` does not import Qt or require a display.
 
 Upgrade with `python -m pip install --upgrade hugmunn`.
@@ -73,7 +73,7 @@ environment. The [configuration guide](configuration.md) describes storage.
 | A local model is unavailable | Confirm both weights and a working llama-server or launch script are present. |
 | llama-server exits while loading | Check free RAM/VRAM and the runtime log; try a smaller model or context. |
 | Cloud authentication fails | Check the provider, key, API billing, and environment overrides. |
-| The application crashes after another GUI package is imported | Run Hugmunn in its own environment and avoid mixing PyQt6 with PySide6. |
+| The application crashes after another GUI package is imported | Run Hugmunn in its own environment and avoid mixing PySide6 with PyQt6. |
 
 `QT_QPA_PLATFORM=offscreen` is useful for automated checks, not for normal
 interactive use. See [desktop installers](installers.md) for packaged builds.

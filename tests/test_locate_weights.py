@@ -119,7 +119,7 @@ def test_scanning_does_not_walk_without_bound(tmp_path):
 
 def test_the_dialog_records_a_file_belonging_to_another_model(qt_app, weights_folder,
                                                               monkeypatch):
-    from PyQt6.QtWidgets import QFileDialog, QMessageBox
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
 
     from hugmunn.ui.download_dialog import DownloadDialog
 
@@ -139,7 +139,7 @@ def test_the_dialog_records_a_file_belonging_to_another_model(qt_app, weights_fo
 
 
 def test_the_dialog_refuses_a_file_it_does_not_recognise(qt_app, tmp_path, monkeypatch):
-    from PyQt6.QtWidgets import QFileDialog, QMessageBox
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
 
     from hugmunn.ui.download_dialog import DownloadDialog
 
@@ -162,7 +162,7 @@ def test_the_dialog_refuses_a_file_it_does_not_recognise(qt_app, tmp_path, monke
 
 def test_scanning_from_the_dialog_records_every_model_found(qt_app, weights_folder,
                                                             monkeypatch):
-    from PyQt6.QtWidgets import QFileDialog, QMessageBox
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
 
     from hugmunn.ui.download_dialog import DownloadDialog
 
@@ -183,7 +183,7 @@ def test_find_my_models_is_reachable_from_the_menu(qt_app, weights_folder, tmp_p
     import importlib
 
     monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "cfg"))
-    from PyQt6.QtWidgets import QFileDialog, QMessageBox
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
 
     from hugmunn import config as cfg
 

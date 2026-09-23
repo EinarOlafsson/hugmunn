@@ -1,4 +1,6 @@
 include LICENSE README.md CHANGELOG.md CONTRIBUTING.md
+include THIRD_PARTY_NOTICES.md
+recursive-include licenses *.txt
 recursive-include docs *.md *.rst *.py *.png
 recursive-include examples *.py
 recursive-include packaging *.py *.spec *.nsi *.md
