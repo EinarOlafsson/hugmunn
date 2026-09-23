@@ -66,7 +66,9 @@ class ServerManager:
             self._spec, self._adopted, self._proc = spec, True, None
             return
 
-        if sys.platform == "win32":
+        from ..config import inference_backend, backend_arguments
+
+        if sys.platform == "win32" or inference_backend() != "auto":
             # Registry scripts use a POSIX shell; native Windows launches the
             # executable with the same model arguments instead.
             command = self._direct_command(spec)
@@ -129,6 +131,7 @@ class ServerManager:
         if override is not None:
             command += ["--model", str(override)]
             report(f"using weights at {override}")
+        command += backend_arguments()
         context = spec.context_arguments()
         if context:
             command += context

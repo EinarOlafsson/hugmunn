@@ -17,7 +17,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+    QComboBox, QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
     QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout,
 )
 
@@ -36,11 +36,14 @@ SEARCH_ROOTS = (
     "~/git/llama.cpp/build/bin", "~/repo/llama.cpp/build/bin",
 )
 
-BUILD_STEPS = """\
-git clone https://github.com/ggml-org/llama.cpp
+
+
+BUILD_STEPS = """git clone https://github.com/ggml-org/llama.cpp
 cd llama.cpp
-cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86
-cmake --build build --config Release -j 16
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j 4
+# Optional: -DGGML_METAL=ON, -DGGML_VULKAN=ON, or
+# -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=native
 """
 
 
@@ -61,7 +64,7 @@ def search() -> list[Path]:
     if on_path := shutil.which("llama-server"):
         add(Path(on_path))
     for root in SEARCH_ROOTS:
-        add(Path(root).expanduser() / "llama-server")
+        add(Path(root).expanduser() / ("llama-server.exe" if os.name == "nt" else "llama-server"))
     return found
 
 
@@ -85,6 +88,7 @@ class RuntimeDialog(QDialog):
         self.setWindowTitle("Set up llama-server")
         self.setMinimumSize(760, 560)
         self._worker: SetupWorker | None = None
+        self._close_requested = False
         self.checks = setup_llama.preflight()
 
         layout = QVBoxLayout(self)
@@ -102,6 +106,21 @@ class RuntimeDialog(QDialog):
         self.plan.setWordWrap(True)
         self.plan.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(self.plan)
+        self.backend = QComboBox()
+        for key, label in (("auto", "Automatic"), ("cpu", "CPU only"), ("cuda", "NVIDIA CUDA"),
+                           ("metal", "Apple Metal"), ("vulkan", "Vulkan (AMD / Intel / NVIDIA)")):
+            self.backend.addItem(label, key)
+        self.backend.setCurrentIndex(max(0, self.backend.findData(config.inference_backend())))
+        layout.addWidget(QLabel("Runtime backend:"))
+        layout.addWidget(self.backend)
+        note = QLabel("Vulkan needs a compatible GPU driver; source builds also need Vulkan headers and glslc. "
+                      "CUDA needs a compatible NVIDIA driver/toolkit. Metal uses shared memory on Apple Silicon. "
+                      "You can also select an existing ROCm or SYCL llama-server below.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        manual = QPushButton("Manual build instructions")
+        manual.clicked.connect(lambda: QMessageBox.information(self, "Build llama.cpp", BUILD_STEPS))
+        layout.addWidget(manual)
 
         # The button that does the whole thing. First, and primary, because it
         # is what almost everyone opening this dialog wants.
@@ -215,25 +234,10 @@ class RuntimeDialog(QDialog):
                 + "\n".join(f"  {p}" for p in found))
 
     def _confirm_prebuilt(self) -> None:
-        """Say what a downloaded build costs before downloading one."""
-        import platform
-
-        if platform.system().lower() == "linux":
-            answer = QMessageBox.question(
-                self, "This will be CPU-only",
-                "llama.cpp publishes prebuilt CUDA binaries for Windows but not "
-                "for Linux, so a downloaded build here cannot use your GPU.\n\n"
-                + (f"That matters: your {self.checks.gpu_name} would sit idle, "
-                   "and a large model on CPU alone is several times slower.\n\n"
-                   if self.checks.has_gpu else "")
-                + "It needs no compiler and takes seconds, so it is a reasonable "
-                  "way to get going.\n\nDownload it?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Cancel if self.checks.can_build_cuda
-                else QMessageBox.StandardButton.Yes,
-            )
-            if answer != QMessageBox.StandardButton.Yes:
-                return
+        """Download the selected backend; automatic chooses CPU or macOS Metal."""
+        if setup_llama.prebuilt_asset_name(self.backend.currentData()) is None:
+            QMessageBox.information(self, "No matching download", "Choose another backend or build from source.")
+            return
         self._start("prebuilt")
 
     def _start(self, mode: str) -> None:
@@ -245,7 +249,7 @@ class RuntimeDialog(QDialog):
             button.setEnabled(False)
         self.close_button.setText("Cancel")
 
-        worker = SetupWorker(mode, self)
+        worker = SetupWorker(mode, self, backend=self.backend.currentData())
         worker.line.connect(self._append)
         worker.ok.connect(self._on_ok)
         worker.failed.connect(self._on_failed)
@@ -265,12 +269,19 @@ class RuntimeDialog(QDialog):
         self.accept()
 
     def _on_failed(self, message: str) -> None:
+        if self._close_requested:
+            return
+        from ..core.reporting import report_error
+        report_error("runtime-setup")
         self._append("")
         self._append(f"FAILED: {message}")
         QMessageBox.critical(self, "Setup failed", message)
 
     def _on_finished(self) -> None:
         self._worker = None
+        if self._close_requested:
+            super().reject()
+            return
         self.build_button.setEnabled(self.checks.can_build)
         self.prebuilt_button.setEnabled(setup_llama.prebuilt_asset_name() is not None)
         self.close_button.setText("Close")
@@ -278,10 +289,14 @@ class RuntimeDialog(QDialog):
 
     def _accept(self) -> None:
         config.set_runtime(self.path_edit.text().strip())
+        config.set_inference_backend(self.backend.currentData())
         self.accept()
 
     def reject(self) -> None:  # noqa: D102 - Qt naming
         if self._worker is not None:
             self._worker.cancel()
-            self._worker.wait(5000)
+            self._close_requested = True
+            self.close_button.setText("Stopping…")
+            self.close_button.setEnabled(False)
+            return
         super().reject()

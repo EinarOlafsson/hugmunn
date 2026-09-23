@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["HUGMUNN_PYTEST_SESSION"] = "1"
 
 
 #: Held for the life of the process. Python may collect the QApplication

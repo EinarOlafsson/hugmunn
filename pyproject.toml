@@ -66,7 +66,7 @@ namespaces = true
 version = {attr = "hugmunn._version.__version__"}
 
 [tool.setuptools.package-data]
-hugmunn = ["skills/*.md", "resources/icons/*.svg", "resources/icons/*.png", "resources/icons/*.ico", "resources/icons/*.icns", "py.typed"]
+hugmunn = ["skills/*.md", "resources/*.txt", "resources/icons/*.svg", "resources/icons/*.png", "resources/icons/*.ico", "resources/icons/*.icns", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

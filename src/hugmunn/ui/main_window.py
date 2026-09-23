@@ -25,7 +25,7 @@ from .. import config
 from ..core import autonomy as autonomykit
 from ..core import cleanup
 from ..core import commands as commandkit
-from ..core import credentials
+from ..core import cli
 from ..core import effort as effortkit
 from ..core import context as contextkit
 from ..core import prompts as promptkit
@@ -181,6 +181,8 @@ class MainWindow(QMainWindow):
         self._remote = None          # core.webserver.RemoteServer, when on
         self._bridge = None          # ui.remote_bridge.RemoteBridge
         self._catalogue_worker = None
+        self._checking_accounts = False
+        self.accounts_checked.connect(self._accounts_ready)
 
         # Restore any cloud catalogue we can reach without blocking startup —
         # the stored list is refreshed in Settings, not on every launch.
@@ -192,6 +194,7 @@ class MainWindow(QMainWindow):
         # a dialog over a blank grey rectangle reads as a crash on startup.
         QTimer.singleShot(300, self._offer_restore)
         QTimer.singleShot(700, self._offer_runtime_setup)
+        QTimer.singleShot(0, self._refresh_catalogues)
 
     # ------------------------------------------------------------------ UI
 
@@ -216,6 +219,9 @@ class MainWindow(QMainWindow):
         settings.setShortcut(QKeySequence("Ctrl+,"))
         settings.triggered.connect(self._open_settings)
         app_menu.addAction(settings)
+        setup = QAction("Welcome and setup…", self)
+        setup.triggered.connect(self._open_setup)
+        app_menu.addAction(setup)
         self.recent_menu = app_menu.addMenu("Recent conversations")
         self.recent_menu.aboutToShow.connect(self._fill_recent_menu)
         app_menu.addSeparator()
@@ -262,6 +268,14 @@ class MainWindow(QMainWindow):
             act = QAction(f"Sign in to {providers.LABELS[provider]}…", self)
             act.triggered.connect(lambda _=False, p=provider: self._sign_in(p))
             accounts.addAction(act)
+        github = QAction("Connect GitHub for reports…", self)
+        github.triggered.connect(lambda: self._open_setup(github=True))
+        accounts.addAction(github)
+        self.report_action = QAction("Automatically report errors to GitHub", self)
+        self.report_action.setCheckable(True)
+        self.report_action.setChecked(self.settings.automatic_reports)
+        self.report_action.toggled.connect(self._set_reporting)
+        accounts.addAction(self.report_action)
         accounts.addSeparator()
         refresh = QAction("Refresh model lists", self)
         refresh.setToolTip("Ask each provider what your key can reach now.")
@@ -880,6 +894,8 @@ class MainWindow(QMainWindow):
             )
 
     def _on_download_failed(self, message: str) -> None:
+        from ..core.reporting import report_error
+        report_error("model-download")
         self.download_progress.setVisible(False)
         self.download_note.setText("")
         self.download_note.setVisible(False)
@@ -1144,7 +1160,7 @@ class MainWindow(QMainWindow):
         self.model_combo.setCurrentIndex(max(0, index))
         self.model_combo.blockSignals(False)
 
-        if not credentials.is_signed_in(provider) and provider not in self._offered_login:
+        if not cli.is_signed_in(provider) and provider not in self._offered_login:
             # The list shown before sign-in is a fallback, so offer the dialog
             # rather than letting the first send fail with a 401. Once per
             # provider: _sign_in refreshes this list when it closes, so
@@ -1233,18 +1249,32 @@ class MainWindow(QMainWindow):
 
     # -------------------------------------------------- accounts and themes
 
+    accounts_checked = Signal()
+
+    def _accounts_ready(self) -> None:
+        self._checking_accounts = False
+        if self._agent_worker is None:
+            self._refresh_models()
+        self._sync_controls()
+
     def _refresh_catalogues(self) -> None:
-        for provider in providers.CLOUD:
-            if credentials.is_signed_in(provider):
-                providers.clear_catalogue(provider)
-        current = self._provider()
-        if current in providers.CLOUD:
-            self._fetch_catalogue(current)
+        if self._checking_accounts:
+            return
+        self._checking_accounts = True
+        def check():
+            for provider in providers.CLOUD:
+                cli.status(provider, refresh=True)
+                cli.refresh_models(provider)
+            try:
+                self.accounts_checked.emit()
+            except RuntimeError:
+                pass
+        threading.Thread(target=check, daemon=True).start()
 
     def _sign_in(self, provider: Provider) -> None:
         dialog = LoginDialog(provider, self)
         dialog.exec()
-        if credentials.is_signed_in(provider):
+        if cli.is_signed_in(provider):
             # Signing out later should be allowed to prompt again.
             self._offered_login.discard(provider)
         if self._provider() == provider:
@@ -1351,6 +1381,23 @@ class MainWindow(QMainWindow):
             self, f"Found {len(found)} model(s)",
             "\n".join(f"{config.by_key(k).label}\n    {v}" for k, v in found.items()),
         )
+
+    def _open_setup(self, checked=False, *, github=False) -> None:
+        """Revisit hardware, accounts, theme and the agreement without losing chats."""
+        from .setup_wizard import SetupWizard
+        wizard = SetupWizard(self.settings, self)
+        if github:
+            wizard.setStartId(3)
+        if wizard.exec() == QDialog.DialogCode.Accepted:
+            self.apply_theme(self.settings.theme)
+            self.report_action.setChecked(self.settings.automatic_reports)
+            self._refresh_models()
+            self._sync_controls()
+
+    def _set_reporting(self, enabled: bool) -> None:
+        """Persist the report preference; acceptance and connected account still gate sending."""
+        self.settings.automatic_reports = enabled
+        self.settings.save()
 
     def _open_settings(self) -> None:
         from .settings_dialog import SettingsDialog
@@ -1478,6 +1525,8 @@ class MainWindow(QMainWindow):
         self._sync_controls()
 
     def _on_server_failed(self, message: str) -> None:
+        from ..core.reporting import report_error
+        report_error("model-start")
         self.server_status.setText("Failed")
         self._sync_controls()
         QMessageBox.critical(self, "Server failed to start", message)
@@ -2212,7 +2261,7 @@ class MainWindow(QMainWindow):
     def _ready_to_send(self) -> bool:
         """A cloud model needs a key; a local one needs a running server."""
         if self._is_cloud():
-            return credentials.is_signed_in(self._provider()) and self._current_spec() is not None
+            return cli.is_signed_in(self._provider()) and self._current_spec() is not None
         return self.server.is_running
 
     def _sync_controls(self) -> None:
@@ -2242,13 +2291,9 @@ class MainWindow(QMainWindow):
             return None
         if not self._is_cloud():
             return LlamaClient(spec.base_url)
-        from ..core import cloud
-
-        provider = self._provider()
-        key = credentials.load(provider)
-        if not key:
+        if not cli.is_signed_in(self._provider()):
             return None
-        return cloud.build(spec, key, self.settings.effort_level)
+        return cli.CliClient(spec, self.settings.effort_level)
 
     def _send(self) -> None:
         if self._agent_worker is not None or not self._ready_to_send():
@@ -2472,6 +2517,8 @@ class MainWindow(QMainWindow):
             self.stats.clear()
 
     def _on_turn_failed(self, message: str) -> None:
+        from ..core.reporting import report_error
+        report_error("model-request")
         self.transcript.add(Notice(message, style.ERR))
         self.transcript.follow()
         self.stats.clear()

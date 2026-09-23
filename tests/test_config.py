@@ -95,13 +95,10 @@ class TestRegistry:
     def test_by_key_unknown(self):
         assert config.by_key("nonexistent") is None
 
-    def test_every_shipped_model_has_tools(self):
-        """Including the abliterated ones — both measured 3/3 structured calls.
+    def test_full_size_models_offer_tools_and_starter_is_chat_only(self):
+        assert all(m.tools_reliable for m in config.REGISTRY if m.key != "qwen-small")
+        assert not config.by_key("qwen-small").tools_reliable
 
-        The tools_reliable flag stays as an escape hatch, but nothing shipped
-        sets it False. If a future model does, test that build first.
-        """
-        assert all(m.tools_reliable for m in config.REGISTRY)
 
 
 class TestSettings:

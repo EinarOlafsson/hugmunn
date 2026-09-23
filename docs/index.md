@@ -8,11 +8,14 @@ Python guide depending on how you want to use it.
 :maxdepth: 2
 
 installation
+setup
+hardware
 desktop
 python-api
 api
 configuration
 model-catalogue
+cli-accounts
 installers
 licensing
 ```

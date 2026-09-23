@@ -386,7 +386,7 @@ def test_a_cpu_only_build_says_so_and_says_what_to_do():
     info = RuntimeInfo(Path("/x"), "version: 1", ())
     assert not info.has_gpu
     assert "CPU-only" in info.summary()
-    assert "CUDA toolkit" in info.summary()
+    assert "Metal" in info.summary() and "Vulkan" in info.summary()
 
 
 def test_a_version_string_alone_does_not_imply_a_gpu():

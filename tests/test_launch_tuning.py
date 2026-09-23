@@ -54,8 +54,9 @@ def test_thinking_models_separate_the_chain_of_thought(key):
 
 
 @pytest.mark.parametrize("key", [s.key for s in config.REGISTRY])
-def test_every_model_quantizes_its_kv_cache(key):
+def test_cuda_models_quantize_their_kv_cache(key, monkeypatch):
     """At 16K context an f16 cache is gigabytes the model needed itself."""
+    monkeypatch.setattr(config, "_INFERENCE_BACKEND", "cuda")
     args = flags(key)
     assert value_of(args, "--cache-type-k") == "q8_0"
     assert value_of(args, "--cache-type-v") == "q8_0"
@@ -72,7 +73,7 @@ def test_models_that_need_system_ram_place_their_experts(key):
 
 def test_no_model_takes_more_than_sixteen_threads():
     for spec in config.REGISTRY:
-        assert value_of(spec.launch_arguments(), "--threads") == "16"
+        assert value_of(spec.launch_arguments(), "--threads") == str(min(16, __import__("os").cpu_count() or 1))
 
 
 # ------------------------------------------- the fallback reaches the wire

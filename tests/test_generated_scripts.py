@@ -10,6 +10,7 @@ invisible.
 from __future__ import annotations
 
 import importlib
+import os
 import stat
 import subprocess
 
@@ -77,12 +78,13 @@ def test_an_existing_script_is_never_overwritten(root):
     assert "my careful tuning" in spec.script_path.read_text()
 
 
-def test_the_tuning_reaches_the_generated_script(root):
+def test_the_tuning_reaches_the_generated_script(root, monkeypatch):
     config, scripts, path = root
+    monkeypatch.setattr(config, "_INFERENCE_BACKEND", "cuda")
     text = scripts.write(prepared(config, path)).read_text()
     assert "--reasoning off" in text
     assert "--cache-type-k q8_0" in text
-    assert "--threads 16" in text
+    assert f"--threads {min(16, os.cpu_count() or 1)}" in text
 
 
 def test_the_expert_split_is_a_variable_not_a_literal(root):

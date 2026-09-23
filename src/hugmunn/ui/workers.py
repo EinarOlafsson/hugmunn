@@ -151,9 +151,10 @@ class SetupWorker(QThread):
     ok = Signal(str)      # path to the binary
     failed = Signal(str)
 
-    def __init__(self, mode: str = "build", parent=None) -> None:
+    def __init__(self, mode: str = "build", parent=None, backend: str = "auto") -> None:
         super().__init__(parent)
         self._mode = mode
+        self._backend = backend
         self._cancel = threading.Event()
 
     def cancel(self) -> None:
@@ -165,7 +166,7 @@ class SetupWorker(QThread):
         action = (setup_llama.download_prebuilt if self._mode == "prebuilt"
                   else setup_llama.build)
         try:
-            binary = action(self.line.emit, cancel=self._cancel)
+            binary = action(self.line.emit, cancel=self._cancel, backend=self._backend)
         except setup_llama.SetupError as exc:
             self.failed.emit(str(exc))
             return

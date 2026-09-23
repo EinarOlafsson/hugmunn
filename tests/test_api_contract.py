@@ -77,11 +77,11 @@ def test_negative_session_limit_is_rejected():
 
 
 def test_cloud_client_receives_requested_effort(monkeypatch):
-    from hugmunn.core import cloud
+    from hugmunn.core import cli
 
-    monkeypatch.setattr(api._credentials, "load", lambda provider: "test-key")
+    monkeypatch.setattr(cli, "status", lambda *a, **kw: cli.Status(True, True, "Connected"))
     build = Mock(return_value=Mock())
-    monkeypatch.setattr(cloud, "build", build)
+    monkeypatch.setattr(cli, "CliClient", build)
     key = hugmunn.models("claude")[0].key
     with hugmunn.agent(key, effort=hugmunn.Effort.EXHAUSTIVE):
         pass

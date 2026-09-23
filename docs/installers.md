@@ -114,7 +114,7 @@ the underlying build tools.
 
 ## Runtime limitations
 
-Cloud chat requires network access and an API key. Local chat requires a
+Cloud chat requires network access, the vendor CLI and an eligible subscription. Local chat requires a
 platform-compatible llama-server binary; on Windows, select `llama-server.exe`
 in runtime setup or through `LLAMA_SERVER`.
 

@@ -23,7 +23,8 @@ what they have seen. Hugmunn takes its name from the pair.
 
 Hugmunn is a desktop application and Python library for working with language
 models. It connects to local models through [llama.cpp](https://github.com/ggml-org/llama.cpp)
-and to cloud models through the Anthropic and OpenAI APIs.
+and to Claude and ChatGPT through the **Claude Code and Codex CLIs**, using
+their subscription logins, as in spaCR. No API key is required.
 
 You can chat, attach instruction packs, let a model read files or run tools,
 and return to saved conversations. The desktop application and Python API use
@@ -31,8 +32,9 @@ the same model clients and tool policies. Local model weights and llama-server
 are separate downloads; they are not included in the Python package or desktop
 installers.
 
-Current additions include **GPT-6 Astra/Sol/Luna**, **Claude Opus 5.5/Fable 5.1**,
-and **Qwen3.8-27B**, including an unlocked variant. See the
+Use **CLI default** for your account’s current Claude or Codex model, or select
+a Claude alias or a model from Codex’s local catalogue. Local additions include
+**Qwen3.8-27B** and unlocked Qwen/Gemma variants. See the
 [model catalogue](docs/model-catalogue.md) for downloads, compatibility and sources.
 
 ## Install
@@ -63,6 +65,56 @@ Linux `.deb`, Windows setup `.exe`, or macOS `.dmg`. These bundle Python and Qt.
 See the [installer guide](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/installers.md)
 for installation, portable bundles, and platform requirements.
 
+## System requirements
+
+**A CUDA GPU is optional.** Cloud models run on the provider's hardware. Local
+models can use CPU, NVIDIA CUDA, Apple Metal, or Vulkan on compatible AMD, Intel
+and NVIDIA devices. An existing ROCm or SYCL llama-server can also be selected.
+
+These are practical starting points, not measured guarantees for every model:
+
+| Use | Minimum starting point | Recommended |
+| --- | --- | --- |
+| Desktop + Claude/Codex | 64-bit, 2 CPU cores, 4 GB RAM, 1 GB free disk, internet, current vendor CLI and eligible subscription | 4 cores, 8 GB RAM, 2 GB free disk |
+| Small local chat (Qwen3.5-0.8B Q4) | 4 GB RAM, 2 GB extra disk for runtime/weights; CPU works | 4+ cores, 8 GB RAM; disable unneeded skills for the 4K context |
+| Local 12B Q5 model | About 9.4 GB weights plus runtime/context; plan for at least 16 GB RAM | 32 GB RAM; 12–16 GB GPU memory or ample unified memory |
+| Local 27B Q5 model | About 20 GB weights; plan for 32 GB RAM and 25 GB extra disk | 64 GB RAM, SSD, 24 GB+ GPU memory or 32–64 GB unified memory |
+| Large 80B–284B MoE models | Model-specific; often 55–128+ GB RAM and 50–100+ GB disk | Check the model card and leave room for context and other applications |
+
+RAM and discrete GPU memory are different pools; their sum is not a guarantee
+that a model fits. Longer contexts consume more memory. CPU inference works but
+large models can be slow. Start with **Qwen3.5-0.8B · small CPU starter** to check
+local setup; use larger models for substantial coding work.
+
+- **Python:** 3.10–3.13 tested; 3.12 recommended. Desktop installers bundle Python.
+- **Linux:** Ubuntu 22.04/24.04 or a compatible recent desktop distribution;
+  X11/Wayland and Qt system libraries. The release installer is x86-64.
+- **macOS:** macOS 13+ for current Qt; Apple Silicon uses Metal and shared RAM.
+  The release installer is ARM64; Intel Macs can install through pip.
+- **Windows:** 64-bit Windows 10 1809+ or Windows 11; Windows 11 recommended.
+  The release installer is x86-64.
+
+OS compatibility also depends on the installed [Qt version](https://doc.qt.io/qt-6/supported-platforms.html)
+and your llama.cpp build. ARM Linux/Windows may use pip where matching Python/Qt
+wheels are available; native ARM installers are not currently built for them.
+See [hardware and runtime setup](docs/hardware.md) for drivers and backend choices.
+
+## First launch
+
+The welcome setup checks CPU, RAM, graphics and free model storage, previews
+themes, and offers optional AI and GitHub sign-in. The last page contains the
+noncommercial license and user agreement. It starts unchecked and must be
+accepted to launch the desktop application. Reopen it from **hugmunn → Welcome
+and setup…**.
+
+Automatic minimal error reports to
+[EinarOlafsson/hugmunn issues](https://github.com/EinarOlafsson/hugmunn/issues)
+are **on by default**, after agreement acceptance and connecting a GitHub account.
+These are public issues under that account. Reports exclude prompts, conversations,
+logs, error messages, file contents, paths and credentials. Turn reporting off in
+setup or **Accounts → Automatically report errors to GitHub**. See
+[setup and reporting](docs/setup.md) for exactly what is collected.
+
 ## First conversation
 
 1. Launch `hugmunn` and choose a provider in the **Model** tab.
@@ -70,8 +122,9 @@ for installation, portable bundles, and platform requirements.
    already have them, use **hugmunn → Find my models…**. Use
    **hugmunn → Set up llama-server…** to select an existing runtime or install one.
 3. For a cloud model, sign in through **Accounts**, then select a model from
-   your account’s list. This requires an API key; a chat subscription alone
-   does not provide API access.
+   the CLI’s list. Install links and browser sign-in are provided. You can also
+   run `claude auth login --claudeai` or `codex login` in a terminal. Your plan’s
+   model access and usage limits apply.
 4. Enter a message and send it with **Ctrl+Enter**.
 
 Local models need enough RAM, GPU memory, and disk space for their weights and

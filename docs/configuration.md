@@ -8,13 +8,13 @@ inheriting the desktop’s current conversation settings.
 
 | Variable | Default or purpose |
 | --- | --- |
-| `HUGMUNN_CONFIG_DIR` | `~/.config/hugmunn`; settings, credentials fallback, and sessions |
+| `HUGMUNN_CONFIG_DIR` | `~/.config/hugmunn`; settings and sessions |
 | `HUGMUNN_MODELS_ROOT` | `~/.claude/models`; registered model files and launch scripts |
 | `HUGMUNN_DATA_DIR` | `~/.local/share/hugmunn`; downloaded or built llama.cpp runtime |
 | `LLAMA_SERVER` | Path to an existing llama-server executable |
 | `HUGMUNN_PYTHON` | External Python executable for snippets in frozen desktop builds |
-| `ANTHROPIC_API_KEY` | Anthropic key; overrides a stored key |
-| `OPENAI_API_KEY` | OpenAI key; overrides a stored key |
+| `CODEX_HOME` | Optional existing Codex configuration/login folder, managed by Codex |
+| `CLAUDE_CONFIG_DIR` | Optional existing Claude Code configuration/login folder |
 
 These defaults are currently used on all operating systems. If the old
 `~/.config/localagent` directory exists and `~/.config/hugmunn` does not, the
@@ -26,19 +26,16 @@ Use absolute paths in environment variables. A runtime selected in Settings
 takes precedence over automatic discovery; otherwise Hugmunn checks the
 environment, managed runtime, PATH, and known local build locations.
 
-## Credentials
+## CLI accounts
 
-For system keyring support, install:
+Claude Code and Codex own their login stores. Hugmunn runs their browser login
+and local status commands; it does not read tokens or save new API keys.
+API-key environment overrides are excluded from child requests and API-key
+login is rejected. Keys saved by earlier Hugmunn releases are left untouched
+but are no longer used. Manage or remove those old keys in the original keyring
+or `credentials.json` file if desired.
 
-```bash
-python -m pip install ".[keyring]"
-```
-
-When a working keyring backend is unavailable, Hugmunn writes
-`credentials.json` in the configuration directory and requests owner-only file
-permissions. That file is not encrypted. On Windows, access also depends on the
-user profile’s filesystem permissions. Keys are not stored in `settings.json`.
-Environment credentials take precedence over both storage backends.
+See [CLI accounts](cli-accounts.md) for installation and login commands.
 
 ## Skills and custom tools
 
@@ -67,3 +64,11 @@ Python agents keep history in memory until `save()` is called. `save(path)`
 writes an explicit JSON file; `save()` creates a file in the sessions directory.
 `load(path)` replaces message history while keeping the receiving agent’s model
 and settings. See the [API guide](python-api.md).
+
+## Setup preferences
+
+`runtime_backend` is `auto`, `cpu`, `cuda`, `metal` or `vulkan`.
+`agreement_version` and `agreement_accepted_at` record desktop agreement
+acceptance. `automatic_reports` defaults to true; reports additionally require
+acceptance and a verified `github_account`. No GitHub token is stored here.
+Use Welcome and setup or Accounts to change these preferences.

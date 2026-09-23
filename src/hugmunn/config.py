@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import re
 import shutil
 from dataclasses import asdict, dataclass, field
@@ -189,6 +190,30 @@ def set_runtime(path: str | Path | None) -> None:
     _RUNTIME_PATH = Path(path).expanduser() if path else None
 
 
+_INFERENCE_BACKEND = "auto"
+
+
+def set_inference_backend(backend: str) -> None:
+    """Choose launch tuning; the selected llama-server must support this backend."""
+    global _INFERENCE_BACKEND
+    _INFERENCE_BACKEND = backend if backend in ("auto", "cpu", "cuda", "metal", "vulkan") else "auto"
+
+
+def inference_backend() -> str:
+    """Return the active local launch preference."""
+    return _INFERENCE_BACKEND
+
+
+def backend_arguments() -> list[str]:
+    """Portable cache settings, with explicit CPU mode when requested."""
+    cuda = _INFERENCE_BACKEND == "cuda" or (_INFERENCE_BACKEND == "auto" and shutil.which("nvidia-smi"))
+    args = ["--flash-attn", "on" if cuda else "auto", "--cache-type-k", "q8_0" if cuda else "f16",
+            "--cache-type-v", "q8_0" if cuda else "f16"]
+    if _INFERENCE_BACKEND == "cpu":
+        args += ["--n-gpu-layers", "0"]
+    return args
+
+
 def runtime_override() -> Path | None:
     return _RUNTIME_PATH
 
@@ -226,14 +251,15 @@ def find_runtime() -> Path | None:
     env = os.environ.get("LLAMA_SERVER", "").strip()
     if env and (found := usable(env)):
         return found
-    if found := usable(models_root() / "bin" / "llama-server"):
+    executable = "llama-server.exe" if os.name == "nt" else "llama-server"
+    if found := usable(models_root() / "bin" / executable):
         return found
     # What hugmunn built for itself. Ahead of PATH because a build made
     # for this machine's GPU beats whatever generic binary happens to be
     # installed system-wide.
     data_dir = os.environ.get(
         "HUGMUNN_DATA_DIR", str(Path.home() / ".local" / "share" / "hugmunn"))
-    if found := usable(Path(data_dir) / "bin" / "llama-server"):
+    if found := usable(Path(data_dir) / "bin" / executable):
         return found
     if which := shutil.which("llama-server"):
         return Path(which)
@@ -366,20 +392,15 @@ class ModelSpec:
         an apparently broken one.
         """
         args = ["--fit", "on", "--ctx-size", str(self.effective_ctx_size),
-                "--flash-attn", "on",
-                # Halves the KV cache. At 16K context that is gigabytes, and
-                # on a card the model already nearly fills it is the
-                # difference between fitting and spilling.
-                "--cache-type-k", "q8_0", "--cache-type-v", "q8_0",
-                "--jinja", "--threads", "16",
+                "--jinja", "--threads", str(min(16, os.cpu_count() or 1)),
                 "--reasoning", self.reasoning]
         if self.reasoning == "auto":
             # Without this the chain of thought is not separated out and
             # lands in the visible answer.
             args += ["--reasoning-format", "deepseek"]
-        if self.n_cpu_moe:
+        if self.n_cpu_moe and inference_backend() not in ("cpu", "metal", "vulkan") and platform.system() != "Darwin":
             args += ["--n-gpu-layers", "999", "--n-cpu-moe", str(self.n_cpu_moe)]
-        return args
+        return args + backend_arguments()
 
     @property
     def context_tokens(self) -> int:
@@ -504,6 +525,13 @@ class ModelSpec:
 
 # Mirrors ~/.claude/models/scripts/. Ports match the --port in each script.
 REGISTRY: tuple[ModelSpec, ...] = (
+    ModelSpec(
+        key="qwen-small", label="Qwen3.5-0.8B · small CPU starter",
+        script="qwen-small.sh", port=8107,
+        blurb="Basic text chat on modest hardware. Larger models are recommended for coding and tools.",
+        repo="unsloth/Qwen3.5-0.8B-GGUF", files=("Qwen3.5-0.8B-Q4_K_M.gguf",),
+        download_gb=0.53, ctx_size=4096, reasoning="off", tools_reliable=False,
+    ),
     ModelSpec(
         key="write",
         freedom="vanilla",
@@ -959,6 +987,13 @@ class Settings:
     cloud_models: dict[str, str] = field(default_factory=dict)
     # One of ui.theme.THEMES, or "system".
     theme: str = "dark"
+    #: Runtime/launch preference; auto lets llama.cpp fit supported devices.
+    runtime_backend: str = "auto"
+    agreement_version: str = ""
+    agreement_accepted_at: str = ""
+    automatic_reports: bool = True
+    #: Explicitly connected account; auth remains managed by GitHub CLI.
+    github_account: str = ""
     #: Height of the message box, in pixels. Dragged, and remembered.
     composer_height: int = 110
     # Context window per model, when the user has overridden the default.
@@ -991,11 +1026,13 @@ class Settings:
             settings.autonomy_level = 1
             settings.auto_approve_reads = True
         set_runtime(settings.llama_server or None)
+        set_inference_backend(settings.runtime_backend)
         for key, size in (settings.context_sizes or {}).items():
             set_context_size(key, size)
         return settings
 
     def save(self) -> None:
+        self.runtime_backend = inference_backend()
         self.model_paths = all_model_paths()
         self.llama_server = str(runtime_override() or "")
         self.context_sizes = all_context_sizes()

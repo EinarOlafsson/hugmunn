@@ -176,10 +176,7 @@ def openai_effort(level: Effort) -> str:
 
 def cloud_note(level: Effort, provider: str) -> str:
     """One line for the sidebar saying what the tier does on this provider."""
-    if provider == "anthropic":
-        budget = anthropic_budget(level)
-        return ("Thinking off." if not budget
-                else f"Up to {budget:,} thinking tokens per turn.")
-    if provider == "openai":
-        return f"reasoning_effort = {openai_effort(level)}."
+    if provider in ("anthropic", "openai"):
+        effort = ("low", "medium", "high", "xhigh")[int(level) - 1]
+        return f"CLI reasoning effort: {effort}. Availability depends on the selected model."
     return "Prompt-only on local models — they have no thinking dial."

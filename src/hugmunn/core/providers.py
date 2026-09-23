@@ -1,17 +1,4 @@
-"""Who serves a model: this machine, Anthropic, or OpenAI.
-
-The model picker is two levels — provider first, then the model within it —
-because the three lists have nothing to do with each other. A local model is
-chosen by what fits in 24 GB of VRAM; a cloud model is chosen by price and
-capability. Flattening them into one dropdown of thirty entries would make
-both choices harder.
-
-The catalogue here is a *fallback*, not the authority. Both providers expose
-their own list, and :func:`fetch_catalogue` replaces this one as soon as the
-user signs in — so a model released after this file was written still shows up,
-and one the account cannot reach does not. Hardcoding the list would mean
-shipping a lie with a shelf life.
-"""
+"""Local models and CLI model metadata. Legacy API catalogue helpers remain internal."""
 
 from __future__ import annotations
 
@@ -36,14 +23,14 @@ class Provider(str, Enum):
 
 LABELS = {
     Provider.LOCAL: "Local models",
-    Provider.ANTHROPIC: "Claude",
-    Provider.OPENAI: "ChatGPT",
+    Provider.ANTHROPIC: "Claude Code",
+    Provider.OPENAI: "ChatGPT · Codex",
 }
 
 BLURBS = {
     Provider.LOCAL: "Runs on this machine. Nothing leaves it.",
-    Provider.ANTHROPIC: "Anthropic's API. Prompts and tool results are sent to Anthropic.",
-    Provider.OPENAI: "OpenAI's API. Prompts and tool results are sent to OpenAI.",
+    Provider.ANTHROPIC: "Claude Code subscription login. Prompts and tool results are sent to Anthropic.",
+    Provider.OPENAI: "Codex subscription login. Prompts and tool results are sent to OpenAI.",
 }
 
 #: Where to get a key, shown in the sign-in dialog.
@@ -95,8 +82,8 @@ class CloudModel:
         return 0.0
 
     def is_available(self) -> bool:
-        """True once a key for this provider is stored."""
-        from .credentials import is_signed_in
+        """True after a CLI subscription login has been checked."""
+        from .cli import is_signed_in
 
         return is_signed_in(self.provider)
 
@@ -141,7 +128,8 @@ def models_for(provider: Provider) -> tuple[CloudModel, ...]:
     """Every model this provider offers, live list preferred."""
     if provider == Provider.LOCAL:
         return ()
-    return _LIVE.get(provider) or FALLBACK.get(provider, ())
+    from .cli import refresh_models
+    return _LIVE.get(provider) or refresh_models(provider)
 
 
 def set_catalogue(provider: Provider, models: tuple[CloudModel, ...]) -> None:

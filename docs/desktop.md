@@ -7,7 +7,7 @@
 Choose a provider and model in the **Model** tab. Local entries are grouped by
 registry metadata: Stock, Tuned, and Unlocked. These labels describe the
 weights’ origin or modification; they do not measure quality or reliability.
-Cloud entries come from a cached provider catalogue and can be refreshed from
+Claude entries use CLI aliases; Codex entries come from its local model cache and can be refreshed from
 **Accounts**.
 
 Write in the message box and use **Ctrl+Enter** to send. **Ctrl+L** starts a new

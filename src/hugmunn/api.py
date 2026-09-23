@@ -19,7 +19,7 @@ from .core.providers import ProviderError
 from . import config as _config
 from .core import agent as _agent
 from .core import autonomy as _autonomy
-from .core import credentials as _credentials
+from .core import cli as _cli
 from .core import effort as _effort
 from .core import persistence as _persistence
 from .core import providers as _providers
@@ -137,7 +137,7 @@ def _wrap_cloud(model) -> Model:
     return Model(
         key=f"{provider}:{model.id}", label=model.label, provider=provider,
         freedom="vanilla", context=model.context, description=model.blurb,
-        downloaded=_credentials.is_signed_in(model.provider),
+        downloaded=_cli.is_signed_in(model.provider),
     )
 
 
@@ -145,14 +145,16 @@ def models(provider: str | None = None) -> list[Model]:
     """Return registered models without making network requests.
 
     Args:
-        provider: Filter by ``"local"``, ``"claude"``, or ``"chatgpt"``;
+        provider: Filter by ``"local"``, ``"claude"``, ``"codex"`` or ``"chatgpt"``;
             ``None`` includes all providers. Unknown values return an empty list.
 
     Returns:
         Model metadata, including download status and context capacity.
-        Cloud entries use the cached catalogue or the built-in fallback.
+        Cloud entries use Claude aliases and the local Codex model cache.
         Call :func:`sign_in` to refresh an account's catalogue.
     """
+    if provider == "codex":
+        provider = "chatgpt"
     # Restore paths chosen in the desktop before inspecting local availability.
     _config.Settings.load()
     out = [_wrap_local(s) for s in _config.REGISTRY]
@@ -164,7 +166,7 @@ def models(provider: str | None = None) -> list[Model]:
 def available_models() -> list[Model]:
     """Return local models with weights and a launch path, plus signed-in cloud models.
 
-    This checks local files and credentials, not memory capacity, server health,
+    This checks local files and cached CLI login status, not memory capacity, server health,
     network connectivity, or API quota.
     """
     return [m for m in models()
@@ -185,36 +187,27 @@ def tool_names() -> list[str]:
     return sorted(_tools.by_name())
 
 
-def sign_in(provider: str, api_key: str) -> int:
-    """Validate and store an API key, then cache the provider's model catalogue.
+def sign_in(provider: str, api_key: str | None = None) -> int:
+    """Check a CLI subscription login and refresh its local model catalogue.
 
-    Args:
-        provider: ``"claude"``/``"anthropic"`` or ``"chatgpt"``/``"openai"``.
-        api_key: A provider API key. A chat subscription is not an API key.
-
-    Returns:
-        Number of models returned by the provider. Model listing does not
-        guarantee that every listed model supports chat or is available to use.
-
-    Raises:
-        ModelNotFound: The provider name is unknown.
-        ProviderError: The catalogue request failed or the key was rejected.
-
-    Keys use the system keyring when available, otherwise a local credentials
-    file. This function makes a blocking network request.
+    First run ``claude auth login --claudeai`` or ``codex login`` in a terminal,
+    or connect the account in the desktop app. Tokens stay with the vendor CLI.
+    This bounded status check returns the number of model choices. ``api_key``
+    is rejected: Hugmunn no longer uses direct paid APIs for these providers.
+    Provider aliases include claude/anthropic and codex/chatgpt/openai.
     """
     resolved = _resolve_provider(provider)
-    found = _providers.fetch_catalogue(resolved, api_key)
-    _credentials.store(resolved, api_key)
-    return len(found)
+    if api_key is not None:
+        raise ValueError("Use the Claude Code or Codex subscription login, not an API key.")
+    result = _cli.status(resolved, refresh=True)
+    if not result.signed_in:
+        raise HugmunnError(result.message + ". Sign in through the CLI first.")
+    return len(_cli.refresh_models(resolved))
 
 
 def signed_in(provider: str) -> bool:
-    """Check for a stored or environment API key without validating it online.
-
-    Accepts the same provider aliases as :func:`sign_in`.
-    """
-    return _credentials.is_signed_in(_resolve_provider(provider))
+    """Check the vendor CLI's subscription login (bounded local subprocess)."""
+    return _cli.status(_resolve_provider(provider), refresh=True).signed_in
 
 
 def _resolve_provider(name: str):
@@ -223,6 +216,7 @@ def _resolve_provider(name: str):
         "anthropic": _providers.Provider.ANTHROPIC,
         "chatgpt": _providers.Provider.OPENAI,
         "openai": _providers.Provider.OPENAI,
+        "codex": _providers.Provider.OPENAI,
     }
     resolved = mapping.get((name or "").strip().lower())
     if resolved is None:
@@ -340,6 +334,8 @@ class Agent:
 
     @staticmethod
     def _resolve(key: str) -> Model:
+        if key.startswith("codex:"):
+            key = "chatgpt:" + key.split(":", 1)[1]
         for candidate in models():
             if candidate.key == key:
                 return candidate
@@ -350,16 +346,13 @@ class Agent:
     def _client(self, start_server: bool):
         if not self.model.is_local:
             resolved = _resolve_provider(self.model.provider)
-            api_key = _credentials.load(resolved)
-            if not api_key:
+            if not _cli.status(resolved, refresh=True).signed_in:
                 raise HugmunnError(
-                    f"not signed in to {self.model.provider}. Call "
-                    f"hugmunn.sign_in({self.model.provider!r}, key) first.")
-            from .core import cloud
-
+                    f"Not signed in to {self.model.provider}. Run the CLI login, then "
+                    f"hugmunn.sign_in({self.model.provider!r}).")
             spec = _providers.by_key(
                 f"{resolved.value}:{self.model.key.split(':', 1)[1]}")
-            return cloud.build(spec, api_key, effort_level=int(self._effort))
+            return _cli.CliClient(spec, effort_level=int(self._effort))
 
         from .core.client import LlamaClient
 

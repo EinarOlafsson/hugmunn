@@ -64,6 +64,27 @@ def main(argv: list[str] | None = None) -> int:
     app.setStyleSheet(theme.stylesheet())
     app.setWindowIcon(window_icon())
 
+    if not options.smoke_test:
+        from .core.onboarding import needs_setup
+        from .ui.setup_wizard import SetupWizard
+        from PySide6.QtWidgets import QDialog
+
+        settings = Settings.load()
+        if needs_setup(settings):
+            app.setQuitOnLastWindowClosed(False)
+            if SetupWizard(settings).exec() != QDialog.DialogCode.Accepted:
+                return 0
+            app.setQuitOnLastWindowClosed(True)
+        from .core.reporting import report_error
+        original_hook = sys.excepthook
+
+        def report_exception(kind, value, traceback):
+            original_hook(kind, value, traceback)
+            if not issubclass(kind, (KeyboardInterrupt, SystemExit)):
+                report_error("unexpected", value)
+
+        sys.excepthook = report_exception
+
     window = MainWindow()
     window.show()
 
@@ -86,7 +107,10 @@ def main(argv: list[str] | None = None) -> int:
     idle.start(250)
     idle.timeout.connect(lambda: None)
 
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        sys.excepthook = original_hook
 
 
 if __name__ == "__main__":

@@ -13,8 +13,8 @@ from PySide6.QtWidgets import (
     QMessageBox, QPushButton, QTabWidget, QVBoxLayout, QWidget,
 )
 
-from ..core import cleanup, credentials, providers
-from ..core.providers import BLURBS, CONSOLE_URLS, LABELS, Provider
+from ..core import cleanup, cli, providers
+from ..core.providers import BLURBS, LABELS, Provider
 from . import theme
 from .login_dialog import LoginDialog
 
@@ -99,7 +99,7 @@ class SettingsDialog(QDialog):
 
         intro = QLabel(
             "Local models need no account and send nothing anywhere. Claude and "
-            "ChatGPT need an API key, and every prompt — plus anything a tool "
+            "Codex use CLI subscription logins, and every prompt — plus anything a tool "
             "reads for them — goes to that provider."
         )
         intro.setWordWrap(True)
@@ -123,15 +123,14 @@ class SettingsDialog(QDialog):
             grid.addWidget(button, row * 2, 2)
             setattr(self, f"_btn_{provider.value}", button)
 
-            blurb = QLabel(BLURBS[provider] + f"  Keys: {CONSOLE_URLS[provider]}")
+            blurb = QLabel(BLURBS[provider])
             blurb.setObjectName("blurb")
             blurb.setWordWrap(True)
             grid.addWidget(blurb, row * 2 + 1, 1, 1, 2)
         layout.addLayout(grid)
 
         storage = QLabel(
-            f"Keys are kept in <b>{credentials.backend_name()}</b> and never "
-            f"written to settings.json."
+            "Claude Code and Codex own their login stores. Hugmunn does not save API keys."
         )
         storage.setObjectName("blurb")
         storage.setWordWrap(True)
@@ -146,20 +145,8 @@ class SettingsDialog(QDialog):
         for provider, label in self._account_rows.items():
             button = getattr(self, f"_btn_{provider.value}")
             count = len(providers.models_for(provider))
-            if credentials.is_signed_in(provider):
-                source = (" (from the environment)" if credentials.from_env(provider)
-                          else "")
-                label.setText(
-                    f"<span style='color:{palette['success']}'>Signed in</span> as "
-                    f"{credentials.masked(provider)}{source} · {count} models available"
-                )
-                button.setText("Change key…")
-            else:
-                label.setText(
-                    f"<span style='color:{palette['fg_dim']}'>Not signed in</span> — "
-                    f"{count} models listed until you do"
-                )
-                button.setText("Sign in…")
+            label.setText(cli.status(provider).message + f" · {count} model choices")
+            button.setText("Check connection…" if cli.is_signed_in(provider) else "Sign in…")
 
     def _sign_in(self, provider: Provider) -> None:
         dialog = LoginDialog(provider, self)

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.0.0.11
+
+- Replace desktop and Python Claude/OpenAI API calls with Claude Code/Codex
+  subscription CLIs, browser login and local model discovery. Keep Hugmunn
+  tool approvals and cancellation; old API keys are no longer used.
+
+- Add first-run hardware checks, theme previews, optional AI/GitHub sign-in and
+  a final versioned user agreement with the complete noncommercial license.
+- Default minimal public error reports to the Hugmunn issue tracker, gated by
+  accepted terms and an explicitly connected GitHub account, with an opt-out.
+- Support CPU, Metal and Vulkan runtime setup alongside CUDA; fix current
+  tar.gz/zip downloads, Windows executable handling and shared-library layout.
+- Add a small Qwen3.5-0.8B CPU starter model and publish minimum/recommended
+  system requirements, backend prerequisites and privacy documentation.
+
 ## 0.0.0.10
 
 - Add GPT-6 Astra, Sol and Luna with streaming Responses API tool support.

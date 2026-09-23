@@ -15,8 +15,8 @@ for model in hugmunn.models():
 ready = hugmunn.available_models()
 ```
 
-`models()` lists registered local models and the in-memory cloud catalogue, or
-a built-in fallback if no catalogue has been fetched. It does not make network
+`models()` lists registered local models, Claude aliases and Codex’s locally
+cached models. It does not make network
 requests. `available_models()` checks local weights and launch prerequisites,
 or the presence of a cloud key. It does not test available memory, credentials
 against the provider, or API quota.
@@ -75,28 +75,30 @@ retains conversation history between calls and is not safe for concurrent runs.
 
 ## Cloud models
 
-Read a key from the environment and discover current model IDs through the
-provider instead of copying an ID from an old example:
+First run `claude auth login --claudeai` or `codex login` in your terminal.
+Hugmunn uses the same subscription login as the vendor CLI:
 
 ```python
-import os
 import hugmunn
 
-hugmunn.sign_in("claude", os.environ["ANTHROPIC_API_KEY"])
+hugmunn.sign_in("claude")  # check the CLI login; does not open a browser
 for model in hugmunn.models("claude"):
     print(model.key, model.label)
+
+with hugmunn.agent("claude:default") as assistant:
+    print(assistant.ask("Explain this project in one paragraph."))
 ```
 
-Pass a printed key, including its `claude:` prefix, to `hugmunn.agent`. For
-OpenAI, use `sign_in("chatgpt", os.environ["OPENAI_API_KEY"])` and
-`models("chatgpt")`. `anthropic` and `openai` are also accepted by credential
-functions; the discovery filters and public model keys use `claude` and
-`chatgpt`.
+For Codex, use `hugmunn.sign_in("codex")`, `models("codex")`, and
+`hugmunn.agent("codex:default")`. Existing `chatgpt:` model keys remain accepted.
+`anthropic` and `openai` remain aliases for account functions.
 
-`sign_in()` makes a blocking request, stores a validated key, and refreshes the
-in-memory catalogue. `signed_in()` only checks for a key. Environment keys can
-be used without storing them, but call `sign_in()` if you need to discover model
-IDs beyond the built-in fallback. Cloud calls can incur provider charges.
+`sign_in()` checks local CLI authentication and refreshes the local model list.
+`signed_in()` also runs a bounded status command. Neither stores credentials.
+The former `sign_in(provider, api_key)` form now raises `ValueError` with login
+instructions. Old saved API keys are ignored. Subscription limits still apply.
+CLI replies arrive when each structured response finishes, rather than token
+by token. Tool calls still pass through Hugmunn's approval policy.
 
 ## Tools and approval
 
@@ -173,7 +175,7 @@ specific response:
 - `ModelNotFound`: unknown model key or credential provider.
 - `ApprovalRequired`: a tool needs approval but no callback was supplied.
 - `ServerError`: a local server failed to start or become ready.
-- `ProviderError`: cloud catalogue lookup or credential validation failed.
+- `ProviderError`: CLI login or provider request failed.
 
 Invalid tier values, skill names, and tool names raise `ValueError` before a
 server is started. File operations can raise ordinary Python filesystem errors.

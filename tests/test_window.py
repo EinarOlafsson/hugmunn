@@ -70,7 +70,7 @@ def test_the_window_builds(window):
 def test_the_provider_dropdown_offers_exactly_local_claude_and_chatgpt(window):
     labels = [window.provider_combo.itemText(i)
               for i in range(window.provider_combo.count())]
-    assert labels == ["Local models", "Claude", "ChatGPT"]
+    assert labels == ["Local models", "Claude Code", "ChatGPT · Codex"]
 
 
 def test_switching_provider_replaces_the_model_list(window):
@@ -88,15 +88,16 @@ def test_switching_provider_replaces_the_model_list(window):
     gpt = {window.model_combo.itemText(i) for i in range(window.model_combo.count())}
 
     assert local and claude and gpt
-    assert not (local & claude) and not (claude & gpt)
+    assert not (local & claude) and (claude & gpt) == {"CLI default"}
 
 
-def test_more_than_one_model_is_offered_per_cloud_provider(window):
-    """Not just the flagship — the user asked for all of them."""
+def test_cli_default_is_offered_without_an_account_catalogue(window, tmp_path, monkeypatch):
+    from hugmunn.core import providers
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "empty-codex"))
     for provider in (Provider.ANTHROPIC, Provider.OPENAI):
-        window.provider_combo.setCurrentIndex(
-            window.provider_combo.findData(provider.value))
-        assert window.model_combo.count() >= 3
+        providers.clear_catalogue(provider)
+        window.provider_combo.setCurrentIndex(window.provider_combo.findData(provider.value))
+        assert window.model_combo.findData(f"{provider.value}:default") >= 0
 
 
 def test_a_cloud_model_hides_the_server_controls(window):
@@ -135,42 +136,30 @@ def test_sending_is_blocked_until_a_cloud_provider_is_signed_in(window):
 
 
 def test_signing_in_unblocks_sending_and_builds_the_right_client(window, monkeypatch):
-    from hugmunn.core import cloud, credentials
-
-    credentials.store(Provider.ANTHROPIC, "sk-ant-test-key-abcdefgh")
-    try:
-        window.provider_combo.setCurrentIndex(
-            window.provider_combo.findData(Provider.ANTHROPIC.value))
-        assert window._ready_to_send()
-        assert isinstance(window._build_client(), cloud.AnthropicClient)
-    finally:
-        credentials.clear(Provider.ANTHROPIC)
+    from hugmunn.ui.main_window import cli
+    monkeypatch.setattr(cli, "is_signed_in", lambda p: True)
+    window.provider_combo.setCurrentIndex(window.provider_combo.findData(Provider.ANTHROPIC.value))
+    assert window._ready_to_send()
+    assert isinstance(window._build_client(), cli.CliClient)
 
 
-def test_the_effort_tier_reaches_the_client_as_a_thinking_budget(window):
-    from hugmunn.core import credentials, effort as effortkit
-
-    credentials.store(Provider.ANTHROPIC, "sk-ant-test-key-abcdefgh")
-    try:
-        window.provider_combo.setCurrentIndex(
-            window.provider_combo.findData(Provider.ANTHROPIC.value))
-        window.effort_combo.setCurrentIndex(
-            window.effort_combo.findData(int(effortkit.Effort.EXHAUSTIVE)))
-        client = window._build_client()
-        assert client.thinking_budget == effortkit.anthropic_budget(
-            effortkit.Effort.EXHAUSTIVE)
-    finally:
-        credentials.clear(Provider.ANTHROPIC)
+def test_the_effort_tier_reaches_the_cli(window, monkeypatch):
+    from hugmunn.ui.main_window import cli
+    from hugmunn.core import effort as effortkit
+    monkeypatch.setattr(cli, "is_signed_in", lambda p: True)
+    window.provider_combo.setCurrentIndex(window.provider_combo.findData(Provider.ANTHROPIC.value))
+    window.effort_combo.setCurrentIndex(window.effort_combo.findData(int(effortkit.Effort.EXHAUSTIVE)))
+    assert window._build_client().effort_level == int(effortkit.Effort.EXHAUSTIVE)
 
 
 def test_the_effort_blurb_says_what_the_tier_does_on_this_provider(window):
     window.provider_combo.setCurrentIndex(
         window.provider_combo.findData(Provider.ANTHROPIC.value))
-    assert "thinking tokens" in window.effort_blurb.text()
+    assert "CLI reasoning effort" in window.effort_blurb.text()
 
     window.provider_combo.setCurrentIndex(
         window.provider_combo.findData(Provider.OPENAI.value))
-    assert "reasoning_effort" in window.effort_blurb.text()
+    assert "CLI reasoning effort" in window.effort_blurb.text()
 
     window.provider_combo.setCurrentIndex(
         window.provider_combo.findData(Provider.LOCAL.value))
@@ -232,9 +221,8 @@ def test_the_login_dialog_builds_for_both_providers(window):
 
     for provider in (Provider.ANTHROPIC, Provider.OPENAI):
         dialog = LoginDialog(provider, window)
-        assert not dialog.verify.isEnabled()      # nothing typed yet
-        dialog.key_edit.setText("sk-ant-something-long-enough")
-        assert dialog.verify.isEnabled()
+        assert not hasattr(dialog, "key_edit")
+        assert dialog.login.text() == "Sign in with browser"
         dialog.close()
 
 

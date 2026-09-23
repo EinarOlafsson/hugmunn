@@ -42,7 +42,8 @@ Upgrade with `python -m pip install --upgrade hugmunn`.
 
 An existing runtime can also be selected with `LLAMA_SERVER`. A runtime build
 needs Git, CMake, and a C++ compiler; CUDA builds also need a compatible CUDA
-toolkit. Available prebuilt binaries and GPU backends depend on the platform.
+toolkit. CPU, Metal and Vulkan are also available in runtime setup. See the
+[hardware guide](hardware.md) for prerequisites and memory estimates.
 Use the [llama.cpp build instructions](https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md)
 for manual builds.
 
@@ -56,13 +57,20 @@ weights. Configure the runtime and weights before constructing a local agent.
 
 ## Cloud models
 
-Use **Accounts → Sign in…** and enter the provider API key. Signing in validates
-the key by fetching the model catalogue. Use **Accounts → Refresh model lists**
-to update it later. The provider must allow API access, with any required billing
-configured; chat subscriptions are separate.
+Install the current [Claude Code](https://code.claude.com/docs/en/setup) or
+[Codex CLI](https://developers.openai.com/codex/cli/), then open **Accounts →
+Sign in…**. The dialog starts the CLI's browser login and checks its status.
+You can also run these in a terminal:
 
-`ANTHROPIC_API_KEY` and `OPENAI_API_KEY` can supply credentials from the
-environment. The [configuration guide](configuration.md) describes storage.
+```bash
+claude auth login --claudeai
+codex login
+```
+
+Choose **CLI default**, a Claude model alias, or a model from Codex's local
+cache. **Accounts → Refresh model lists** rechecks sign-in and reloads that cache.
+A plan with access to the selected CLI/model is required; usage limits apply.
+See [CLI accounts](cli-accounts.md) for behavior, tools and troubleshooting.
 
 ## Troubleshooting
 
@@ -72,7 +80,7 @@ environment. The [configuration guide](configuration.md) describes storage.
 | Qt cannot load `xcb` | Install your distribution’s Qt/X11 runtime libraries. On Ubuntu, these commonly include `libxcb-cursor0`, `libxkbcommon-x11-0`, `libegl1`, and `libgl1`. |
 | A local model is unavailable | Confirm both weights and a working llama-server or launch script are present. |
 | llama-server exits while loading | Check free RAM/VRAM and the runtime log; try a smaller model or context. |
-| Cloud authentication fails | Check the provider, key, API billing, and environment overrides. |
+| Cloud authentication fails | Run the CLI login/status command; check plan access and usage limits, and update the CLI. |
 | The application crashes after another GUI package is imported | Run Hugmunn in its own environment and avoid mixing PySide6 with PyQt6. |
 
 `QT_QPA_PLATFORM=offscreen` is useful for automated checks, not for normal

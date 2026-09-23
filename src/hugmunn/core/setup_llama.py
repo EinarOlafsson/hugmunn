@@ -1,27 +1,8 @@
-"""Get a working llama-server onto this machine, from inside the app.
+"""Install llama-server for CPU, CUDA, Apple Metal or Vulkan.
 
-Everything else hugmunn needs is either portable or downloadable. The
-binary is neither: it is compiled against this machine's CPU features and CUDA
-version, so it cannot ship with the app, cannot live in the models repo, and
-cannot be copied from the machine that already works. That is the whole reason
-a second machine ends up with 87 GB of correct weights and nothing to run.
-
-So this builds it. Not a shell script the user has to find and run -- the
-machine that needs this is the one where the models repo may not be cloned at
-all, which makes "run the script in the repo" circular.
-
-Two routes, and the choice is not a preference:
-
-* **Build from source** is the only way to get GPU support on Linux. llama.cpp
-  publishes prebuilt CUDA binaries for Windows but not for Linux, so a
-  downloaded Linux build is CPU-only. On a 24 GB card that is the difference
-  between 37 tok/s and something not worth waiting for.
-* **Download a prebuilt** needs no toolchain at all, which matters on a
-  managed machine where installing cmake means filing a ticket. It is offered
-  as CPU-only, said plainly, rather than presented as equivalent.
-
-Everything is installed under the user's own data directory rather than into
-the models repo, so this works whether or not that repo exists.
+Source builds select a backend explicitly and reset cached CMake GPU options.
+Official prebuilt archives are matched to OS, architecture and backend. An
+existing ROCm or SYCL build can also be selected in the runtime dialog.
 """
 
 from __future__ import annotations
@@ -47,7 +28,7 @@ BIN_DIR = INSTALL_ROOT / "bin"
 
 #: Never the whole machine. This box runs other people's jobs, and a build
 #: that takes every core for six minutes is a rude thing to start silently.
-DEFAULT_JOBS = 16
+DEFAULT_JOBS = min(16, os.cpu_count() or 1)
 
 
 class SetupError(RuntimeError):
@@ -66,6 +47,14 @@ class Preflight:
     compute_cap: str = ""
     gpu_name: str = ""
     missing: list[str] = field(default_factory=list)
+    metal: bool = False
+    vulkan: bool = False
+
+    @property
+    def backend(self) -> str:
+        """Best detected build backend; a driver alone is not a CUDA toolkit."""
+        return "metal" if self.metal else "cuda" if self.can_build_cuda else "vulkan" if self.vulkan else "cpu"
+
 
     @property
     def can_build(self) -> bool:
@@ -81,6 +70,8 @@ class Preflight:
 
     def summary(self) -> str:
         """What will happen, and what it will cost, before it starts."""
+        if self.can_build and self.backend in ("metal", "vulkan"):
+            return f"Will build llama.cpp with {self.backend.title()} acceleration, using up to {DEFAULT_JOBS} cores."
         if self.can_build_cuda:
             return (f"Will build llama.cpp with CUDA for your {self.gpu_name} "
                     f"(compute {self.compute_cap}). Takes a few minutes and "
@@ -115,9 +106,11 @@ def preflight() -> Preflight:
     result = Preflight(
         git=shutil.which("git") or "",
         cmake=shutil.which("cmake") or "",
-        compiler=shutil.which("c++") or shutil.which("g++") or shutil.which("clang++") or "",
+        compiler=shutil.which("c++") or shutil.which("g++") or shutil.which("clang++") or shutil.which("cl") or "",
         nvcc=shutil.which("nvcc") or "",
         nvidia_smi=shutil.which("nvidia-smi") or "",
+        metal=platform.system() == "Darwin" and platform.machine().lower() in ("arm64", "aarch64"),
+        vulkan=bool(shutil.which("vulkaninfo")),
     )
     if result.nvidia_smi:
         try:
@@ -143,7 +136,7 @@ def preflight() -> Preflight:
 
 def installed_binary() -> Path | None:
     """The llama-server this module has installed, if it is there."""
-    candidate = BIN_DIR / "llama-server"
+    candidate = BIN_DIR / ("llama-server.exe" if platform.system() == "Windows" else "llama-server")
     if candidate.is_file() and os.access(candidate, os.X_OK):
         return candidate
     return None
@@ -162,27 +155,60 @@ def _run(command: list[str], on_progress: Callable[[str], None],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1, start_new_session=True,
     )
-    try:
+    import queue
+    import signal
+    import threading
+
+    output: queue.Queue = queue.Queue()
+    def read_output():
         assert process.stdout is not None
-        for line in process.stdout:
+        try:
+            for line in process.stdout:
+                output.put(line)
+        finally:
+            output.put(None)
+    reader = threading.Thread(target=read_output, daemon=True)
+    reader.start()
+    try:
+        while True:
             if cancel is not None and cancel.is_set():
-                process.terminate()
+                if process.poll() is None:
+                    if os.name == "nt":
+                        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                                       capture_output=True, timeout=5)
+                    else:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    try:
+                        process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        if os.name != "nt":
+                            os.killpg(process.pid, signal.SIGKILL)
+                        else:
+                            process.kill()
+                        process.wait(timeout=3)
                 raise SetupError("cancelled")
-            line = line.rstrip()
-            if line:
-                on_progress(line)
+            try:
+                line = output.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            if line is None:
+                break
+            if line.rstrip():
+                on_progress(line.rstrip())
+        if process.wait() != 0:
+            raise SetupError(f"{command[0]} exited with code {process.returncode}")
     finally:
-        process.stdout and process.stdout.close()
-    if process.wait() != 0:
-        raise SetupError(f"{command[0]} exited with code {process.returncode}")
+        reader.join(timeout=1)
+        if not reader.is_alive() and process.stdout:
+            process.stdout.close()
 
 
 def build(on_progress: Callable[[str], None], cancel=None,
-          jobs: int = DEFAULT_JOBS, cuda: bool | None = None) -> Path:
+          jobs: int = DEFAULT_JOBS, cuda: bool | None = None, backend: str = "auto") -> Path:
     """Clone (or update) llama.cpp and build llama-server. Returns its path.
 
-    ``cuda`` defaults to whatever the machine supports. A shallow clone,
-    because the history is large and none of it is wanted.
+    ``backend`` selects auto, CPU, CUDA, Metal or Vulkan. The older ``cuda``
+    argument is retained for callers that explicitly request CUDA or CPU.
     """
     checks = preflight()
     if not checks.can_build:
@@ -190,8 +216,17 @@ def build(on_progress: Callable[[str], None], cancel=None,
             "cannot build here — missing " + ", ".join(checks.missing)
             + ("\n" + checks.advice() if checks.advice() else "")
         )
-    if cuda is None:
-        cuda = checks.can_build_cuda
+    if cuda is not None:
+        backend = "cuda" if cuda else "cpu"  # compatibility with existing API callers
+    if backend == "auto":
+        backend = checks.backend
+    if backend not in ("cpu", "cuda", "metal", "vulkan"):
+        raise SetupError(f"unknown backend: {backend}")
+    if backend == "cuda" and not checks.can_build_cuda:
+        raise SetupError("CUDA requires the NVIDIA CUDA toolkit and a detected GPU. Choose CPU or Vulkan instead.")
+    if backend == "metal" and platform.system() != "Darwin":
+        raise SetupError("Metal is available only on macOS")
+    jobs = max(1, min(jobs, os.cpu_count() or 1))
 
     INSTALL_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -200,6 +235,8 @@ def build(on_progress: Callable[[str], None], cancel=None,
         try:
             _run([checks.git, "pull", "--ff-only"], on_progress, cancel, SOURCE_DIR)
         except SetupError:
+            if cancel is not None and cancel.is_set():
+                raise
             # A dirty or diverged checkout should not block a rebuild; the
             # source we already have builds perfectly well.
             on_progress("(could not update; building the existing checkout)")
@@ -210,134 +247,139 @@ def build(on_progress: Callable[[str], None], cancel=None,
 
     args = [checks.cmake, "-B", str(SOURCE_DIR / "build"),
             "-DCMAKE_BUILD_TYPE=Release", "-DLLAMA_BUILD_SERVER=ON"]
-    if cuda:
-        # For the card that is here, not for every architecture ever shipped:
-        # "all" turns a six-minute build into most of an hour.
-        args += ["-DGGML_CUDA=ON",
-                 f"-DCMAKE_CUDA_ARCHITECTURES={checks.compute_cap or '86'}"]
-        on_progress(f"==> configuring with CUDA for compute {checks.compute_cap}")
-    else:
-        on_progress("==> configuring for CPU")
+    args += [f"-DGGML_{name.upper()}={'ON' if backend == name else 'OFF'}"
+             for name in ("cuda", "metal", "vulkan")]
+    if backend == "cuda":
+        args.append(f"-DCMAKE_CUDA_ARCHITECTURES={checks.compute_cap}")
+    on_progress(f"==> configuring for {backend}")
     _run(args, on_progress, cancel, SOURCE_DIR)
 
     on_progress(f"==> building with {jobs} cores")
     _run([checks.cmake, "--build", str(SOURCE_DIR / "build"),
           "--config", "Release", "-j", str(jobs)], on_progress, cancel, SOURCE_DIR)
 
-    built = SOURCE_DIR / "build" / "bin" / "llama-server"
+    executable = "llama-server.exe" if platform.system() == "Windows" else "llama-server"
+    output = SOURCE_DIR / "build" / "bin"
+    if not (output / executable).is_file() and (output / "Release" / executable).is_file():
+        output = output / "Release"
+    built = output / executable
     if not built.is_file():
         raise SetupError(f"the build finished but {built} is not there")
-
-    BIN_DIR.mkdir(parents=True, exist_ok=True)
-    for tool in ("llama-server", "llama-cli", "llama-bench", "llama-quantize"):
-        source = SOURCE_DIR / "build" / "bin" / tool
-        if source.is_file():
-            link = BIN_DIR / tool
-            link.unlink(missing_ok=True)
-            try:
-                link.symlink_to(source)
-            except OSError:
-                shutil.copy2(source, link)
-
-    on_progress(f"==> done: {BIN_DIR / 'llama-server'}")
-    return BIN_DIR / "llama-server"
+    # Return the binary beside its shared libraries. Copying just the executable
+    # breaks Windows DLL lookup and GPU plugin loading on other platforms.
+    on_progress(f"==> done: {built}")
+    return built
 
 
 # ------------------------------------------------------------ prebuilt route
 
 
-def prebuilt_asset_name() -> str | None:
-    """The release asset for this platform, or None if there is not one.
-
-    CPU-only on Linux by necessity: llama.cpp publishes CUDA binaries for
-    Windows and not for Linux, so there is no GPU build to download here.
-    """
+def prebuilt_asset_name(backend: str = "auto") -> str | None:
+    """Return an exact release filename suffix for the requested platform/backend."""
     machine = platform.machine().lower()
+    arch = "arm64" if machine in ("arm64", "aarch64") else "x64" if machine in ("x86_64", "amd64") else None
     system = platform.system().lower()
-    if system == "linux" and machine in ("x86_64", "amd64"):
-        return "ubuntu-x64"
+    if arch is None:
+        return None
+    if backend == "auto":
+        backend = "metal" if system == "darwin" else "cpu"
     if system == "darwin":
-        return "macos-arm64" if machine == "arm64" else "macos-x64"
+        return f"macos-{arch}.tar.gz" if backend in ("metal", "cpu") else None
+    if backend == "metal":
+        return None
+    if system == "linux":
+        middle = "cuda-12.8-" if backend == "cuda" and arch == "x64" else "vulkan-" if backend == "vulkan" else "" if backend == "cpu" else None
+        return f"ubuntu-{middle}{arch}.tar.gz" if middle is not None else None
     if system == "windows":
-        return "win-cuda-x64" if shutil.which("nvidia-smi") else "win-x64"
+        middle = "cuda-12.4" if backend == "cuda" and arch == "x64" else "vulkan" if backend == "vulkan" and arch == "x64" else "cpu" if backend == "cpu" else None
+        return f"win-{middle}-{arch}.zip" if middle else None
     return None
 
 
-def download_prebuilt(on_progress: Callable[[str], None], cancel=None) -> Path:
-    """Fetch an official release build. No toolchain needed, no GPU on Linux."""
+def _unpack_runtime(payload: bytes, name: str, destination: Path) -> Path:
+    """Extract runtime files and libraries without trusting archive paths or links."""
     import io
-    import json
+    import tarfile
     import zipfile
 
+    destination.mkdir(parents=True, exist_ok=True)
+    def save(filename: str, content: bytes) -> None:
+        leaf = Path(filename).name
+        if leaf.startswith(("llama-", "lib", "ggml")) or leaf.endswith((".dll", ".dylib")) or ".so" in leaf:
+            target = destination / leaf
+            target.write_bytes(content)
+            target.chmod(target.stat().st_mode | 0o755)
+
+    if name.endswith(".zip"):
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            for entry in archive.infolist():
+                if not entry.is_dir():
+                    save(entry.filename, archive.read(entry))
+    else:
+        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as archive:
+            for entry in archive.getmembers():
+                if entry.isfile():
+                    source = archive.extractfile(entry)
+                    if source:
+                        save(entry.name, source.read())
+                elif entry.issym() or entry.islnk():
+                    # Resolve only within the archive, then write a regular file.
+                    try:
+                        target_name = str(Path(entry.name).parent / entry.linkname) if entry.issym() else entry.linkname
+                        target = archive.getmember(target_name)
+                        if target.isfile():
+                            source = archive.extractfile(target)
+                            if source:
+                                save(entry.name, source.read())
+                    except KeyError:
+                        pass
+    executable = "llama-server.exe" if platform.system() == "Windows" else "llama-server"
+    binary = destination / executable
+    if not binary.is_file():
+        raise SetupError(f"the archive did not contain {executable}")
+    return binary
+
+
+def download_prebuilt(on_progress: Callable[[str], None], cancel=None, backend: str = "auto") -> Path:
+    """Download an official CPU, Metal, Vulkan or CUDA archive for this machine."""
+    import hashlib
     import httpx
 
-    fragment = prebuilt_asset_name()
-    if fragment is None:
-        raise SetupError(
-            f"no prebuilt binary is published for {platform.system()} "
-            f"{platform.machine()} — build from source instead"
-        )
-
-    on_progress("==> asking GitHub for the latest release")
+    suffix = prebuilt_asset_name(backend)
+    if suffix is None:
+        raise SetupError("No prebuilt archive for this platform/backend. Choose CPU, build from source, or select an existing runtime.")
+    on_progress("==> checking recent official llama.cpp releases")
     try:
-        response = httpx.get(
-            "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest",
-            timeout=30.0, follow_redirects=True,
-        )
+        response = httpx.get("https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=10",
+                             timeout=30.0, follow_redirects=True)
         response.raise_for_status()
-        assets = response.json().get("assets") or []
-    except (httpx.HTTPError, json.JSONDecodeError, ValueError) as exc:
-        raise SetupError(f"could not reach GitHub: {exc}") from exc
-
-    match = next((a for a in assets
-                  if fragment in a.get("name", "") and a.get("name", "").endswith(".zip")),
-                 None)
-    if match is None:
-        raise SetupError(
-            f"the latest release has no {fragment} asset. Build from source, "
-            f"or download one yourself and point hugmunn at it."
-        )
-
-    on_progress(f"==> downloading {match['name']}")
-    try:
-        with httpx.stream("GET", match["browser_download_url"],
-                          timeout=httpx.Timeout(300.0, connect=15.0),
-                          follow_redirects=True) as stream:
+        releases = response.json()
+        match = next((a for release in releases if not release.get("draft")
+                      for a in release.get("assets", [])
+                      if a.get("name", "").startswith("llama-") and a["name"].endswith("-" + suffix)), None)
+        if match is None:
+            raise SetupError(f"No current {suffix} archive. Build from source instead.")
+        on_progress(f"==> downloading {match['name']}")
+        chunks = []
+        with httpx.stream("GET", match["browser_download_url"], timeout=300, follow_redirects=True) as stream:
             stream.raise_for_status()
-            total = int(stream.headers.get("content-length", 0))
-            chunks, seen = [], 0
+            seen = 0
             for chunk in stream.iter_bytes(1024 * 1024):
                 if cancel is not None and cancel.is_set():
                     raise SetupError("cancelled")
                 chunks.append(chunk)
                 seen += len(chunk)
-                if total:
-                    on_progress(f"    {seen / 1e6:.0f} / {total / 1e6:.0f} MB")
-            payload = b"".join(chunks)
-    except httpx.HTTPError as exc:
-        raise SetupError(f"download failed: {exc}") from exc
-
-    on_progress("==> unpacking")
-    BIN_DIR.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
-        for entry in archive.namelist():
-            leaf = Path(entry).name
-            if not leaf or entry.endswith("/"):
-                continue
-            if leaf.startswith("llama-") or leaf.endswith((".so", ".dylib", ".dll")):
-                target = BIN_DIR / leaf
-                target.write_bytes(archive.read(entry))
-                if leaf.startswith("llama-"):
-                    target.chmod(target.stat().st_mode | 0o755)
-
-    binary = BIN_DIR / "llama-server"
-    if not binary.is_file():
-        raise SetupError("the archive did not contain llama-server")
-    on_progress(f"==> done: {binary}")
-    if platform.system().lower() == "linux":
-        on_progress("note: this is a CPU-only build — no Linux CUDA release is "
-                    "published. Build from source to use the GPU.")
-    return binary
+                on_progress(f"    {seen / 1e6:.0f} MB")
+        payload = b"".join(chunks)
+        digest = match.get("digest") or ""
+        if digest.startswith("sha256:") and hashlib.sha256(payload).hexdigest() != digest[7:]:
+            raise SetupError("The runtime download failed its SHA-256 integrity check")
+        folder = BIN_DIR / match["name"].removesuffix(".tar.gz").removesuffix(".zip")
+        binary = _unpack_runtime(payload, match["name"], folder)
+        on_progress(f"==> done: {binary}")
+        return binary
+    except (httpx.HTTPError, ValueError, OSError) as exc:
+        raise SetupError(f"Runtime download failed: {exc}") from exc
 
 
 # ------------------------------------------------------- what a build can do
@@ -367,7 +409,7 @@ class RuntimeInfo:
         if self.has_gpu:
             return "GPU-capable: " + "; ".join(self.devices)
         return ("CPU-only build — this binary cannot use a GPU. Rebuild with "
-                "the CUDA toolkit installed for a large speedup.")
+                "CUDA, Metal, Vulkan, ROCm or SYCL for compatible hardware.")
 
 
 def runtime_info(path: Path | None = None) -> RuntimeInfo:

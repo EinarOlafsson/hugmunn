@@ -8,7 +8,7 @@ Use :func:`agent` to manage a conversation and its local server::
         print(chat.ask("Explain Python context managers."))
 
 The selected local model needs downloaded weights and a llama-server runtime.
-Cloud models use API credentials. Importing the package does not load Qt,
+Cloud models use Claude Code and Codex subscription logins. Importing the package does not load Qt,
 start a server, or contact a provider. Names in ``__all__`` form the public API;
 ``hugmunn.core`` and ``hugmunn.ui`` are implementation modules.
 """

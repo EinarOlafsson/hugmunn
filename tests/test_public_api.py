@@ -107,9 +107,9 @@ def test_an_unknown_model_says_so_and_says_where_to_look():
 def test_a_cloud_model_without_a_key_refuses_clearly(monkeypatch):
     from hugmunn import api
 
-    monkeypatch.setattr(api._credentials, "load", lambda provider: "")
+    monkeypatch.setattr(api._cli, "status", lambda *a, **kw: api._cli.Status(True, False, "Not connected"))
     with pytest.raises(hugmunn.HugmunnError) as caught:
-        hugmunn.Agent("claude:claude-opus-5")
+        hugmunn.Agent("claude:default")
     assert "sign_in" in str(caught.value)
 
 
@@ -294,15 +294,9 @@ def test_sign_in_rejects_an_unknown_provider():
 
 
 def test_signed_in_answers_for_both_spellings(monkeypatch):
-    """Patched on the module the API actually holds.
-
-    ``hugmunn.core.credentials`` and ``hugmunn.api._credentials`` are the same
-    object until something reloads one of them, and several tests reload
-    modules to point them at a temporary directory. Patching through the API's
-    own reference is correct regardless, and does not depend on test order.
-    """
+    """CLI subscription status supports the documented provider aliases."""
     from hugmunn import api
 
-    monkeypatch.setattr(api._credentials, "is_signed_in", lambda p: True)
+    monkeypatch.setattr(api._cli, "status", lambda *a, **kw: api._cli.Status(True, True, "Connected"))
     assert hugmunn.signed_in("claude") and hugmunn.signed_in("anthropic")
     assert hugmunn.signed_in("chatgpt") and hugmunn.signed_in("openai")
