@@ -18,6 +18,11 @@ The [final comparison and all ten originals](omniscience-variants/README.md)
 explore minimal, engraved, geometric, stoic, cute, angry, and solar treatments,
 plus three versions with intertwined wings or tails.
 
+## Eye placement and gaze
+
+[Four further refinements](gaze-studies/README.md) move the eye beneath the
+joined wings and show one or both ravens looking at the viewer.
+
 ## First ten studies
 
 Ten alternatives for Hugmunn, with space between Huginn and Muninn and three
