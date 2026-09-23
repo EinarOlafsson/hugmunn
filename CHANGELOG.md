@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.0.5 — 2026-09-23
+
+- Use the selected omniscience design: two upright, outward-looking ravens
+  beneath a radiant all-seeing eye. Update the application, remote page,
+  README, screenshots, and desktop installer icons in both colours.
+- Preserve the logo concepts, generation prompts, comparison sheets, and
+  previous artwork in `icons/`.
+- Document installation and upgrades from PyPI.
+
 ## 0.0.0.4 — 2026-09-23
 
 - Replace the draft logos with hollow two-raven outlines in light and dark variants.

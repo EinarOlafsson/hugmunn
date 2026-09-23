@@ -7,30 +7,28 @@ loading both bindings into one process can crash Qt.
 ## Install with pip
 
 ```bash
-git clone https://github.com/EinarOlafsson/hugmunn.git
-cd hugmunn
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install .
+python -m pip install hugmunn
 hugmunn
 ```
 
 On Windows, activate with `.venv\Scripts\activate` in Command Prompt or
 `.\.venv\Scripts\Activate.ps1` in PowerShell. You can also call
-`.\.venv\Scripts\python.exe -m pip install .` without activating.
+`.\.venv\Scripts\python.exe -m pip install hugmunn` without activating.
 
-Use `python -m pip install -e .` when developing. To install a built wheel:
+For development, clone the repository and install it with
+`python -m pip install -e .`. To install a built wheel:
 
 ```bash
-python -m pip install /path/to/hugmunn-0.0.0.4-py3-none-any.whl
+python -m pip install /path/to/hugmunn-0.0.0.5-py3-none-any.whl
 ```
 
 The wheel includes Python modules, skill packs, and artwork. It does not include
 model weights or llama-server. PyQt6 is currently a dependency even for library
 use, though importing `hugmunn` does not import Qt or require a display.
 
-The project is prepared for PyPI publication. Until it is published, install
-from the checkout, a built wheel, or the GitHub URL in the README.
+Upgrade with `python -m pip install --upgrade hugmunn`.
 
 ## Local models
 

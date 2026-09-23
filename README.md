@@ -5,9 +5,9 @@ Huginn and Muninn are Odin’s two ravens in Norse mythology. Their names mean
 what they have seen. Hugmunn takes its name from the pair.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-white.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg">
-  <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg" alt="Hugmunn — two circling ravens" width="420">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-white.svg?v=omniscience">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg?v=omniscience">
+  <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg?v=omniscience" alt="Hugmunn — two ravens beneath a radiant all-seeing eye" width="420">
 </picture>
 
 [![PyPI](https://img.shields.io/pypi/v/hugmunn)](https://pypi.org/project/hugmunn/)
@@ -33,12 +33,12 @@ installers.
 
 ## Install
 
-Use Python 3.10 or newer in a separate environment. From a checkout:
+Install from PyPI with Python 3.10 or newer in a separate environment:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install .
+python -m pip install hugmunn
 hugmunn
 ```
 
@@ -50,16 +50,14 @@ hugmunn
 ```
 
 `python -m hugmunn` also launches the application. `hugmunn --version` prints the
-installed version without opening a window. The package builds as a wheel and
-source distribution; `pip install hugmunn` will be available once a release is
-published to PyPI.
+installed version without opening a window. For development, install a checkout
+with `python -m pip install -e .`.
 
-For native desktop packages, see the
-[installer guide](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/installers.md).
-The repository includes builders for a Linux `.deb`, a Windows setup `.exe`, and
-a macOS `.dmg`, plus a GitHub Actions workflow to build them on their respective
-operating systems. Build recipes are not a claim that signed installers have
-already been released.
+Download desktop packages from
+[GitHub Releases](https://github.com/EinarOlafsson/hugmunn/releases/latest): a
+Linux `.deb`, Windows setup `.exe`, or macOS `.dmg`. These bundle Python and Qt.
+See the [installer guide](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/installers.md)
+for installation, portable bundles, and platform requirements.
 
 ## First conversation
 
@@ -89,8 +87,8 @@ network when requested.
 ## Desktop controls
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/docs/images/desktop-dark.png">
-  <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/docs/images/desktop-light.png" alt="Hugmunn desktop with model controls and raven artwork" width="900">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/docs/images/desktop-dark.png?v=omniscience">
+  <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/docs/images/desktop-light.png?v=omniscience" alt="Hugmunn desktop with model controls and raven artwork" width="900">
 </picture>
 
 | Control | What it changes |

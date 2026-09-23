@@ -68,6 +68,6 @@ def test_window_artwork_changes_with_theme(qt_app, monkeypatch, tmp_path):
 def test_remote_page_uses_inline_theme_aware_mark():
     from hugmunn.core.webui import PAGE
 
-    assert 'stroke="currentColor"' in PAGE
+    assert 'fill="currentColor"' in PAGE
     assert "__HUGMUNN_MARK__" not in PAGE
-    assert "Two circling ravens" in PAGE
+    assert "Two upright ravens beneath a radiant all-seeing eye" in PAGE

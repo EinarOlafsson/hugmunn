@@ -1,4 +1,18 @@
-# Raven icon studies
+# Hugmunn icon archive
+
+## Active logo — Omniscience
+
+The selected application logo is **11 — Omniscience**: two outward-looking
+ravens beneath a radiant all-seeing eye.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../src/hugmunn/resources/icons/hugmunn-mark-white.svg">
+  <img src="../src/hugmunn/resources/icons/hugmunn-mark-black.svg" alt="Two ravens beneath a radiant all-seeing eye" width="380">
+</picture>
+
+[Original PNG](11-omniscience.png) · [Generation prompt](omniscience-prompt.txt)
+
+## First ten studies
 
 Ten alternatives for Hugmunn, with space between Huginn and Muninn and three
 different expressions. Every option uses hollow forms and two separate birds.
@@ -27,5 +41,17 @@ They retain their transparency and original resolution. The gallery uses CSS
 to preview white outlines on black; the comparison sheets are browser captures
 of that gallery. The exact prompt for each option is in [prompts.json](prompts.json).
 
-These are concept studies. The next refinement should simplify the chosen
-design into production SVG artwork and check its smallest launcher sizes.
+## Selected artwork
+
+The original omniscience PNG is preserved. Its contours were traced into scalable black and white
+SVGs in [`src/hugmunn/resources/icons/`](../src/hugmunn/resources/icons/).
+The same mark is used in the wordmark, remote page, and native icon formats.
+
+For this conversion, ImageMagick flattened the original onto white and made
+a 50% threshold PBM; Potrace 1.16 traced it with `--turdsize 4 --opttolerance 0.2`.
+The SVGs retain the hollow interiors. Run `python packaging/generate_icons.py`
+to regenerate the PNG, ICO, and ICNS files from the packaged SVGs.
+
+Previous production artwork is preserved in
+[`archive/circling-ravens/`](archive/circling-ravens/) and
+[`archive/stoic-sentinels/`](archive/stoic-sentinels/).
