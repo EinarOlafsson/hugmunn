@@ -16,13 +16,13 @@ ready = hugmunn.available_models()
 ```
 
 `models()` lists registered local models, Claude aliases and Codex’s locally
-cached models. It does not make network
-requests. `available_models()` checks local weights and launch prerequisites,
-or the presence of a cloud key. It does not test available memory, credentials
-against the provider, or API quota.
+cached models. It does not make network requests. `available_models()` checks
+local weights and launch prerequisites, or the cached CLI subscription-login
+status. Call `signed_in()` or `sign_in()` to refresh that status. Model discovery
+does not test memory capacity, provider connectivity or remaining plan usage.
 
 `Model.downloaded` means weights exist for a local model; for a cloud model it
-means credentials are present. `Model.context` is a token count and
+means the last CLI login check succeeded. `Model.context` is a token count and
 `Model.size_gb` is the estimated local download size. Registry keys, rather than
 filenames or display labels, select models.
 

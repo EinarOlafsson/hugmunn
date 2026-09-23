@@ -91,7 +91,7 @@ class Event:
 
 @dataclass(frozen=True)
 class Model:
-    """A model in the registry; availability depends on weights and credentials.
+    """A model in the registry; availability depends on weights and cached CLI login status.
 
     ``key`` is what :class:`Agent` takes. For local models it is a short name
     such as ``"uncensored-gemma"``; for cloud models it is
@@ -104,7 +104,7 @@ class Model:
         freedom: Registry classification: vanilla, tuned, or unlocked.
         context: Configured context capacity in tokens.
         size_gb: Estimated weight download size; zero for cloud models.
-        downloaded: Whether weights exist locally, or a cloud key is present.
+        downloaded: Whether weights exist locally, or the last CLI login check succeeded.
         description: Short model description from the registry or provider.
     """
 
@@ -167,7 +167,7 @@ def available_models() -> list[Model]:
     """Return local models with weights and a launch path, plus signed-in cloud models.
 
     This checks local files and cached CLI login status, not memory capacity, server health,
-    network connectivity, or API quota.
+    network connectivity, or remaining subscription usage.
     """
     return [m for m in models()
             if (m.is_local and _config.by_key(m.key)

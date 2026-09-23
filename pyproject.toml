@@ -45,8 +45,8 @@ Changelog = "https://github.com/EinarOlafsson/hugmunn/blob/main/CHANGELOG.md"
 # otherwise, and a suite that hangs gets killed rather than read.
 # Qt fixtures live in tests/conftest.py; no pytest-qt plugin is required.
 dev = ["pytest>=7.4", "pytest-timeout>=2.3"]
-# Encrypted API-key storage. Without it keys go to a mode-600 file and the
-# sign-in dialog says so, so this is a real upgrade rather than a requirement.
+# Optional backend for legacy credential helpers. Current Claude/Codex
+# authentication is owned by the vendor CLIs and does not require this extra.
 keyring = ["keyring>=24.0"]
 docs = ["sphinx>=7.4", "myst-parser>=3.0"]
 build = ["build>=1.2", "twine>=6", "pyinstaller>=6.11", "Pillow>=10"]

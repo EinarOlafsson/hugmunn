@@ -35,7 +35,7 @@ installers.
 Use **CLI default** for your account’s current Claude or Codex model, or select
 a Claude alias or a model from Codex’s local catalogue. Local additions include
 **Qwen3.8-27B** and unlocked Qwen/Gemma variants. See the
-[model catalogue](docs/model-catalogue.md) for downloads, compatibility and sources.
+[model catalogue](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/model-catalogue.md) for downloads, compatibility and sources.
 
 ## Install
 
@@ -97,7 +97,7 @@ local setup; use larger models for substantial coding work.
 OS compatibility also depends on the installed [Qt version](https://doc.qt.io/qt-6/supported-platforms.html)
 and your llama.cpp build. ARM Linux/Windows may use pip where matching Python/Qt
 wheels are available; native ARM installers are not currently built for them.
-See [hardware and runtime setup](docs/hardware.md) for drivers and backend choices.
+See [hardware and runtime setup](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/hardware.md) for drivers and backend choices.
 
 ## First launch
 
@@ -113,7 +113,7 @@ are **on by default**, after agreement acceptance and connecting a GitHub accoun
 These are public issues under that account. Reports exclude prompts, conversations,
 logs, error messages, file contents, paths and credentials. Turn reporting off in
 setup or **Accounts → Automatically report errors to GitHub**. See
-[setup and reporting](docs/setup.md) for exactly what is collected.
+[setup and reporting](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/setup.md) for exactly what is collected.
 
 ## First conversation
 

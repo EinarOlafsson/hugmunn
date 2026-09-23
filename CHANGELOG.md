@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.0.12
+
+- Correct model-discovery documentation to describe cached CLI subscription
+  login status, and remove obsolete API-key setup descriptions.
+- Use complete documentation URLs in the README so its links also work on PyPI.
+
 ## 0.0.0.11
 
 - Replace desktop and Python Claude/OpenAI API calls with Claude Code/Codex
