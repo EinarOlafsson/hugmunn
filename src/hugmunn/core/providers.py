@@ -21,6 +21,8 @@ from enum import Enum
 
 import httpx
 
+from ..errors import HugmunnError
+
 ANTHROPIC_API = "https://api.anthropic.com/v1"
 OPENAI_API = "https://api.openai.com/v1"
 ANTHROPIC_VERSION = "2023-06-01"
@@ -279,5 +281,5 @@ def fetch_catalogue(provider: Provider, api_key: str, timeout: float = 15.0) -> 
     return result
 
 
-class ProviderError(RuntimeError):
-    pass
+class ProviderError(HugmunnError):
+    """A provider rejected credentials or could not return its model catalogue."""

@@ -43,6 +43,11 @@ PATH_ARGS = ("path", "path_a", "database", "subdir", "dest")
 
 
 class Autonomy(IntEnum):
+    """Approval policy, from confirming every call (1) to broad tool access (4).
+
+    These checks inspect tool arguments; they do not sandbox processes.
+    """
+
     CONFIRM_ALL = 1     # every tool call is confirmed, reads included
     ASK_TO_WRITE = 2    # reads run freely; anything that changes state asks
     WORKSPACE = 3       # free inside the working directory; asks outside it

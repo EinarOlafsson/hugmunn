@@ -5,16 +5,19 @@ from __future__ import annotations
 import os
 import signal
 import subprocess
+import sys
+import threading
 import time
 from pathlib import Path
 from typing import Callable
 
 from ..config import ModelSpec
+from ..errors import HugmunnError
 from .client import LlamaClient
 
 
-class ServerError(RuntimeError):
-    pass
+class ServerError(HugmunnError):
+    """A local model server could not be started or did not become ready."""
 
 
 class ServerManager:
@@ -29,6 +32,7 @@ class ServerManager:
         self._spec: ModelSpec | None = None
         self._adopted = False
         self.log_tail: list[str] = []
+        self._log_thread: threading.Thread | None = None
 
     @property
     def spec(self) -> ModelSpec | None:
@@ -60,6 +64,17 @@ class ServerManager:
         if client.is_ready():
             report(f"Adopted running server on port {spec.port}")
             self._spec, self._adopted, self._proc = spec, True, None
+            return
+
+        if sys.platform == "win32":
+            # Registry scripts use a POSIX shell; native Windows launches the
+            # executable with the same model arguments instead.
+            command = self._direct_command(spec)
+            if command is None:
+                raise ServerError("Select llama-server.exe and download the model weights first.")
+            self.stop()
+            self.log_tail.clear()
+            self._spawn(command + list(extra_args or []), spec, Path.cwd(), report, timeout, client)
             return
 
         script = spec.script_path
@@ -149,6 +164,7 @@ class ServerManager:
         ]
 
     def _spawn(self, command, spec, cwd, report, timeout, client) -> None:
+        """Launch a native process and wait for readiness while collecting logs."""
         self._proc = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
@@ -159,15 +175,20 @@ class ServerManager:
             cwd=str(cwd),
         )
         self._spec, self._adopted = spec, False
+        self.log_tail = []
+        self._log_thread = threading.Thread(
+            target=self._read_log, args=(self._proc.stdout, self.log_tail), daemon=True,
+        )
+        self._log_thread.start()
 
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if self._proc.poll() is not None:
+                self._log_thread.join(timeout=1)
                 raise ServerError(
                     f"server exited with code {self._proc.returncode}.\n"
                     + "\n".join(self.log_tail[-15:])
                 )
-            self._drain_log()
             if client.is_ready():
                 report(f"{spec.label} ready on port {spec.port}")
                 return
@@ -176,18 +197,21 @@ class ServerManager:
         self.stop()
         raise ServerError(f"server did not become ready within {timeout:.0f}s")
 
-    def _drain_log(self) -> None:
-        """Non-blocking read of whatever the server has written so far."""
-        if self._proc is None or self._proc.stdout is None:
-            return
-        import select
+    @staticmethod
+    def _read_log(stream, tail: list[str]) -> None:
+        """Drain a pipe on all platforms, retaining only the last 200 lines.
 
-        while select.select([self._proc.stdout], [], [], 0)[0]:
-            line = self._proc.stdout.readline()
-            if not line:
-                break
-            self.log_tail.append(line.rstrip())
-            del self.log_tail[:-200]
+        Windows select() cannot read subprocess pipes. A dedicated reader also
+        prevents a running server from blocking when its output pipe fills.
+        """
+        if stream is None:
+            return
+        try:
+            for line in stream:
+                tail.append(line.rstrip())
+                del tail[:-200]
+        finally:
+            stream.close()
 
     def stop(self) -> None:
         """Terminate a server we started. Adopted servers are left alone."""
@@ -199,13 +223,22 @@ class ServerManager:
         if proc is None or proc.poll() is not None:
             return
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            if sys.platform == "win32":
+                proc.terminate()
+            else:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
         except (ProcessLookupError, PermissionError):
             proc.terminate()
         try:
             proc.wait(timeout=20)
         except subprocess.TimeoutExpired:
             try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                if sys.platform == "win32":
+                    proc.kill()
+                else:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
                 proc.kill()
+            proc.wait(timeout=5)
+        if self._log_thread is not None:
+            self._log_thread.join(timeout=1)

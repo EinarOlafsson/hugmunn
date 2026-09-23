@@ -10,6 +10,8 @@ both cheaper and safer.
 from __future__ import annotations
 
 import difflib
+import os
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -98,22 +100,40 @@ def diff_files(workdir: str, path_a: str, path_b: str) -> str:
 def python_exec(workdir: str, code: str, timeout: int = 60) -> str:
     """Run a Python snippet in a subprocess and return its output.
 
-    A subprocess rather than ``exec`` in-process: a runaway loop or a crash
-    takes down the child, not the application, and the timeout is enforceable.
+    Uses the current interpreter in a pip installation. Frozen desktop builds
+    use ``HUGMUNN_PYTHON`` or a Python executable on PATH. A snippet runs in a
+    child process so its failure does not terminate the application.
     """
     root = Path(workdir).expanduser().resolve()
     if not root.is_dir():
         raise ToolError(f"working directory does not exist: {root}")
+    executable = sys.executable
+    environment = None
+    if getattr(sys, "frozen", False):
+        executable = (os.environ.get("HUGMUNN_PYTHON") or
+                      shutil.which("python3") or shutil.which("python"))
+        if not executable or Path(executable).resolve() == Path(sys.executable).resolve():
+            raise ToolError("Install Python and set HUGMUNN_PYTHON to its executable to run Python tools.")
+        # Do not make the external interpreter load the frozen app's libraries.
+        environment = os.environ.copy()
+        for name in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"):
+            original = environment.pop(f"{name}_ORIG", None)
+            if original is None:
+                environment.pop(name, None)
+            else:
+                environment[name] = original
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, dir=root) as handle:
         handle.write(code)
         script = Path(handle.name)
     try:
         proc = subprocess.run(
-            [sys.executable, str(script)], cwd=str(root),
+            [executable, str(script)], cwd=str(root), env=environment,
             capture_output=True, text=True, timeout=int(timeout),
         )
     except subprocess.TimeoutExpired:
         raise ToolError(f"code timed out after {timeout}s") from None
+    except OSError as exc:
+        raise ToolError(f"could not start Python: {exc}") from exc
     finally:
         script.unlink(missing_ok=True)
 

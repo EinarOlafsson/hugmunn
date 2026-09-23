@@ -1,267 +1,192 @@
-<div align="center">
+# Hugmunn
 
-<img src="assets/logo/10-thought-and-memory.svg" alt="" width="140">
+Huginn and Muninn are Odin’s two ravens in Norse mythology. Their names mean
+“thought” and “memory”: they travel through the world and return to tell Odin
+what they have seen. Hugmunn takes its name from the pair.
 
-# hugmunn
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-white.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg">
+  <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg" alt="Hugmunn — two circling ravens" width="420">
+</picture>
 
-**A desktop client and Python library for local and cloud language models.**
+Hugmunn is a desktop application and Python library for working with language
+models. It connects to local models through [llama.cpp](https://github.com/ggml-org/llama.cpp)
+and to cloud models through the Anthropic and OpenAI APIs.
 
-Chat, tool use, and agent loops against llama.cpp on your own machine — or
-against Claude and ChatGPT — with the same tools, skills and safety policy
-whichever model is answering.
-
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](#requirements)
-[![Qt](https://img.shields.io/badge/gui-PyQt6-41cd52)](#requirements)
-[![Tests](https://img.shields.io/badge/tests-856%20passing-brightgreen)](#development)
-[![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
-
-</div>
-
----
-
-Huginn and Muninn are Odin's ravens — *hugr*, thought, and *munr*, memory.
-They fly out at dawn and return at dusk to report what the world is doing.
-
-## What it is
-
-Two things sharing one core:
-
-**A desktop application.** A Qt window for talking to models, watching them use
-tools, approving what they change, and picking up conversations where you left
-them.
-
-**A Python library.** The same agent loop, importable, so you can drive a model
-from your own code without a window.
-
-```python
-import hugmunn
-
-with hugmunn.agent("code-glm") as a:
-    print(a.ask("what does this repository do?"))
-```
-
-## Why it exists
-
-Local models are usable now, and the tooling around them mostly is not. The
-gaps this closes:
-
-- **The same interface for local and cloud.** Switching from a 27B on your own
-  GPU to Claude Opus is a dropdown, not a different application. Tools, skills,
-  autonomy and persistence carry across unchanged.
-- **Nothing leaves the machine unless you choose it.** Local models are the
-  default and the app says, every time, when a model is not one.
-- **Honest numbers.** Throughput is measured on your hardware, not quoted from
-  someone else's. Context usage counts the system prompt and tool schemas, not
-  just the visible conversation.
-- **Work that finishes.** An agent that stops after twelve tool rounds and
-  reports a round count has wasted the run. This one changes strategy, steps
-  back to re-canvas, and when it does run out, answers from what it found.
-
----
+You can chat, attach instruction packs, let a model read files or run tools,
+and return to saved conversations. The desktop application and Python API use
+the same model clients and tool policies. Local model weights and llama-server
+are separate downloads; they are not included in the Python package or desktop
+installers.
 
 ## Install
 
+Use Python 3.10 or newer in a separate environment. From a checkout:
+
 ```bash
-git clone git@github.com:EinarOlafsson/hugmunn.git
-cd hugmunn
-pip install -e .
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m pip install .
 hugmunn
 ```
 
-Requires **Python 3.10+**. Local models additionally need a `llama-server`
-binary — the app will build one for you on first launch, or you can point it at
-an existing one.
+Or install directly from GitHub:
 
-### Requirements
-
-| | |
-|---|---|
-| Python | 3.10, 3.11, 3.12 (3.13/3.14 parse cleanly but are untested) |
-| GUI | PyQt6 ≥ 6.6 |
-| Local models | llama.cpp; built in-app, or `LLAMA_SERVER=/path/to/llama-server` |
-| Optional | `pip install -e ".[keyring]"` for encrypted API-key storage |
-
----
-
-## The desktop app
-
-### Models
-
-24 models ship in the registry, downloadable from inside the app, grouped by
-**how much alignment is left in the weights**:
-
-| | | |
-|---|---|---|
-| **Stock** | as the lab shipped it | 11 models |
-| **Tuned** | community tunes and standard abliterations | 3 models |
-| **Unlocked** | refusal directions removed, usually via Heretic | 10 models |
-
-The dropdown is white on black and colours only the row under the cursor —
-blue, grey, red — so the list stays readable and the signal appears when you
-ask for it.
-
-Cloud models are chosen the same way. Sign in from inside the app and the list
-comes from **your account**, not a hardcoded guess.
-
-### Controls
-
-Six tabs, because fifteen settings in one column meant scrolling past the model
-picker to reach the system prompt.
-
-**Effort** — how hard the model works within one answer. On Claude and GPT this
-sets a real thinking budget; on local models it is instruction only, because
-they have no such dial.
-
-**Persistence** — how long the loop keeps going. `Light` (8 rounds) through
-`Relentless` (200). Higher tiers get *more* interruption, not less: a run
-allowed 200 rounds will otherwise spend them all down one wrong assumption made
-in the first five. Every N rounds it is made to stop, state what it knows versus
-what it assumed, and go and look at what it skipped.
-
-**Autonomy** — what may run without asking. Four tiers from *confirm everything*
-to *free anywhere except system paths and installed packages*. Editable installs
-stay writable, which is what makes the top tier useful rather than merely
-dangerous.
-
-**Context** — window size per model, a usage meter that counts the system
-prompt and tool schemas, and what to do when a conversation stops fitting:
-refuse, drop oldest, or summarise. Trimming goes further than strictly needed,
-because llama.cpp caches the prompt by prefix and trimming to exactly fit pays a
-full reprocess every single turn.
-
-**Sessions** — every conversation is saved as it happens, not on exit. Resuming
-one restores the settings it ran under, not just its words: the same messages
-under different settings behave differently, and the difference does not show
-until an answer is wrong.
-
-### Tools
-
-19 built-in tools: files, shell, search, SQL, PDFs, web fetch and scraping,
-PubMed and arXiv. Plus 27 skill packs — instruction sets attached per
-conversation — and a plugin directory for tools you or a model write.
-
-Anything that changes the machine goes through an approval dialog. For file
-edits that dialog shows a **diff**, not the whole new file: three hundred lines
-of which four differ is not something anyone reads.
-
-Large tool results are set aside and replaced in the conversation by a digest
-and a handle, with a `recall` tool to search or page through the rest. One
-`read_file` on a real source file is several thousand tokens, and the model
-usually wanted one function.
-
-### Remote access
-
-```
-/remote
+```bash
+python -m pip install "hugmunn @ git+https://github.com/EinarOlafsson/hugmunn.git"
+hugmunn
 ```
 
-Serves a page your phone can chat from, watch tools in, and **answer approval
-prompts from**. It is one conversation, not two kept in sync.
+`python -m hugmunn` also launches the application. `hugmunn --version` prints the
+installed version without opening a window. The package builds as a wheel and
+source distribution; `pip install hugmunn` will be available once a release is
+published to PyPI.
 
-A token is always required, including on loopback, compared in constant time and
-rate-limited per address. Loopback by default — reaching the machine from
-elsewhere is a tunnel's job, and the reply tells you how, with Tailscale
-recommended over a public URL and the reason why.
+For native desktop packages, see the
+[installer guide](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/installers.md).
+The repository includes builders for a Linux `.deb`, a Windows setup `.exe`, and
+a macOS `.dmg`, plus a GitHub Actions workflow to build them on their respective
+operating systems. Build recipes are not a claim that signed installers have
+already been released.
 
-### Themes
+## First conversation
 
-Eight: Dark, Light, Glass, Cell, and light/dark imitations of Claude and
-ChatGPT. Every palette is checked against WCAG AA on every surface a colour can
-land on — a theme that fails is a test failure, not a matter of taste.
+1. Launch `hugmunn` and choose a provider in the **Model** tab.
+2. For a local model, choose a registry entry and download its weights. If you
+   already have them, use **hugmunn → Find my models…**. Use
+   **hugmunn → Set up llama-server…** to select an existing runtime or install one.
+3. For a cloud model, sign in through **Accounts**, then select a model from
+   your account’s list. This requires an API key; a chat subscription alone
+   does not provide API access.
+4. Enter a message and send it with **Ctrl+Enter**.
 
----
+Local models need enough RAM, GPU memory, and disk space for their weights and
+context. The model picker shows estimated requirements. Start with a model that
+fits your machine; cloud models do not need a local GPU.
 
-## The library
+The **Run** tab selects a working directory, enables tools, and controls
+approval behavior. With the default **Ask before changing anything** setting,
+read tools run directly and writes or shell commands ask for approval. Higher
+autonomy levels permit more actions without asking. This policy is not an
+operating-system sandbox.
+
+Cloud requests send prompts and tool results to the selected provider. Local
+inference stays on the local server, but web tools and downloads still use the
+network when requested.
+
+## Desktop controls
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/docs/images/desktop-dark.png">
+  <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/docs/images/desktop-light.png" alt="Hugmunn desktop with model controls and raven artwork" width="900">
+</picture>
+
+| Control | What it changes |
+| --- | --- |
+| Model | Provider, model, downloads, and server status |
+| Run | Working directory, tools, effort, persistence, and autonomy |
+| Context | Reasoning options, context size, and overflow handling |
+| Tools | Instruction packs, custom tools, and prompt presets |
+| Sessions | Saved conversations and their desktop settings |
+| System | System prompt |
+| View menu | Light, dark, system, and other colour themes |
+
+**Effort** controls instructions and supported provider reasoning settings.
+**Persistence** sets the tool-round budget. **Autonomy** decides which tool calls
+need approval. These are separate settings.
+
+Conversations are saved as you work. **Ctrl+L** starts a new one. Type `/help`
+for commands, or `/remote` to open the same conversation in a browser through a
+local, token-protected page. See the
+[desktop guide](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/desktop.md)
+for details.
+
+## Python API
+
+Discover the models known to the installation:
 
 ```python
 import hugmunn
 
-# what can this machine run?
-for model in hugmunn.available_models():
-    print(model.key, model.label, model.freedom)
-
-# a local model, with tools, approving everything
-with hugmunn.agent(
-    "uncensored-gemma",
-    tools=True,
-    approve=lambda name, summary, args: True,
-    persistence=hugmunn.Persistence.RELENTLESS,
-    workdir="~/project",
-) as a:
-    for event in a.run("run the tests and fix what fails"):
-        if event.kind == "content":
-            print(event.text, end="", flush=True)
-        elif event.kind == "tool_start":
-            print(f"\n[{event.tool}: {event.summary}]")
-
-# a cloud model, same interface
-hugmunn.sign_in("claude", "sk-ant-...")
-with hugmunn.agent("claude:claude-opus-5") as a:
-    print(a.ask("summarise the changes in the last commit"))
+for model in hugmunn.models("local"):
+    print(model.key, model.label, model.size_gb, model.downloaded)
 ```
 
-Tools are **off** unless you ask for them, and when on, anything that changes
-the machine raises `ApprovalRequired` unless you pass `approve`. A library that
-runs shell commands the moment it is imported into somebody's script deserves
-the review it would get.
+After downloading a model and setting up llama-server, use its registry key:
 
-`hugmunn.core` and `hugmunn.ui` are implementation and change without notice.
-Everything in `hugmunn.__all__` keeps its meaning across a minor version.
+```python
+import hugmunn
 
-<details>
-<summary><b>Full public surface</b></summary>
+with hugmunn.agent("code-glm") as chat:
+    print(chat.ask("Explain Python context managers with an example."))
+    chat.save("conversation.json")
+```
 
-| | |
-|---|---|
-| `Agent`, `agent` | the loop; `agent` is the context-manager form |
-| `Event` | what `run()` yields — `kind`, `text`, `tool`, `summary`, `timings` |
-| `Model`, `models`, `available_models` | discovery |
-| `Session`, `sessions` | saved conversations |
-| `Effort`, `Persistence`, `Autonomy` | the tiers |
-| `skills`, `tool_names` | what can be attached |
-| `sign_in`, `signed_in` | cloud credentials |
-| `HugmunnError` and subclasses | everything raised deliberately |
+Stream a response with access to a limited set of read tools:
 
-</details>
+```python
+import hugmunn
 
----
+with hugmunn.agent(
+    "code-glm",
+    workdir="/path/to/project",
+    tools=["list_directory", "read_file", "search_text"],
+) as chat:
+    for event in chat.run("Read the README and describe this project."):
+        if event.kind == "content":
+            print(event.text, end="", flush=True)
+        elif event.kind == "error":
+            raise hugmunn.HugmunnError(event.text)
+```
 
-## Configuration
+Tools are disabled by default in the Python API. When enabled, calls requiring
+approval raise `ApprovalRequired` unless you supply an `approve` callback.
+An agent closes the local server it started when its context exits; an already
+running server is left running. Library conversations are saved explicitly with
+`save()`.
 
-| | |
-|---|---|
-| Settings | `~/.config/hugmunn/settings.json` |
-| Conversations | `~/.config/hugmunn/sessions/` |
-| API keys | system keyring, else a mode-600 file — never `settings.json` |
-| Weights | `~/.claude/models/`, or anywhere you point it |
+The [API guide](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/python-api.md)
+covers cloud models, approval callbacks, streaming, cancellation, and sessions.
+The [reference](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/api.rst)
+is generated from the public docstrings. Runnable examples are in
+[`examples/`](https://github.com/EinarOlafsson/hugmunn/tree/main/examples).
 
-`HUGMUNN_CONFIG_DIR`, `HUGMUNN_MODELS_ROOT` and `LLAMA_SERVER` override these.
-`ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are read if set.
+## Configuration and documentation
 
----
+Settings and sessions normally live in `~/.config/hugmunn/`; model weights
+default to `~/.claude/models/`. Override these with `HUGMUNN_CONFIG_DIR` and
+`HUGMUNN_MODELS_ROOT`. Set `LLAMA_SERVER` to use an existing runtime.
+
+| Guide | Contents |
+| --- | --- |
+| [Installation](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/installation.md) | pip, environments, model setup, troubleshooting |
+| [Desktop](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/desktop.md) | Controls, tools, sessions, remote access |
+| [Python API](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/python-api.md) | Examples and behavior |
+| [Configuration](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/configuration.md) | Paths, credentials, skills, custom tools |
+| [Installers](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/installers.md) | Native builds and release preparation |
+| [Contributing](https://github.com/EinarOlafsson/hugmunn/blob/main/CONTRIBUTING.md) | Development, tests, documentation builds |
+
+Hugmunn’s themes and packaging take inspiration from
+[spacr](https://github.com/EinarOlafsson/spacr), my microscopy analysis project.
+The applications are installed separately.
 
 ## Development
 
 ```bash
-pip install -e ".[dev]"
-QT_QPA_PLATFORM=offscreen pytest -q
+python -m pip install -e ".[dev,docs,build]"
+QT_QPA_PLATFORM=offscreen python -m pytest
+python -m sphinx -W --keep-going -b html docs docs/_build/html
+python -m build
+python -m twine check dist/*.whl dist/*.tar.gz
 ```
 
-**856 tests.** GUI tests build a real window offscreen and drive it — every
-significant bug in this project surfaced under live use rather than from a unit
-test written against its author's assumptions, so the window is constructed for
-real and the controls are actually switched.
+Tests use fake model clients and offscreen Qt windows; they do not require
+model downloads or paid API calls. See [CHANGELOG.md](https://github.com/EinarOlafsson/hugmunn/blob/main/CHANGELOG.md)
+for changes.
 
-`pytest-qt` is deliberately not a dependency: it loads a Qt binding at configure
-time and prefers PySide6, and two Qt bindings in one process own separate copies
-of the C++ runtime. It segfaults with no Python traceback.
+## License
 
----
-
-## Licence
-
-MIT. See [LICENSE](LICENSE).
-
-The models it downloads carry their own licences — Apache 2.0, MIT and others
-depending on the model. Abliterated builds carry the licence of the model they
-were derived from.
+Hugmunn’s source and raven artwork are distributed under the
+[MIT license](https://github.com/EinarOlafsson/hugmunn/blob/main/LICENSE).
+Model weights, llama.cpp, Qt, and other dependencies have their own licenses.

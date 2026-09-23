@@ -20,6 +20,8 @@ from enum import IntEnum
 
 
 class Persistence(IntEnum):
+    """Tool-round budgets: LIGHT 8, NORMAL 25, PERSISTENT 60, RELENTLESS 200."""
+
     LIGHT = 1
     NORMAL = 2
     PERSISTENT = 3

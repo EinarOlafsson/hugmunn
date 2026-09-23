@@ -1,30 +1,9 @@
-"""The public Python interface. Everything else in this package is internal.
+"""Public model discovery, conversation, and credential interfaces.
 
-``import hugmunn`` gets you this module's names and nothing more. The modules
-under ``hugmunn.core`` and ``hugmunn.ui`` are implementation: they change
-without notice, and importing from them directly is not supported. Anything
-here keeps its meaning across a minor version, and anything removed goes
-through a release where it still works and warns.
-
-The shape is one class and a few functions::
-
-    import hugmunn
-
-    agent = hugmunn.Agent(model="uncensored-gemma")
-    for event in agent.run("what does config.py do?"):
-        if event.kind == "content":
-            print(event.text, end="")
-
-That starts a llama.cpp server if one is not already up, streams the answer,
-and stops the server when the agent is closed. A cloud model is the same call
-with a different name::
-
-    agent = hugmunn.Agent(model="claude:claude-opus-5")
-
-Tools are off unless asked for, and when they are on, anything that changes
-the machine goes through ``approve`` -- which defaults to refusing. That is
-deliberate: a library that runs shell commands the moment it is imported into
-somebody's script is a library that gets one bad review and deserves it.
+Import these names from :mod:`hugmunn`. Local agents connect to llama.cpp;
+cloud agents connect to the selected provider. Tools are disabled by default.
+When enabled, the autonomy policy determines which calls require ``approve``.
+Use an agent as a context manager to stop any server it starts.
 """
 
 from __future__ import annotations
@@ -32,6 +11,10 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass
 from typing import Any, Callable, Iterator, Sequence
+from pathlib import Path
+
+from .errors import HugmunnError
+from .core.providers import ProviderError
 
 from . import config as _config
 from .core import agent as _agent
@@ -46,15 +29,15 @@ from .core import tools as _tools
 from .core.server import ServerError, ServerManager
 
 __all__ = [
-    "Agent", "Event", "Model", "Session",
+    "Agent", "agent", "Event", "Model", "Session", "sessions",
     "Effort", "Persistence", "Autonomy",
     "models", "available_models", "sign_in", "signed_in",
     "skills", "tool_names",
-    "ApprovalRequired", "ModelNotFound", "ServerError", "HugmunnError",
+    "ApprovalRequired", "ModelNotFound", "ServerError", "ProviderError", "HugmunnError",
     "__version__",
 ]
 
-from . import __version__  # noqa: E402  (re-exported deliberately)
+from ._version import __version__  # noqa: E402  (re-exported deliberately)
 
 #: Tiers. Re-exported so callers never import from ``hugmunn.core``.
 Effort = _effort.Effort
@@ -62,20 +45,15 @@ Persistence = _persistence.Persistence
 Autonomy = _autonomy.Autonomy
 
 
-class HugmunnError(RuntimeError):
-    """Base class for everything this package raises deliberately."""
-
-
 class ModelNotFound(HugmunnError):
     """The named model is not in the registry, or its provider is unknown."""
 
 
 class ApprovalRequired(HugmunnError):
-    """A tool needed a human and no ``approve`` callback said yes.
+    """A tool requires approval and no callback was supplied.
 
-    Raised rather than returned, because a caller who did not pass ``approve``
-    almost certainly did not mean to run a shell command, and a silent refusal
-    buried in a stream is a bug report waiting to happen.
+    A callback returning ``False`` instead produces a ``denied`` event and
+    lets the model continue without executing the tool.
     """
 
 
@@ -91,6 +69,8 @@ class Event:
         A fragment of the answer. Concatenate these in order.
     ``tool_start`` / ``tool_result``
         A tool was called, and what it returned.
+    ``denied``
+        The approval callback declined a tool call. The tool was not executed.
     ``notice``
         Something the run wants the user to know -- a strategy change, a
         context trim. Informational.
@@ -111,11 +91,21 @@ class Event:
 
 @dataclass(frozen=True)
 class Model:
-    """A model this installation can run.
+    """A model in the registry; availability depends on weights and credentials.
 
     ``key`` is what :class:`Agent` takes. For local models it is a short name
     such as ``"uncensored-gemma"``; for cloud models it is
     ``"claude:<id>"`` or ``"chatgpt:<id>"``.
+
+    Attributes:
+        key: Identifier accepted by :class:`Agent`.
+        label: Display name.
+        provider: ``"local"``, ``"claude"``, or ``"chatgpt"``.
+        freedom: Registry classification: vanilla, tuned, or unlocked.
+        context: Configured context capacity in tokens.
+        size_gb: Estimated weight download size; zero for cloud models.
+        downloaded: Whether weights exist locally, or a cloud key is present.
+        description: Short model description from the registry or provider.
     """
 
     key: str
@@ -129,6 +119,7 @@ class Model:
 
     @property
     def is_local(self) -> bool:
+        """Whether this model uses a local llama.cpp server."""
         return self.provider == "local"
 
 
@@ -151,12 +142,19 @@ def _wrap_cloud(model) -> Model:
 
 
 def models(provider: str | None = None) -> list[Model]:
-    """Every model this installation knows about.
+    """Return registered models without making network requests.
 
-    ``provider`` filters to ``"local"``, ``"claude"`` or ``"chatgpt"``.
-    Cloud lists come from the account when a key is present and from a small
-    built-in list when it is not, so this is cheap and never blocks.
+    Args:
+        provider: Filter by ``"local"``, ``"claude"``, or ``"chatgpt"``;
+            ``None`` includes all providers. Unknown values return an empty list.
+
+    Returns:
+        Model metadata, including download status and context capacity.
+        Cloud entries use the cached catalogue or the built-in fallback.
+        Call :func:`sign_in` to refresh an account's catalogue.
     """
+    # Restore paths chosen in the desktop before inspecting local availability.
+    _config.Settings.load()
     out = [_wrap_local(s) for s in _config.REGISTRY]
     for cloud in _providers.CLOUD:
         out.extend(_wrap_cloud(m) for m in _providers.models_for(cloud))
@@ -164,7 +162,11 @@ def models(provider: str | None = None) -> list[Model]:
 
 
 def available_models() -> list[Model]:
-    """Models that could be run right now -- weights present, or signed in."""
+    """Return local models with weights and a launch path, plus signed-in cloud models.
+
+    This checks local files and credentials, not memory capacity, server health,
+    network connectivity, or API quota.
+    """
     return [m for m in models()
             if (m.is_local and _config.by_key(m.key)
                 and _config.by_key(m.key).is_available()) or (not m.is_local and m.downloaded)]
@@ -176,16 +178,30 @@ def skills() -> list[str]:
 
 
 def tool_names() -> list[str]:
-    """Every built-in tool an agent may be given."""
+    """Return sorted built-in tool names for the ``Agent(tools=...)`` allowlist.
+
+    Per-agent tools such as ``recall`` are not included.
+    """
     return sorted(_tools.by_name())
 
 
 def sign_in(provider: str, api_key: str) -> int:
-    """Store an API key and load that provider's real model list.
+    """Validate and store an API key, then cache the provider's model catalogue.
 
-    Returns how many models the key can reach. Raises
-    :class:`~hugmunn.core.providers.ProviderError` if the key is rejected --
-    which is the point of doing the round trip rather than just saving it.
+    Args:
+        provider: ``"claude"``/``"anthropic"`` or ``"chatgpt"``/``"openai"``.
+        api_key: A provider API key. A chat subscription is not an API key.
+
+    Returns:
+        Number of models returned by the provider. Model listing does not
+        guarantee that every listed model supports chat or is available to use.
+
+    Raises:
+        ModelNotFound: The provider name is unknown.
+        ProviderError: The catalogue request failed or the key was rejected.
+
+    Keys use the system keyring when available, otherwise a local credentials
+    file. This function makes a blocking network request.
     """
     resolved = _resolve_provider(provider)
     found = _providers.fetch_catalogue(resolved, api_key)
@@ -194,6 +210,10 @@ def sign_in(provider: str, api_key: str) -> int:
 
 
 def signed_in(provider: str) -> bool:
+    """Check for a stored or environment API key without validating it online.
+
+    Accepts the same provider aliases as :func:`sign_in`.
+    """
     return _credentials.is_signed_in(_resolve_provider(provider))
 
 
@@ -218,8 +238,7 @@ ApproveFn = Callable[[str, str, dict], bool]
 def _deny(name: str, summary: str, arguments: dict) -> bool:
     raise ApprovalRequired(
         f"{name} needs approval ({summary}) and no approve= callback was given. "
-        f"Pass approve=lambda name, summary, args: True to allow everything, "
-        f"or lower the autonomy tier."
+        "Pass an approve= callback that reviews the tool name, summary, and arguments."
     )
 
 
@@ -234,8 +253,11 @@ class Agent:
         :mod:`hugmunn.core.prompts` for the presets the desktop app offers.
     :param tools: ``False`` (the default) gives the model no tools at all.
         ``True`` gives it the built-in set. A list of names gives it those.
-    :param approve: called before anything that changes the machine. Omitted,
-        any such call raises :class:`ApprovalRequired`.
+    :param approve: synchronous ``(name, summary, arguments) -> bool`` callback
+        for calls requiring approval under ``autonomy``. Without a callback,
+        these calls raise :class:`ApprovalRequired`. Returning ``False`` denies
+        the tool and yields a ``denied`` event. Higher autonomy tiers may allow
+        writes without invoking this callback.
     :param effort: how hard the model works within one answer.
     :param persistence: how long the loop keeps going before it stops.
     :param autonomy: what may run without asking.
@@ -244,6 +266,14 @@ class Agent:
         uses the model's own default.
     :param start_server: for local models, start llama-server if one is not
         already running. ``False`` requires you to have started it yourself.
+    :raises ModelNotFound: the model key is unknown.
+    :raises HugmunnError: credentials are missing or a required server is absent.
+    :raises ServerError: the local server could not start.
+    :raises ValueError: a tier, tool name, or skill name is invalid.
+
+    Construction may block while a local server loads weights. Agents retain
+    history in memory and are not thread-safe. Use :meth:`save` to persist a
+    library conversation; desktop conversations are saved separately by the UI.
     """
 
     def __init__(
@@ -261,12 +291,24 @@ class Agent:
         thinking: bool | None = None,
         start_server: bool = True,
     ) -> None:
+        effort, persistence, autonomy = Effort(effort), Persistence(persistence), Autonomy(autonomy)
+        if isinstance(tools, str):
+            raise ValueError("tools must be a boolean or a sequence of tool names")
+        if isinstance(skills, str):
+            raise ValueError("skills must be a sequence of skill names")
+        catalogue = _skills.load_all()
+        requested_skills = set(skills)
+        unknown_skills = requested_skills - {s.key for s in catalogue}
+        if unknown_skills:
+            raise ValueError(f"Unknown skills: {', '.join(sorted(unknown_skills))}")
+        chosen = [s for s in catalogue if s.key in requested_skills]
         self.model = self._resolve(model)
-        self.workdir = workdir
+        self.workdir = str(Path(workdir).expanduser().resolve())
         self.history: list[dict[str, Any]] = []
         self._approve = approve or _deny
         self._server: ServerManager | None = None
         self._closed = False
+        self._effort = effort
 
         allowed = None
         if tools is False:
@@ -275,12 +317,14 @@ class Agent:
             use_tools = True
         else:
             use_tools, allowed = True, set(tools)
+            unknown = allowed - set(tool_names()) - {"recall", "spawn_agent"}
+            if unknown:
+                raise ValueError(f"Unknown tools: {', '.join(sorted(unknown))}")
 
         client = self._client(start_server)
-        chosen = [s for s in _skills.load_all() if s.key in set(skills)]
         self._agent = _agent.Agent(
             client=client,
-            workdir=workdir,
+            workdir=self.workdir,
             system_prompt=system_prompt if system_prompt is not None
             else _config.Settings().system_prompt,
             use_tools=use_tools,
@@ -301,7 +345,7 @@ class Agent:
                 return candidate
         raise ModelNotFound(
             f"no model called {key!r}. hugmunn.models() lists them; "
-            f"cloud keys look like 'claude:claude-opus-5'.")
+            "cloud keys use 'claude:<model-id>' or 'chatgpt:<model-id>'.")
 
     def _client(self, start_server: bool):
         if not self.model.is_local:
@@ -315,7 +359,7 @@ class Agent:
 
             spec = _providers.by_key(
                 f"{resolved.value}:{self.model.key.split(':', 1)[1]}")
-            return cloud.build(spec, api_key)
+            return cloud.build(spec, api_key, effort_level=int(self._effort))
 
         from .core.client import LlamaClient
 
@@ -335,11 +379,23 @@ class Agent:
     # ------------------------------------------------------------- using it
 
     def run(self, message: str, cancel: Any = None) -> Iterator[Event]:
-        """Send a message and stream what comes back.
+        """Append a user message and yield events until the turn ends.
 
-        The conversation accumulates in :attr:`history`, so consecutive calls
-        continue it. ``cancel`` is anything with ``.is_set()`` --
-        a :class:`threading.Event` -- and ends the turn when it becomes true.
+        Args:
+            message: User text to append to the current conversation.
+            cancel: Optional object with ``is_set()``, such as
+                :class:`threading.Event`. Cancellation is cooperative.
+
+        Yields:
+            Event: Content, reasoning, tool activity, notices, errors, or done.
+                Consume the iterator fully so history records the complete turn.
+
+        Raises:
+            HugmunnError: This agent has already been closed.
+            ApprovalRequired: A tool requires approval without a callback.
+
+        Model failures normally arrive as ``error`` events. Unlike :meth:`ask`,
+        this method does not convert those events into exceptions.
         """
         if self._closed:
             raise HugmunnError("this agent has been closed")
@@ -352,10 +408,11 @@ class Agent:
             )
 
     def ask(self, message: str, cancel: Any = None) -> str:
-        """Run a turn and return the answer as one string.
+        """Return concatenated answer text, raising ``HugmunnError`` on error events.
 
-        The convenience form. Everything else -- tool calls, reasoning,
-        notices -- is discarded, so use :meth:`run` when any of that matters.
+        ``message`` and ``cancel`` have the same meaning as in :meth:`run`.
+        Reasoning, tool events, and notices are omitted from the returned string.
+        Use :meth:`run` when the caller needs to display that activity.
         """
         parts = []
         for event in self.run(message, cancel=cancel):
@@ -372,7 +429,16 @@ class Agent:
     # -------------------------------------------------------------- sessions
 
     def save(self, path: str | None = None) -> str:
-        """Write this conversation to disk. Returns the path."""
+        """Write a JSON conversation and return its path.
+
+        ``path=None`` creates a new entry in the configured sessions directory.
+        Each call creates a new session ID. An explicit path is overwritten;
+        its parent directory must exist. Messages and model metadata are saved,
+        but this method does not save the agent's run settings.
+
+        Raises:
+            OSError: The destination cannot be written.
+        """
         import time
 
         session = _sessions.Session(
@@ -380,23 +446,39 @@ class Agent:
             messages=list(self.history), model_key=self.model.key,
             model_label=self.model.label, provider=self.model.provider,
         )
-        if path:
-            import json
-            from dataclasses import asdict
-            from pathlib import Path
+        import json
+        from dataclasses import asdict
 
-            Path(path).write_text(json.dumps(asdict(session), indent=1),
-                                  encoding="utf-8")
-            return path
-        _sessions.save(session)
-        _sessions.mark_closed(session)
-        return str(session.path)
+        session.closed_cleanly = True
+        target = Path(path).expanduser() if path is not None else session.path
+        if path is None:
+            target.parent.mkdir(parents=True, exist_ok=True)
+        # Replace atomically so a failed write does not truncate an existing chat.
+        import tempfile
+
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=target.parent,
+                prefix=f".{target.name}.", suffix=".tmp", delete=False,
+            ) as output:
+                temporary = Path(output.name)
+                json.dump(asdict(session), output, indent=1)
+            temporary.replace(target)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        return str(target)
 
     def load(self, path: str) -> int:
-        """Continue a saved conversation. Returns how many messages came back."""
+        """Replace history from a JSON session and return the message count.
+
+        The agent keeps its current model, tools, and settings; stored metadata
+        does not reconfigure it. Raises ``HugmunnError`` for an unreadable file.
+        """
         from pathlib import Path
 
-        session = _sessions.load(Path(path))
+        session = _sessions.load(Path(path).expanduser())
         if session is None:
             raise HugmunnError(f"could not read a conversation from {path}")
         self.history = list(session.messages)
@@ -431,15 +513,22 @@ Session = _sessions.Session
 
 
 def sessions(limit: int = 50) -> list[Session]:
-    """Saved conversations, newest first."""
+    """Return up to ``limit`` nonempty saved sessions, newest first.
+
+    Unreadable files are skipped. The directory follows ``HUGMUNN_CONFIG_DIR``.
+    ``limit`` must be nonnegative; zero returns an empty list.
+    """
+    if limit < 0:
+        raise ValueError("limit must be nonnegative")
     return _sessions.recent(limit)
 
 
 @contextlib.contextmanager
-def agent(model: str, **kwargs):
-    """:class:`Agent` as a context manager, closed on the way out.
+def agent(model: str, **kwargs: Any) -> Iterator[Agent]:
+    """Yield an :class:`Agent` and close it when the context exits.
 
-    ``with hugmunn.agent("code-glm") as a: print(a.ask("hello"))``
+    ``model`` and keyword arguments are passed to :class:`Agent`. Cleanup also
+    runs if the body raises an exception.
     """
     instance = Agent(model, **kwargs)
     try:

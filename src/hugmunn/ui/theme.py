@@ -1,21 +1,8 @@
-"""Palettes and the stylesheet built from them.
+"""Colour palettes, contrast checks, and Qt stylesheets.
 
-Adapted from ``spacr.qt.theme``, which is where the structure and most of the
-colour values come from. spaCR's version carries a scrim solver for themes
-drawn over a photograph; hugmunn has no wallpaper, so what is kept is the
-part that transfers: four palettes with identical keys, the WCAG arithmetic
-that keeps them honest, and one function that renders any of them to QSS.
-
-The lesson that came with it is the naming. spaCR shipped a module-level
-``PALETTE`` holding the *dark* colours, two dozen widgets imported it, and the
-light theme rendered dark panels on a white page — black on black, measured at
-1.08:1. So there is no module-level palette here either. :func:`active` returns
-the one that is on screen right now, and widgets resolve colours through it at
-construction time rather than capturing them at import.
-
-Every palette has the same keys, so a widget can swap between them without
-knowing which it has. :func:`failures` proves it, and a test runs it over all
-four.
+Adapted from spacr's theme system. Resolve colours through :func:`active` when
+constructing or repainting a widget so theme changes reach custom rendering.
+All palettes share the same keys; :func:`failures` checks foreground contrast.
 """
 
 from __future__ import annotations
@@ -525,6 +512,9 @@ QTabBar::tab {{ background: transparent; color: {p['fg_dim']};
 QTabBar::tab:selected {{ color: {p['fg']}; border-bottom-color: {p['accent']}; }}
 
 QMenu {{ background: {p['surface_alt']}; border: 1px solid {p['border']}; color: {p['fg']}; }}
+QMenuBar {{ background: {p['surface']}; color: {p['fg']}; }}
+QMenuBar::item {{ background: transparent; padding: 4px 8px; }}
+QMenuBar::item:selected {{ background: {p['accent']}; color: {p['on_accent']}; }}
 QMenu::item:selected {{ background: {p['accent']}; color: {p['on_accent']}; }}
 QMenu::separator {{ height: 1px; background: {p['border']}; margin: 4px 8px; }}
 QToolTip {{ background: {p['surface_alt']}; color: {p['fg']};

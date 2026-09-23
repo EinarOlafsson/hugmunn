@@ -18,6 +18,8 @@ Two things it does that a naive chat page does not:
 
 from __future__ import annotations
 
+from ..branding import svg
+
 PAGE = r"""<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
@@ -108,6 +110,7 @@ pre.code { background:var(--code); padding:10px; border-radius:8px; overflow-x:a
 <body>
 
 <header>
+  __HUGMUNN_MARK__
   <b>hugmunn</b>
   <span id="model">connecting…</span>
   <button id="gear" title="Settings">⚙</button>
@@ -339,3 +342,8 @@ setInterval(() => { if (!streaming) refresh(); }, 8000);
 </body>
 </html>
 """
+
+# Inline artwork follows the page's foreground, including remote theme changes.
+PAGE = PAGE.replace("__HUGMUNN_MARK__", svg().replace(
+    'width="512" height="512"', 'width="32" height="32" aria-hidden="true"'
+).replace('fill="#ffffff"', 'fill="currentColor"'))

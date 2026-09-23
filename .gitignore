@@ -6,6 +6,10 @@ dist/
 .pytest_cache/
 .venv/
 venv/
+docs/_build/
+.ruff_cache/
+.coverage
+htmlcov/
 *.log
 .localagent/
 

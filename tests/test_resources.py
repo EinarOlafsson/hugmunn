@@ -81,7 +81,7 @@ class TestWarnings:
 
     def test_swap_in_use_is_reported_first(self):
         note = self._warn(ram_used_gb=10, ram_total_gb=100, swap_used_gb=4.0)
-        assert "Swap" in note and "tok/s" in note
+        assert "Swap" in note and "4.0 GB" in note
 
     def test_exhausted_vram_is_reported(self):
         note = self._warn(ram_used_gb=10, ram_total_gb=100,

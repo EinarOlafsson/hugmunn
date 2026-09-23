@@ -47,7 +47,12 @@ MIN_MESSAGES = 2
 
 @dataclass
 class Session:
-    """One conversation, and enough state to put the app back where it was."""
+    """Saved messages and model metadata for a conversation.
+
+    ``started`` and ``updated`` are Unix timestamps in seconds. Desktop
+    sessions also record run ``settings`` and an optional ``goal``. Library
+    saves may leave those fields empty. ``messages`` uses chat message dicts.
+    """
 
     id: str
     started: float
@@ -69,6 +74,7 @@ class Session:
 
     @property
     def path(self) -> Path:
+        """Default JSON path in the currently configured sessions directory."""
         return session_dir() / f"{self.id}.json"
 
     @property
@@ -91,13 +97,16 @@ class Session:
 
     @property
     def turns(self) -> int:
+        """Number of user messages, including turns without an answer."""
         return sum(1 for m in self.messages if m.get("role") == "user")
 
     @property
     def worth_restoring(self) -> bool:
+        """Whether there are enough messages to offer desktop restoration."""
         return len(self.messages) >= MIN_MESSAGES
 
     def age_phrase(self, now: float | None = None) -> str:
+        """Describe time since the last update; ``now`` is a Unix timestamp."""
         seconds = max(0.0, (now if now is not None else time.time()) - self.updated)
         if seconds < 90:
             return "just now"
@@ -110,6 +119,7 @@ class Session:
         return f"{days} day{'s' if days != 1 else ''} ago"
 
     def summary(self) -> str:
+        """Return the title, turn count, and relative update time for display."""
         return f"{self.title}  ·  {self.turns} turn(s), {self.age_phrase()}"
 
 
@@ -148,9 +158,15 @@ def save(session: Session) -> None:
 
 
 def load(path: Path) -> Session | None:
+    """Read a session JSON object, returning ``None`` for invalid input."""
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    messages = data.get("messages", [])
+    if not isinstance(messages, list) or any(not isinstance(m, dict) for m in messages):
         return None
     known = {f for f in Session.__dataclass_fields__}
     try:

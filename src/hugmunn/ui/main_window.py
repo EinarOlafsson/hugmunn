@@ -42,7 +42,7 @@ from ..core.agent import Agent
 from ..core.client import LlamaClient
 from ..core.providers import Provider
 from ..core.server import ServerManager
-from . import style, theme
+from . import branding, style, theme
 from .download_dialog import DownloadDialog
 from .login_dialog import LoginDialog
 from .model_picker import (FreedomDelegate, describe, hover_colour,
@@ -136,6 +136,8 @@ class Composer(QTextEdit):
 
 
 class MainWindow(QMainWindow):
+    """Desktop chat window with model controls, tools, and saved sessions."""
+
     #: Seconds a context summary may take before it is abandoned. It runs on
     #: the thread driving the turn, which on the desktop is the GUI thread.
     SUMMARY_TIMEOUT = 45.0
@@ -183,6 +185,7 @@ class MainWindow(QMainWindow):
         # Restore any cloud catalogue we can reach without blocking startup —
         # the stored list is refreshed in Settings, not on every launch.
         self._build_ui()
+        self._refresh_branding()
         self._refresh_models()
         self._sync_controls()
         # Deferred so the window is on screen before anything modal appears:
@@ -266,26 +269,7 @@ class MainWindow(QMainWindow):
         accounts.addAction(refresh)
 
     def _build_sidebar(self) -> QWidget:
-        """Tabs for the controls, with the meters pinned below them.
-
-        The meters are not a setting. They are what tells you whether the
-        machine can take another model right now, and status you have to open
-        a tab to find is status nobody looks at. So they sit outside the tab
-        stack, always on screen, which is where they were asked to be.
-        """
-        """The controls column, inside a scroll area.
-
-        It has to scroll. The column is fifteen sections tall and wants about
-        1400px; a 1080p screen gives it rather less, and Qt resolves that
-        shortfall by compressing children below their size hints. Widgets with
-        a fixed height -- the four resource meters -- cannot compress, so they
-        are simply drawn outside their frame, on top of whatever is next to
-        them. Scrolling is the only arrangement in which nothing can overlap
-        at any window size.
-        """
-        # Tabs, because fifteen sections stacked in one column meant scrolling
-        # past the model picker to reach the system prompt, and nothing was
-        # ever in view at the same time as the thing it affects.
+        """Build scrollable settings tabs with branding and fixed resource meters."""
         self.sidebar_tabs = QTabWidget()
         self.sidebar_tabs.setObjectName("sidebarTabs")
         self.sidebar_tabs.setMinimumWidth(300)
@@ -582,6 +566,13 @@ class MainWindow(QMainWindow):
         outer = QVBoxLayout(column)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
+        self.brand_label = QLabel()
+        self.brand_label.setObjectName("brand")
+        self.brand_label.setAccessibleName("Hugmunn — thought and memory")
+        self.brand_label.setToolTip("Huginn and Muninn: thought and memory")
+        self.brand_label.setContentsMargins(18, 8, 18, 8)
+        self.brand_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        outer.addWidget(self.brand_label)
         outer.addWidget(self.sidebar_tabs, 1)
 
         footer = QFrame()
@@ -1279,6 +1270,17 @@ class MainWindow(QMainWindow):
         self.transcript.restyle()
         self.resources.restyle()
         self.composer_bar.setStyleSheet(f"border-top: 1px solid {theme.active()['border']};")
+        self._refresh_branding()
+
+    def _refresh_branding(self) -> None:
+        """Update the wordmark and window icon for the active background."""
+        icon = branding.window_icon()
+        self.setWindowIcon(icon)
+        app = QApplication.instance()
+        if app is not None:
+            app.setWindowIcon(icon)
+        self.brand_label.setPixmap(branding.pixmap(
+            "horizontal", 220, scale=self.devicePixelRatioF()))
 
     def _offer_runtime_setup(self) -> None:
         """On a machine with weights and no binary, offer to build one.

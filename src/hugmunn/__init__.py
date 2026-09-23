@@ -1,22 +1,19 @@
-"""hugmunn — a desktop client and Python library for local and cloud LLMs.
+"""Desktop application and Python API for local and cloud language models.
 
-Named for Huginn and Muninn, Odin's ravens: *hugr*, thought, and *munr*,
-memory. They fly out at dawn and return at dusk to report what the world is
-doing, which is close enough.
-
-The public interface is :mod:`hugmunn.api`, re-exported here::
+Use :func:`agent` to manage a conversation and its local server::
 
     import hugmunn
 
-    with hugmunn.agent("code-glm") as a:
-        print(a.ask("what does this repository do?"))
+    with hugmunn.agent("code-glm") as chat:
+        print(chat.ask("Explain Python context managers."))
 
-Everything under ``hugmunn.core`` and ``hugmunn.ui`` is implementation and
-changes without notice. If you find yourself importing from either, say so in
-an issue -- it means the public surface is missing something.
+The selected local model needs downloaded weights and a llama-server runtime.
+Cloud models use API credentials. Importing the package does not load Qt,
+start a server, or contact a provider. Names in ``__all__`` form the public API;
+``hugmunn.core`` and ``hugmunn.ui`` are implementation modules.
 """
 
-__version__ = "0.0.0.3"
+from ._version import __version__
 
 from .api import (  # noqa: F401,E402
     Agent,
@@ -28,6 +25,7 @@ from .api import (  # noqa: F401,E402
     Model,
     ModelNotFound,
     Persistence,
+    ProviderError,
     ServerError,
     Session,
     agent,
@@ -45,6 +43,6 @@ __all__ = [
     "Effort", "Persistence", "Autonomy",
     "models", "available_models", "skills", "tool_names",
     "sign_in", "signed_in",
-    "HugmunnError", "ModelNotFound", "ApprovalRequired", "ServerError",
+    "HugmunnError", "ModelNotFound", "ApprovalRequired", "ServerError", "ProviderError",
     "__version__",
 ]

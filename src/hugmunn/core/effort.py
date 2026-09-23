@@ -17,6 +17,8 @@ from enum import IntEnum
 
 
 class Effort(IntEnum):
+    """Reasoning/instruction level from QUICK (1) to EXHAUSTIVE (4)."""
+
     QUICK = 1
     STANDARD = 2
     THOROUGH = 3

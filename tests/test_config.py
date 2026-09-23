@@ -135,17 +135,17 @@ class TestSettings:
 
 
 class TestVersion:
-    def test_package_and_pyproject_agree(self):
-        """A version bumped in one place and not the other ships a lie."""
-        import re
+    def test_package_and_version_source_agree(self):
+        """The API and build backend use the same lightweight version source."""
+        import runpy
         from pathlib import Path
 
         import hugmunn
 
         pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
-        match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject.read_text(), re.M)
-        assert match, "no version in pyproject.toml"
-        assert match.group(1) == hugmunn.__version__
+        assert 'version = {attr = "hugmunn._version.__version__"}' in pyproject.read_text()
+        source = pyproject.parent / "src/hugmunn/_version.py"
+        assert runpy.run_path(str(source))["__version__"] == hugmunn.__version__
 
     def test_changelog_documents_the_current_version(self):
         from pathlib import Path

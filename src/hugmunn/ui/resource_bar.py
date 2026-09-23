@@ -173,12 +173,11 @@ class ResourceBar(QFrame):
 
     @staticmethod
     def _warning(snap: Snapshot) -> str:
-        """The specific thing that will bite, not a generic 'high usage'."""
+        """Describe the most pressing memory constraint in the snapshot."""
         if snap.swap_used_gb > 1.0:
             return (
-                f"Swap in use ({snap.swap_used_gb:.1f} GB) — a model loading now "
-                "will page from disk. Measured 2.1 tok/s versus 13.2 on the same "
-                "122B once memory was free."
+                f"Swap in use ({snap.swap_used_gb:.1f} GB). "
+                "Memory pressure may slow model loading and generation."
             )
         if snap.has_gpu and (snap.vram_total_gb - (snap.vram_used_gb or 0)) < 2.0:
             others = f" ({snap.gpu_procs} process(es) hold it)" if snap.gpu_procs else ""

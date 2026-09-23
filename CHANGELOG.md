@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Replace the draft logos with the two-raven artwork in light and dark variants.
+  Use it in the desktop sidebar, window icon, remote page, and installers.
+- Include icons and skill packs in wheels and source distributions, with a
+  single version source and headless `--help`/`--version` commands.
+- Rewrite the README and add installation, desktop, configuration, and Python
+  guides, generated API documentation, and runnable examples.
+- Add native Linux, Windows, and macOS installer builders and CI workflows.
+- Give server and provider errors the public `HugmunnError` base class, validate
+  agent options before starting a server, apply cloud effort settings, and
+  report session write failures instead of silently returning a path.
+- Load saved model paths for Python callers, support native Windows server
+  launch/stop, and use an external Python interpreter for frozen-app snippets.
+
 ## 0.0.0.3
 
 A public Python API, a real README, and the dropdown to spec.
