@@ -346,4 +346,5 @@ setInterval(() => { if (!streaming) refresh(); }, 8000);
 # Inline artwork follows the page's foreground, including remote theme changes.
 PAGE = PAGE.replace("__HUGMUNN_MARK__", svg().replace(
     'width="512" height="512"', 'width="32" height="32" aria-hidden="true"'
-).replace('fill="#ffffff"', 'fill="currentColor"'))
+).replace('fill="#ffffff"', 'fill="currentColor"').replace(
+    'stroke="#ffffff"', 'stroke="currentColor"'))
