@@ -2,16 +2,19 @@
 
 ## Active logo — Joined wings
 
-The application logo is the [simplified joined-wing design](simplified/README.md):
-two outward-looking ravens with fewer feather divisions and a radiant all-seeing
-eye below their joined wings. It refines the owner's selected **01 — Outward gaze**.
+The application logo is the [minimal joined-wing design](minimal/README.md):
+two outward-looking raven heads and joined wings enclosing an all-seeing eye.
+Only a few broad wing shapes remain, with open chests and necks. It refines
+the owner's selected **01 — Outward gaze** around those essential features.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../src/hugmunn/resources/icons/hugmunn-mark-white.svg">
   <img src="../src/hugmunn/resources/icons/hugmunn-mark-black.svg" alt="Two ravens with joined wings sheltering an all-seeing eye" width="380">
 </picture>
 
-[Current original PNG](simplified/joined-wings.png) · [Generation prompt](simplified/prompt.txt)
+[Current original PNG](minimal/joined-wings.png) · [Generation prompt](minimal/prompt.txt)
+
+The [first feather reduction](simplified/README.md) is also preserved.
 
 The earlier [omniscience logo](11-omniscience.png) and its
 [prompt](omniscience-prompt.txt) remain preserved.
@@ -70,5 +73,6 @@ to regenerate the PNG, ICO, and ICNS files from the packaged SVGs.
 Previous production artwork is preserved in
 [`archive/circling-ravens/`](archive/circling-ravens/),
 [`archive/stoic-sentinels/`](archive/stoic-sentinels/),
-[`archive/omniscience-above/`](archive/omniscience-above/), and
-[`archive/joined-wings-detailed/`](archive/joined-wings-detailed/).
+[`archive/omniscience-above/`](archive/omniscience-above/),
+[`archive/joined-wings-detailed/`](archive/joined-wings-detailed/), and
+[`archive/joined-wings-simplified/`](archive/joined-wings-simplified/).

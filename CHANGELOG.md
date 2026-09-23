@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.0.8 — 2026-09-23
+
+- Further simplify the icon around its essential features: two raven heads,
+  joined wings enclosing the all-seeing eye, and large hollow spaces.
+  Remove small chest and neck feather lines and retain only broad wing shapes.
+- Use the minimal artwork across the app, remote page, README, screenshots,
+  and desktop icon formats; preserve earlier versions in `icons/`.
+
 ## 0.0.0.7 — 2026-09-23
 
 - Simplify the raven logo with fewer feather divisions and larger hollow

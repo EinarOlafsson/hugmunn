@@ -41,7 +41,7 @@ build host’s glibc floor and Qt/X11 runtime dependencies.
 On Debian or Ubuntu, install the matching package with:
 
 ```bash
-sudo apt install ./dist/desktop/hugmunn_0.0.0.7_amd64.deb
+sudo apt install ./dist/desktop/hugmunn_0.0.0.8_amd64.deb
 ```
 
 The application appears as **Hugmunn** in the desktop menu. Remove it with

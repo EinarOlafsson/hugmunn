@@ -1,8 +1,10 @@
 # Simplified joined-wing ravens
 
-The active logo retains the selected outward-looking ravens, their joined
+This first simplification retains the selected outward-looking ravens, their joined
 wings, and the eye below them. Larger hollow shapes and fewer feather lines
 make the mark easier to read at small sizes.
+
+The application now uses the [further reduced version](../minimal/README.md).
 
 ![Previous and simplified logos](preview-light.png)
 
