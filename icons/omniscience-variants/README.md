@@ -31,5 +31,6 @@ Options 08–10 explore intertwined wings or tails with upright, outward-looking
 heads. Two earlier separate-bird alternatives are preserved in
 [`alternates/`](alternates/), together with their prompts.
 
-The active application artwork remains the approved parent design,
-[11 — Omniscience](../README.md#active-logo--omniscience).
+The active application artwork is the later refinement,
+[01 — Outward gaze](../README.md#active-logo--joined-wings), with the eye
+below the joined wings.

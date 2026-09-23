@@ -1,16 +1,20 @@
 # Hugmunn icon archive
 
-## Active logo — Omniscience
+## Active logo — Joined wings
 
-The selected application logo is **11 — Omniscience**: two outward-looking
-ravens beneath a radiant all-seeing eye.
+The selected application logo is **01 — Outward gaze** from the gaze studies:
+two outward-looking ravens with joined wings and a radiant all-seeing eye
+in the space below them. It matches the final image selected by the owner.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../src/hugmunn/resources/icons/hugmunn-mark-white.svg">
-  <img src="../src/hugmunn/resources/icons/hugmunn-mark-black.svg" alt="Two ravens beneath a radiant all-seeing eye" width="380">
+  <img src="../src/hugmunn/resources/icons/hugmunn-mark-black.svg" alt="Two ravens with joined wings sheltering an all-seeing eye" width="380">
 </picture>
 
-[Original PNG](11-omniscience.png) · [Generation prompt](omniscience-prompt.txt)
+[Selected original PNG](gaze-studies/01-outward-gaze.png) · [Generation prompts](gaze-studies/prompts.json)
+
+The earlier [omniscience logo](11-omniscience.png) and its
+[prompt](omniscience-prompt.txt) remain preserved.
 
 ## Final ten omniscience variations
 
@@ -54,7 +58,7 @@ of that gallery. The exact prompt for each option is in [prompts.json](prompts.j
 
 ## Selected artwork
 
-The original omniscience PNG is preserved. Its contours were traced into scalable black and white
+The selected original PNG is preserved. Its contours were traced into scalable black and white
 SVGs in [`src/hugmunn/resources/icons/`](../src/hugmunn/resources/icons/).
 The same mark is used in the wordmark, remote page, and native icon formats.
 
@@ -64,5 +68,6 @@ The SVGs retain the hollow interiors. Run `python packaging/generate_icons.py`
 to regenerate the PNG, ICO, and ICNS files from the packaged SVGs.
 
 Previous production artwork is preserved in
-[`archive/circling-ravens/`](archive/circling-ravens/) and
-[`archive/stoic-sentinels/`](archive/stoic-sentinels/).
+[`archive/circling-ravens/`](archive/circling-ravens/),
+[`archive/stoic-sentinels/`](archive/stoic-sentinels/), and
+[`archive/omniscience-above/`](archive/omniscience-above/).

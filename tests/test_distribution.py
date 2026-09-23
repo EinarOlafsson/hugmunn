@@ -70,4 +70,4 @@ def test_remote_page_uses_inline_theme_aware_mark():
 
     assert 'fill="currentColor"' in PAGE
     assert "__HUGMUNN_MARK__" not in PAGE
-    assert "Two upright ravens beneath a radiant all-seeing eye" in PAGE
+    assert "Two ravens with joined wings sheltering a radiant all-seeing eye" in PAGE

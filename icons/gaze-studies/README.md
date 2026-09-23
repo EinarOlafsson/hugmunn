@@ -1,5 +1,7 @@
 # Eye placement and gaze
 
+**Selected for the application: 01 — Outward gaze.**
+
 Four refinements of the selected woven-wing concept. The symbolic eye moves
 into the space between the birds, beneath their joined inner wings.
 

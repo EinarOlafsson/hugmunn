@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.0.6 — 2026-09-23
+
+- Use the selected outward-looking ravens with joined wings and the all-seeing
+  eye in the space below them. Update light and dark application artwork,
+  the remote page, README, screenshots, and native desktop icons.
+- Save all ten omniscience variations, two additional alternatives, and four
+  gaze refinements in `icons/`, with original images, prompts, and galleries.
+- Preserve the previous production logo in `icons/archive/omniscience-above/`.
+
 ## 0.0.0.5 — 2026-09-23
 
 - Use the selected omniscience design: two upright, outward-looking ravens
