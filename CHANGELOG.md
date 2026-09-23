@@ -1,14 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.0.0.4 — 2026-09-23
 
-- Replace the draft logos with the two-raven artwork in light and dark variants.
+- Replace the draft logos with hollow two-raven outlines in light and dark variants.
   Use it in the desktop sidebar, window icon, remote page, and installers.
 - Include icons and skill packs in wheels and source distributions, with a
   single version source and headless `--help`/`--version` commands.
 - Rewrite the README and add installation, desktop, configuration, and Python
   guides, generated API documentation, and runnable examples.
 - Add native Linux, Windows, and macOS installer builders and CI workflows.
+- Develop on nightly and publish new versions automatically when merged to main,
+  using the owner’s PyPI trusted publisher and attaching installers to GitHub releases.
 - Give server and provider errors the public `HugmunnError` base class, validate
   agent options before starting a server, apply cloud effort settings, and
   report session write failures instead of silently returning a path.

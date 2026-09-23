@@ -9,6 +9,14 @@ source .venv/bin/activate
 python -m pip install -e ".[dev,docs,build]"
 ```
 
+## Branches and releases
+
+Work on `nightly` and push completed changes with descriptive commits. Merge
+validated work into `main`. For a release, bump `src/hugmunn/_version.py` and
+update `CHANGELOG.md` before the merge. Main pushes automatically publish a
+new version after tests and native builds pass; an already released version is
+not uploaded again. See [the release guide](docs/installers.md).
+
 ## Tests
 
 ```bash

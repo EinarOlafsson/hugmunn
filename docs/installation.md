@@ -22,7 +22,7 @@ On Windows, activate with `.venv\Scripts\activate` in Command Prompt or
 Use `python -m pip install -e .` when developing. To install a built wheel:
 
 ```bash
-python -m pip install /path/to/hugmunn-0.0.0.3-py3-none-any.whl
+python -m pip install /path/to/hugmunn-0.0.0.4-py3-none-any.whl
 ```
 
 The wheel includes Python modules, skill packs, and artwork. It does not include

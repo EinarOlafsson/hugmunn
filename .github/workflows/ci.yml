@@ -1,7 +1,9 @@
 name: Tests and Python package
 
 on:
+  workflow_call:
   push:
+    branches: [main, nightly]
   pull_request:
   workflow_dispatch:
 

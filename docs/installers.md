@@ -41,7 +41,7 @@ build host’s glibc floor and Qt/X11 runtime dependencies.
 On Debian or Ubuntu, install the matching package with:
 
 ```bash
-sudo apt install ./dist/desktop/hugmunn_0.0.0.3_amd64.deb
+sudo apt install ./dist/desktop/hugmunn_0.0.0.4_amd64.deb
 ```
 
 The application appears as **Hugmunn** in the desktop menu. Remove it with
@@ -63,25 +63,50 @@ saved conversations in their existing user directories.
 
 ## Release workflow
 
-`.github/workflows/desktop.yml` builds and smoke-tests native bundles on their
-own operating systems when manually dispatched or when a version tag is pushed.
-Artifacts are uploaded to the workflow run. The workflow does not automatically
-publish a GitHub release or sign the binaries.
+`main` is the default and release branch. Make changes on `nightly`, push
+completed work there, and merge it into `main` after validation. Before a new
+release, bump `src/hugmunn/_version.py` and add the matching version section to
+`CHANGELOG.md` on `nightly`.
 
-Before sharing a release:
+Every push to `main`, including a merge or a direct version bump, runs
+`.github/workflows/publish.yml`. If the version is already published on both
+GitHub and PyPI, the workflow skips publication. A new version triggers:
 
-1. Update `src/hugmunn/_version.py` and `CHANGELOG.md`.
-2. Run tests, build documentation, and validate the wheel and source archive.
-3. Build the native packages and test an installation on each target platform.
-4. Sign Windows executables and sign/notarize macOS builds if distributing them
-   with a verified publisher identity. Certificates are not included here.
-5. Attach the tested artifacts and checksum manifests to the matching release.
+1. Python tests, wheel/source builds, and documentation checks.
+2. Linux, Windows, and macOS installer builds on native runners, with startup checks.
+3. A lightweight `v<version>` tag pointing to the tested commit.
+4. PyPI publication through the repository owner's trusted publisher, and a
+   GitHub release with the wheel, source archive, desktop installers, portable
+   bundles, and installer checksum manifests. These run independently, so a
+   PyPI account setup issue does not withhold desktop downloads.
 
-`.github/workflows/publish.yml` supports PyPI trusted publishing from a matching
-version tag. It requires a GitHub environment named `pypi` and a PyPI trusted
-publisher for owner `EinarOlafsson`, repository `hugmunn`, workflow `publish.yml`,
-and environment `pypi`. Configure those services before running the publish
-workflow. Building locally does not publish anything.
+The workflow does not create commits or add bot contributors. An interrupted
+release can be retried from **Actions → Release Hugmunn**, using the same source
+commit or its version tag. Once a tag exists, a different commit must use a new
+version. Existing PyPI files are skipped on retries.
+
+`.github/workflows/desktop.yml` is also available as a manual build without
+publishing. The native packages are unsigned; public distribution with a
+verified publisher identity requires your Windows signing certificate and an
+Apple Developer ID with notarization.
+
+### One-time PyPI setup
+
+While signed into your own PyPI account, add a pending trusted publisher at
+[PyPI account publishing](https://pypi.org/manage/account/publishing/):
+
+| Field | Value |
+| --- | --- |
+| PyPI project | `hugmunn` |
+| GitHub owner | `EinarOlafsson` |
+| Repository | `hugmunn` |
+| Workflow | `publish.yml` |
+| Environment | `pypi` |
+
+The repository has a matching GitHub environment named `pypi`. The PyPI account
+that registers the pending publisher owns the new project when it is first
+published. No API token needs to be stored in the repository. Building locally
+does not publish anything.
 
 See the [Python packaging guide](https://packaging.python.org/en/latest/tutorials/packaging-projects/)
 and [PyInstaller documentation](https://pyinstaller.org/en/stable/usage.html) for
