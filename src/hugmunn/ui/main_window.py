@@ -1176,6 +1176,9 @@ class MainWindow(QMainWindow):
         if spec is None:
             self.model_blurb.setText("")
             self.privacy_label.setText("")
+            if hasattr(self, "effort_blurb"):
+                self._on_effort_changed()
+                self._on_autonomy_changed()
             self._sync_controls()
             return
 

@@ -85,13 +85,16 @@ def expected(role):
 
 
 @pytest.fixture(params=list(theme.THEMES))
-def themed(request, qt_app):
+def themed(request, qt_app, no_leftover_widgets):
     from PyQt6.QtWidgets import QApplication
 
     previous = theme.active_name()
     theme.set_active(request.param)
     QApplication.instance().setStyleSheet(theme.stylesheet())
     yield request.param
+    # Restyling a closed widget during Python/Qt teardown can segfault.
+    # Destroy this test's widgets before Qt walks them to restore the theme.
+    no_leftover_widgets()
     theme.set_active(previous)
     QApplication.instance().setStyleSheet(theme.stylesheet())
 

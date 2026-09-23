@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import os
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +16,47 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 #: application is already gone segfaults during interpreter shutdown -- after
 #: the tests have reported success, which is a confusing place to find it.
 _APPLICATION = None
+
+
+@pytest.fixture
+def model_scripts(tmp_path, monkeypatch):
+    """Provide launch scripts without depending on a developer's model folder."""
+    from hugmunn import config
+
+    root = tmp_path / "model-fixtures"
+    monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(root))
+    monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path / "configuration"))
+    (root / "scripts").mkdir(parents=True)
+    for spec in config.REGISTRY:
+        if not spec.files:
+            continue
+        folder = "qwen3.5-122b" if spec.key == "write-big" else spec.key
+        script = spec.script_path
+        script.write_text(
+            '#!/bin/sh\nexec llama-server \\\n'
+            f'  --model "$BASE/gguf/{folder}/{Path(spec.files[0]).name}" \\\n'
+            f'  --ctx-size {spec.ctx_size} \\\n'
+            '  "$@"\n', encoding="utf-8",
+        )
+        script.chmod(0o755)
+    return root
+
+
+@pytest.fixture
+def model_runtime(model_scripts, monkeypatch):
+    """Provide tiny weight files and a stub executable for argument-only tests."""
+    from hugmunn import config
+
+    runtime = model_scripts / "llama-server"
+    runtime.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runtime.chmod(0o755)
+    monkeypatch.setenv("LLAMA_SERVER", str(runtime))
+    config.set_runtime(None)
+    for spec in config.REGISTRY:
+        for path in spec.expected_files().values():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"test weights")
+    return runtime
 
 
 @pytest.fixture(scope="session")
@@ -42,7 +84,12 @@ def no_leftover_widgets():
     Deleting them is not optional tidiness: the suite passed file by file and
     crashed in combination, which is the most confusing shape a bug can have.
     """
-    yield
+    yield destroy_widgets
+    destroy_widgets()
+
+
+def destroy_widgets():
+    """Deliver deferred widget deletions before changing global Qt styles."""
     try:
         from PyQt6.QtCore import QEvent
         from PyQt6.QtWidgets import QApplication

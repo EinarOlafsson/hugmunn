@@ -159,7 +159,7 @@ class TestVersion:
 class TestContextSize:
     """The UI needs the real --ctx-size to warn before a 400 happens."""
 
-    def test_parsed_from_the_launch_script(self):
+    def test_parsed_from_the_launch_script(self, model_scripts):
         assert config.by_key("code-glm").context_tokens == 32768
         assert config.by_key("write").context_tokens == 16384
 

@@ -97,6 +97,7 @@ class TestProgress:
         assert downloads.Progress(1, 1, "a", 0, 0, 0, 0).percent == 0.0
 
 
+@pytest.mark.usefixtures("model_scripts")
 class TestDestinationMatchesTheLaunchScript:
     """The bug: repo paths were flattened, so 3 of 4 sharded models landed
     where llama.cpp never looks and reported themselves not-downloaded."""
@@ -130,7 +131,7 @@ class TestDestinationMatchesTheLaunchScript:
         assert "qwen3.5-122b" in str(target)
 
     def test_missing_script_yields_no_targets(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(config, "MODELS_ROOT", tmp_path)
+        monkeypatch.setenv("HUGMUNN_MODELS_ROOT", str(tmp_path))
         spec = config.ModelSpec("k", "L", "nope.sh", 1, "b",
                                 repo="r", files=("a.gguf",), download_gb=1)
         assert spec.expected_files() == {}
@@ -160,6 +161,7 @@ class TestLinkIntoPlace:
         assert expected.read_bytes() == b"new"
 
 
+@pytest.mark.usefixtures("model_scripts")
 class TestUserChosenLocation:
     """Weights may live anywhere; the app remembers where."""
 
@@ -199,8 +201,7 @@ class TestUserChosenLocation:
         assert spec.is_available()
 
     def test_settings_roundtrip_restores_the_path(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
-        monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "settings.json")
+        monkeypatch.setenv("HUGMUNN_CONFIG_DIR", str(tmp_path))
         config.set_model_path("agentic", "/mnt/big/minimax/shard1.gguf")
         config.Settings().save()
         config._MODEL_PATHS.clear()

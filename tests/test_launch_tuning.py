@@ -78,21 +78,21 @@ def test_no_model_takes_more_than_sixteen_threads():
 # ------------------------------------------- the fallback reaches the wire
 
 
-def test_the_tuning_reaches_the_command_line():
+def test_the_tuning_reaches_the_command_line(model_runtime):
     command = ServerManager()._direct_command(config.by_key("uncensored"))
     assert command is not None
     assert "--reasoning" in command and command[command.index("--reasoning") + 1] == "off"
     assert "--cache-type-k" in command
 
 
-def test_the_flagship_moe_gets_its_expert_split():
+def test_the_flagship_moe_gets_its_expert_split(model_runtime):
     command = ServerManager()._direct_command(config.by_key("uncensored-big"))
     assert command is not None
     assert "--n-cpu-moe" in command
     assert "--n-gpu-layers" in command
 
 
-def test_the_port_is_the_last_word_so_nothing_overrides_it():
+def test_the_port_is_the_last_word_so_nothing_overrides_it(model_runtime):
     command = ServerManager()._direct_command(config.by_key("write"))
     assert command[-2] == "--port"
 
