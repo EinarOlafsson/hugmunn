@@ -1,0 +1,12 @@
+[
+  {
+    "id": "08-northern-star",
+    "title": "Northern star",
+    "prompt": "Use case: logo-brand. Input image is the approved Hugmunn omniscience logo and is the EDIT TARGET. Create one polished variation of it. Preserve its core composition and identity: exactly two separated upright ravens facing outward in opposite directions, with an all-seeing eye centered above their heads and radiating knowledge/light. Neither raven touches or interlocks with the other. Black outline art with mostly hollow transparent interiors on a genuinely transparent background; no color, shading, gradients, wordmark, text, letters or numbers. Square icon with ample outer margins. Ravens and the radiant eye remain one balanced emblem, recognizable at app-icon sizes. Maintain the wide gap and equal head heights. One standalone icon only, not a comparison sheet. Change the visual treatment as specified below. A restrained Nordic celestial variation: clean stoic hollow ravens with a little angular feather geometry, and the central all-seeing eye in a spare eight-point compass-star halo. The star is formed by individual radial lines, not a filled shape. Very minimal, thoughtful, no runes, no lettering, no enclosing badge."
+  },
+  {
+    "id": "10-continuous-line",
+    "title": "Continuous line",
+    "prompt": "Use case: logo-brand. Input image is the approved Hugmunn omniscience logo and is the EDIT TARGET. Create one polished variation of it. Preserve its core composition and identity: exactly two separated upright ravens facing outward in opposite directions, with an all-seeing eye centered above their heads and radiating knowledge/light. Neither raven touches or interlocks with the other. Black outline art with mostly hollow transparent interiors on a genuinely transparent background; no color, shading, gradients, wordmark, text, letters or numbers. Square icon with ample outer margins. Ravens and the radiant eye remain one balanced emblem, recognizable at app-icon sizes. Maintain the wide gap and equal head heights. One standalone icon only, not a comparison sheet. Change the visual treatment as specified below. Use a friendly but wise monoline drawing language: medium-bold consistent smooth black strokes, graceful continuous outer contours, one simple hollow wing per raven and just two tail feather notches. The two ravens remain separate, upright, and outward-facing. Simple almond eye, open circular halo, seven radiating straight lines. Extremely clean, iconic, mostly hollow."
+  }
+]

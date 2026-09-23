@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hugmunn — final omniscience variations</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #202322; background: #eff0ed; }
+    * { box-sizing: border-box; }
+    body { max-width: 1600px; margin: auto; padding: 36px; }
+    header { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: -.9px; font-weight: 650; }
+    p { margin: 0; color: #5a625e; font-size: 14px; line-height: 1.5; }
+    nav { display: flex; gap: 8px; flex-shrink: 0; }
+    button { font: inherit; cursor: pointer; }
+    nav button, dialog button { border: 1px solid #b8beba; background: transparent; color: inherit; border-radius: 7px; padding: 10px 14px; font-size: 13px; }
+    button[aria-pressed="true"] { background: #202322; color: #fff; }
+    button:focus-visible, a:focus-visible { outline: 3px solid #548777; outline-offset: 4px; }
+    main { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
+    article { background: #fff; border: 1px solid #d6dbd6; border-radius: 10px; overflow: hidden; }
+    .preview { display: grid; place-items: center; width: 100%; aspect-ratio: 1; border: 0; padding: 8px; background: #fff; }
+    .preview img { display: block; width: 100%; height: auto; }
+    .small .preview img { width: 64px; }
+    .caption { padding: 15px 16px 18px; border-top: 1px solid #e8ebe7; }
+    .line { display: flex; align-items: center; gap: 9px; }
+    .number { font-size: 14px; font-variant-numeric: tabular-nums; color: #77827c; }
+    h2 { font-size: 14px; font-weight: 650; margin: 0; }
+    .mood { margin-top: 9px; font-size: 10px; letter-spacing: 1.5px; color: #66716a; }
+    footer { margin-top: 24px; display: flex; justify-content: space-between; gap: 16px; font-size: 12px; color: #5a625e; }
+    footer a { color: inherit; }
+    .dark { color-scheme: dark; color: #edf0ec; background: #171b19; }
+    .dark article, .dark .preview, .dark dialog { background: #000; }
+    .dark article { border-color: #414942; }
+    .dark .caption { border-color: #2c322d; }
+    .dark p, .dark footer, .dark .mood, .dark .number { color: #aab7ae; }
+    .dark img { filter: invert(1); }
+    .dark button[aria-pressed="true"] { background: #edf0ec; color: #171b19; }
+    html:has(.dark) { background: #171b19; }
+    dialog { border: 1px solid #888; border-radius: 12px; width: min(760px, 92vw); padding: 22px; color: inherit; background: #fff; }
+    dialog::backdrop { background: #0009; }
+    dialog img { display: block; width: 100%; max-height: 70vh; object-fit: contain; }
+    .dialog-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    @media (max-width: 1100px) { main { grid-template-columns: repeat(3, 1fr); } header { align-items: start; flex-direction: column; } }
+    @media (max-width: 720px) { body { padding: 20px; } main { grid-template-columns: repeat(2, 1fr); gap: 12px; } footer { flex-direction: column; } }
+    @media (max-width: 420px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Hugmunn / Omniscience</h1><p>Ten final variations of the raven-and-eye emblem.</p></div>
+    <nav aria-label="Preview settings">
+      <button id="theme" aria-pressed="false">Dark background</button>
+      <button id="size" aria-pressed="false">64 px check</button>
+    </nav>
+  </header>
+  <main id="studies" aria-label="Ten icon options"></main>
+  <footer><span>01–10 FINAL OMNISCIENCE VARIATIONS</span><span>Click an icon to enlarge · <a href="prompts.json">Generation prompts</a></span></footer>
+  <dialog id="zoom" aria-labelledby="zoom-title">
+    <div class="dialog-bar"><h2 id="zoom-title"></h2><button id="close">Close</button></div>
+    <img id="zoom-image" alt="">
+  </dialog>
+  <script>
+    const studies = [
+  [
+    "01-essential",
+    "Essential",
+    "MINIMAL"
+  ],
+  [
+    "02-engraved",
+    "Engraved",
+    "ENGRAVED"
+  ],
+  [
+    "03-geometric",
+    "Geometric",
+    "GEOMETRIC"
+  ],
+  [
+    "04-wise-watchers",
+    "Wise watchers",
+    "STOIC"
+  ],
+  [
+    "05-gentle-scholars",
+    "Gentle scholars",
+    "CUTE"
+  ],
+  [
+    "06-fierce-guardians",
+    "Fierce guardians",
+    "ANGRY"
+  ],
+  [
+    "07-solar-vision",
+    "Solar vision",
+    "RADIANT"
+  ],
+  [
+    "08-crossed-wings",
+    "Crossed wings",
+    "INTERWOVEN"
+  ],
+  [
+    "09-braided-tails",
+    "Braided tails",
+    "INTERWOVEN"
+  ],
+  [
+    "10-woven-knowledge",
+    "Woven knowledge",
+    "INTERWOVEN"
+  ]
+];
+    const dialog = document.getElementById('zoom');
+    for (const [id, title, mood] of studies) {
+      const card = document.createElement('article');
+      const number = id.slice(0, 2);
+      card.innerHTML = `<button class="preview" aria-label="Enlarge option ${number}: ${title}"><img src="${id}.png" alt="${title}: two ravens and an all-seeing eye, ${mood.toLowerCase()} style"></button><div class="caption"><div class="line"><span class="number">${number}</span><h2>${title}</h2></div><div class="mood">${mood}</div></div>`;
+      card.querySelector('button').addEventListener('click', () => {
+        document.getElementById('zoom-title').textContent = `${number} / ${title}`;
+        const image = document.getElementById('zoom-image');
+        image.src = `${id}.png`;
+        image.alt = title;
+        dialog.showModal();
+      });
+      document.getElementById('studies').append(card);
+    }
+    for (const [id, className] of [['theme', 'dark'], ['size', 'small']]) {
+      document.getElementById(id).addEventListener('click', event => {
+        const enabled = document.body.classList.toggle(className);
+        event.currentTarget.setAttribute('aria-pressed', String(enabled));
+      });
+    }
+    document.getElementById('close').addEventListener('click', () => dialog.close());
+    if (new URLSearchParams(location.search).get('theme') === 'dark') document.getElementById('theme').click();
+  </script>
+</body>
+</html>

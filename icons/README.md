@@ -12,6 +12,12 @@ ravens beneath a radiant all-seeing eye.
 
 [Original PNG](11-omniscience.png) · [Generation prompt](omniscience-prompt.txt)
 
+## Final ten omniscience variations
+
+The [final comparison and all ten originals](omniscience-variants/README.md)
+explore minimal, engraved, geometric, stoic, cute, angry, and solar treatments,
+plus three versions with intertwined wings or tails.
+
 ## First ten studies
 
 Ten alternatives for Hugmunn, with space between Huginn and Muninn and three
