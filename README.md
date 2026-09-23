@@ -13,7 +13,7 @@ what they have seen. Hugmunn takes its name from the pair.
 [![PyPI](https://img.shields.io/pypi/v/hugmunn)](https://pypi.org/project/hugmunn/)
 [![Python](https://img.shields.io/badge/Python-3.10%E2%80%933.13-3776AB?logo=python&logoColor=white)](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/installation.md)
 [![Tests](https://github.com/EinarOlafsson/hugmunn/actions/workflows/ci.yml/badge.svg?branch=nightly)](https://github.com/EinarOlafsson/hugmunn/actions/workflows/ci.yml)
-[![GUI](https://img.shields.io/badge/GUI-Qt%20%28PyQt6%29-41CD52)](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/desktop.md)
+[![GUI](https://img.shields.io/badge/GUI-Qt%20%28PySide6%29-41CD52)](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/desktop.md)
 [![Installers](https://img.shields.io/github/v/release/EinarOlafsson/hugmunn?label=Installers)](https://github.com/EinarOlafsson/hugmunn/releases/latest)
 [![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/installers.md)
 [![Docs](https://img.shields.io/badge/Docs-Guides%20%26%20API-4A9EFF)](https://github.com/EinarOlafsson/hugmunn/tree/main/docs)
@@ -30,6 +30,10 @@ and return to saved conversations. The desktop application and Python API use
 the same model clients and tool policies. Local model weights and llama-server
 are separate downloads; they are not included in the Python package or desktop
 installers.
+
+Current additions include **GPT-6 Astra/Sol/Luna**, **Claude Opus 5.5/Fable 5.1**,
+and **Qwen3.8-27B**, including an unlocked variant. See the
+[model catalogue](docs/model-catalogue.md) for downloads, compatibility and sources.
 
 ## Install
 

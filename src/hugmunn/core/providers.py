@@ -106,22 +106,30 @@ class CloudModel:
 # maintained inventory of every model either provider offers.
 FALLBACK: dict[Provider, tuple[CloudModel, ...]] = {
     Provider.ANTHROPIC: (
-        CloudModel("claude-opus-5", "Claude Opus 5", Provider.ANTHROPIC,
-                   "Most capable. Extended thinking.", 200_000, 64_000, True),
+        CloudModel("claude-opus-5-5", "Claude Opus 5.5", Provider.ANTHROPIC,
+                   "Coding and knowledge work. Adaptive thinking.", 1_000_000, 128_000, True),
+        CloudModel("claude-fable-5-1", "Claude Fable 5.1", Provider.ANTHROPIC,
+                   "Demanding reasoning and long-running tasks.", 1_000_000, 128_000, True),
         CloudModel("claude-sonnet-5", "Claude Sonnet 5", Provider.ANTHROPIC,
-                   "Balanced speed and capability.", 200_000, 64_000, True),
+                   "Balanced speed and capability.", 1_000_000, 128_000, True),
+        CloudModel("claude-opus-5", "Claude Opus 5", Provider.ANTHROPIC,
+                   "Earlier Opus model.", 1_000_000, 128_000, True),
         CloudModel("claude-fable-5", "Claude Fable 5", Provider.ANTHROPIC,
-                   "Tuned for writing.", 200_000, 64_000, True),
+                   "Earlier Fable model.", 1_000_000, 128_000, True),
         CloudModel("claude-haiku-4-5-20251001", "Claude Haiku 4.5", Provider.ANTHROPIC,
-                   "Fastest and cheapest.", 200_000, 32_000, True),
+                   "Lower latency and cost.", 200_000, 64_000, True),
     ),
     Provider.OPENAI: (
+        CloudModel("gpt-6-astra", "GPT-6 Astra", Provider.OPENAI,
+                   "Complex reasoning, coding and research.", 1_050_000, 128_000, True),
+        CloudModel("gpt-6-sol", "GPT-6 Sol", Provider.OPENAI,
+                   "Coding and multi-step tasks.", 1_050_000, 128_000, True),
+        CloudModel("gpt-6-luna", "GPT-6 Luna", Provider.OPENAI,
+                   "Lower-cost, focused tasks.", 1_050_000, 128_000, True),
         CloudModel("gpt-5.1", "GPT-5.1", Provider.OPENAI,
-                   "Flagship. Reasoning effort control.", 400_000, 32_000, True),
-        CloudModel("gpt-5.1-mini", "GPT-5.1 mini", Provider.OPENAI,
-                   "Cheaper, still reasons.", 400_000, 32_000, True),
+                   "Earlier reasoning model.", 400_000, 32_000, True),
         CloudModel("gpt-4.1", "GPT-4.1", Provider.OPENAI,
-                   "No reasoning control. Wide availability.", 1_000_000, 32_000, False),
+                   "Non-reasoning model.", 1_000_000, 32_000, False),
     ),
 }
 
@@ -213,7 +221,7 @@ def _usable(model_id: str, provider: Provider) -> bool:
     return model_id.startswith(("gpt-", "o1", "o3", "o4", "chatgpt")) and not any(
         marker in model_id
         for marker in ("embedding", "audio", "realtime", "tts", "whisper",
-                       "image", "moderation", "transcribe", "search", "instruct")
+                       "image", "moderation", "transcribe", "search", "instruct", "live", "codex", "pro")
     )
 
 
@@ -264,8 +272,8 @@ def fetch_catalogue(provider: Provider, api_key: str, timeout: float = 15.0) -> 
             label=row.get("display_name") or _pretty(model_id),
             provider=provider,
             blurb=known.blurb if known else f"From your {LABELS[provider]} account.",
-            context=known.context if known else (200_000 if provider == Provider.ANTHROPIC else 128_000),
-            max_output=known.max_output if known else 8192,
+            context=row.get("max_input_tokens") or (known.context if known else (200_000 if provider == Provider.ANTHROPIC else 128_000)),
+            max_output=row.get("max_tokens") or (known.max_output if known else 8192),
             thinking=known.thinking if known else _thinks(model_id, provider),
         ))
 

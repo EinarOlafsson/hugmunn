@@ -12,6 +12,7 @@ desktop
 python-api
 api
 configuration
+model-catalogue
 installers
 licensing
 ```

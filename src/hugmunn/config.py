@@ -203,6 +203,7 @@ _RUNTIME_CANDIDATES = (
     "/opt/homebrew/bin/llama-server",
     "~/llama.cpp/build/bin/llama-server",
     "~/src/llama.cpp/build/bin/llama-server",
+
 )
 
 
@@ -833,6 +834,30 @@ REGISTRY: tuple[ModelSpec, ...] = (
         files=("Huihui-DeepSeek-V4-Flash-BF16-abliterated-ds4-Q2_K.gguf",),
         download_gb=99.7,
     ),
+    ModelSpec(
+        key="qwen38", label="Qwen3.8-27B", script="qwen38.sh", port=8104,
+        blurb="Newer Qwen dense model for writing and coding. Q5 download; use recent llama.cpp.",
+        repo="unsloth/Qwen3.8-27B-GGUF",
+        files=("Qwen3.8-27B-UD-Q5_K_M.gguf",), download_gb=19.8,
+        ctx_size=16384, reasoning="auto",
+    ),
+    ModelSpec(
+        key="qwen38-unlocked", label="Qwen3.8-27B · uncensored",
+        script="qwen38-unlocked.sh", port=8105, freedom="unlocked",
+        blurb="Community Heretic variant at Q5. MTP weights included; speculative decoding is not enabled.",
+        repo="llmfan46/Qwen3.8-27B-Ultra-Uncensored-Heretic-Native-MTP-Preserved-GGUF",
+        files=("Qwen3.8-27B-Ultra-Uncensored-Heretic-Native-MTP-Preserved-Q5_K_M.gguf",),
+        download_gb=20.1, ctx_size=16384, reasoning="off",
+    ),
+    ModelSpec(
+        key="gemma12-unlocked", label="Gemma-4-12B · uncensored",
+        script="gemma12-unlocked.sh", port=8106, freedom="unlocked",
+        blurb="Smaller Heretic variant at Q5. About 9.4 GB of weights before context and runtime memory.",
+        repo="llmfan46/gemma-4-12B-it-uncensored-heretic-GGUF",
+        files=("gemma-4-12B-it-uncensored-heretic-Q5_K_M.gguf",),
+        download_gb=9.4, ctx_size=8192, reasoning="off",
+    ),
+
 )
 
 #: Ordered least to most unlocked, which is the order the picker groups by.

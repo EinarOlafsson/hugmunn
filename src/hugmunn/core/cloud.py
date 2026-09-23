@@ -4,33 +4,9 @@ The agent loop calls ``client.stream(messages, tools=…, cancel=…)`` and read
 :class:`~hugmunn.core.client.Event`. Anything that satisfies that works, so
 adding a provider is an adapter rather than a second agent.
 
-OpenAI is nearly free: its chat-completions API *is* the shape llama.cpp
-imitates, so :class:`OpenAIClient` is the local client plus an auth header and
-a reasoning parameter.
-
-Anthropic is a genuinely different API and the translation is where the care
-goes:
-
-===================  ==============================  ===============================
-                     OpenAI / llama.cpp              Anthropic
-===================  ==============================  ===============================
-endpoint             ``/v1/chat/completions``        ``/v1/messages``
-auth                 ``Authorization: Bearer``       ``x-api-key`` + version header
-system prompt        a message with role ``system``  a top-level ``system`` field
-tool schema          ``function.parameters``         ``input_schema``
-model asks for tool  ``delta.tool_calls[]``          a ``tool_use`` content block
-tool result          one message, role ``tool``      a ``tool_result`` block in *user*
-max tokens           optional                        required
-thinking             ``reasoning_effort``            ``thinking.budget_tokens``
-===================  ==============================  ===============================
-
-The last two rows are the ones that bite. Anthropic has no ``tool`` role at
-all — results go back as content blocks inside a user message — and *every
-result for one assistant turn must be in a single user message*. The OpenAI
-format puts each in its own message, so consecutive tool results are merged
-here. Sending them separately is accepted for a single call and fails the
-moment a model requests two tools at once, which is exactly the case that is
-easy to miss in testing.
+GPT-6 uses the Responses API; earlier OpenAI models retain Chat Completions.
+Claude models use the Messages API with adaptive or budgeted thinking as
+supported by their generation. Tool results are translated at this boundary.
 """
 
 from __future__ import annotations
@@ -128,6 +104,7 @@ class OpenAIClient(_CloudBase):
                  reasoning_effort: str | None = None) -> None:
         super().__init__(model, api_key, timeout)
         self.reasoning_effort = reasoning_effort
+        self._reasoning_items: dict[str, list[dict[str, Any]]] = {}
 
     def stream(
         self,
@@ -138,6 +115,9 @@ class OpenAIClient(_CloudBase):
         cancel: Any = None,
         thinking: bool | None = None,   # set by the effort tier, not per call
     ) -> Iterator[Event]:
+        if self.model.id.startswith("gpt-6"):
+            yield from self._responses(messages, tools, max_tokens, cancel)
+            return
         payload: dict[str, Any] = {
             "model": self.model.id,
             "messages": messages,
@@ -150,7 +130,7 @@ class OpenAIClient(_CloudBase):
         }
         if self.model.thinking and self.reasoning_effort:
             payload["reasoning_effort"] = self.reasoning_effort
-        elif temperature is not None:
+        elif temperature is not None and not self.model.thinking:
             # A reasoning model rejects temperature; a plain one accepts it.
             payload["temperature"] = temperature
 
@@ -194,6 +174,91 @@ class OpenAIClient(_CloudBase):
             yield Event("tool_calls", tool_calls=_finalize(pending))
         yield Event("done", timings=self._rate(produced, started))
 
+    def _response_input(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Convert chat history, retaining encrypted reasoning during tool rounds."""
+        out: list[dict[str, Any]] = []
+        for message in messages:
+            role, content = message.get("role"), message.get("content")
+            if role == "tool":
+                out.append({"type": "function_call_output", "call_id": message["tool_call_id"],
+                            "output": content or ""})
+                continue
+            calls = message.get("tool_calls") or []
+            if calls:
+                out.extend(self._reasoning_items.get(calls[0]["id"], []))
+            if content:
+                out.append({"role": role, "content": content})
+            for call in calls:
+                fn = call["function"]
+                out.append({"type": "function_call", "call_id": call["id"],
+                            "name": fn["name"], "arguments": fn["arguments"]})
+        # Keep only reasoning still represented in the current conversation.
+        active = {c["id"] for m in messages for c in m.get("tool_calls", [])}
+        self._reasoning_items = {k: v for k, v in self._reasoning_items.items() if k in active}
+        return out
+
+    def _responses(self, messages, tools, max_tokens, cancel) -> Iterator[Event]:
+        """Stream GPT-6 text and completed function calls without server-side storage."""
+        effort = self.reasoning_effort or "medium"
+        if effort == "minimal":
+            effort = "low" if self.model.id.startswith("gpt-6-astra") else "none"
+        payload: dict[str, Any] = {
+            "model": self.model.id, "input": self._response_input(messages),
+            "stream": True, "store": False, "include": ["reasoning.encrypted_content"],
+            "max_output_tokens": min(self.model.max_output, max(max_tokens, 16384)),
+            "reasoning": {"effort": effort},
+        }
+        if tools:
+            payload["tools"] = [{"type": "function", **t["function"], "strict": False} for t in tools]
+        started = time.monotonic()
+        calls: list[ToolCall] = []
+        reasoning: list[dict[str, Any]] = []
+        try:
+            with httpx.Client(timeout=httpx.Timeout(self.timeout, connect=15.0)) as client:
+                with client.stream("POST", f"{OPENAI_API}/responses", json=payload,
+                                   headers={"Authorization": f"Bearer {self.api_key}"}) as response:
+                    if response.status_code != 200:
+                        yield Event("error", text=_explain(self.provider, response.status_code,
+                                                         response.read().decode("utf-8", "replace")))
+                        return
+                    for line in response.iter_lines():
+                        if cancel is not None and cancel.is_set():
+                            yield Event("done", text="cancelled")
+                            return
+                        if not line.startswith("data:"):
+                            continue
+                        try:
+                            chunk = json.loads(line[5:])
+                        except ValueError:
+                            continue
+                        kind = chunk.get("type")
+                        if kind == "response.output_text.delta":
+                            yield Event("content", text=chunk.get("delta", ""))
+                        elif kind == "response.refusal.delta":
+                            yield Event("content", text=chunk.get("delta", ""))
+                        elif kind == "response.reasoning_summary_text.delta":
+                            yield Event("reasoning", text=chunk.get("delta", ""))
+                        elif kind == "response.output_item.done":
+                            item = chunk.get("item") or {}
+                            if item.get("type") == "reasoning":
+                                reasoning.append(item)
+                            elif item.get("type") == "function_call":
+                                calls.append(ToolCall(item["call_id"], item["name"], item["arguments"]))
+                        elif kind == "response.completed":
+                            if calls:
+                                self._reasoning_items[calls[0].id] = reasoning
+                                yield Event("tool_calls", tool_calls=calls)
+                            usage = (chunk.get("response") or {}).get("usage") or {}
+                            yield Event("done", timings=self._rate(usage.get("output_tokens", 0), started))
+                            return
+                        elif kind in ("response.failed", "response.incomplete", "error"):
+                            yield Event("error", text="OpenAI did not complete this response. Retry or increase the output budget.")
+                            return
+        except httpx.HTTPError as exc:
+            yield Event("error", text=f"Could not reach OpenAI: {exc}")
+            return
+        yield Event("error", text="OpenAI's stream ended before completion. Please retry.")
+
     @staticmethod
     def _consume(chunk: dict[str, Any], pending: dict[int, dict[str, str]]) -> Iterator[Event]:
         choices = chunk.get("choices") or []
@@ -232,6 +297,7 @@ class AnthropicClient(_CloudBase):
                  thinking_budget: int = 0) -> None:
         super().__init__(model, api_key, timeout)
         self.thinking_budget = thinking_budget
+        self._thinking_items: dict[str, list[dict[str, Any]]] = {}
 
     # ---- request translation ----
 
@@ -328,6 +394,16 @@ class AnthropicClient(_CloudBase):
 
     def _payload(self, messages, tools, temperature, max_tokens) -> dict[str, Any]:
         system, converted = self.convert_messages(messages)
+        active = set()
+        for message in converted:
+            if message["role"] != "assistant":
+                continue
+            calls = [b for b in message["content"] if b.get("type") == "tool_use"]
+            if calls:
+                key = calls[0]["id"]
+                active.add(key)
+                message["content"] = self._thinking_items.get(key, []) + message["content"]
+        self._thinking_items = {k: v for k, v in self._thinking_items.items() if k in active}
         # Required here, unlike OpenAI. The model's own ceiling is the cap:
         # asking for more than it can emit is a 400.
         ceiling = max(max_tokens, self.model.max_output)
@@ -341,6 +417,15 @@ class AnthropicClient(_CloudBase):
             payload["system"] = system
         if tools:
             payload["tools"] = self.convert_tools(tools)
+        if self.model.id.startswith(("claude-opus-5", "claude-sonnet-5", "claude-fable-", "claude-mythos-",
+                                     "claude-opus-4-6", "claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-6")):
+            payload["thinking"] = {"type": "adaptive"}
+            payload["output_config"] = {"effort": ("low" if self.thinking_budget == 0 else
+                "medium" if self.thinking_budget <= 4096 else "high" if self.thinking_budget <= 16384 else "max")}
+            # max effort is Opus/Fable/Mythos-only; Sonnet accepts high.
+            if "sonnet" in self.model.id and payload["output_config"]["effort"] == "max":
+                payload["output_config"]["effort"] = "high"
+            return payload
         if self.model.thinking and self.thinking_budget:
             # Carve the budget out of the ceiling rather than adding to it.
             # An effort tier asking for more thinking than the model can emit
@@ -370,6 +455,7 @@ class AnthropicClient(_CloudBase):
         # only parseable once the block closes, so they are accumulated by
         # block index exactly as OpenAI's fragments are.
         blocks: dict[int, dict[str, str]] = {}
+        thoughts: dict[int, dict[str, Any]] = {}
         calls: list[ToolCall] = []
         produced = 0
         started = time.monotonic()
@@ -404,6 +490,8 @@ class AnthropicClient(_CloudBase):
                         kind = chunk.get("type")
                         if kind == "content_block_start":
                             block = chunk.get("content_block") or {}
+                            if block.get("type") in ("thinking", "redacted_thinking"):
+                                thoughts[chunk.get("index", 0)] = dict(block)
                             if block.get("type") == "tool_use":
                                 blocks[chunk.get("index", 0)] = {
                                     "id": block.get("id", ""),
@@ -413,6 +501,11 @@ class AnthropicClient(_CloudBase):
                         elif kind == "content_block_delta":
                             delta = chunk.get("delta") or {}
                             dtype = delta.get("type")
+                            thought = thoughts.get(chunk.get("index", 0))
+                            if thought is not None:
+                                for field in ("thinking", "signature"):
+                                    if field in delta:
+                                        thought[field] = thought.get(field, "") + delta[field]
                             if dtype == "text_delta":
                                 yield Event("content", text=delta.get("text", ""))
                             elif dtype == "thinking_delta":
@@ -440,6 +533,8 @@ class AnthropicClient(_CloudBase):
             return
 
         if calls:
+            self._thinking_items[calls[0].id] = [v for v in thoughts.values()
+                if v.get("signature") or v.get("type") == "redacted_thinking"]
             yield Event("tool_calls", tool_calls=calls)
         yield Event("done", timings=self._rate(produced, started))
 

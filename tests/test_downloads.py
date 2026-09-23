@@ -67,7 +67,7 @@ class TestRegistryDownloadMetadata:
 
     def test_sizes_are_plausible(self):
         for m in config.REGISTRY:
-            assert 10 < m.download_gb < 200, f"{m.key}: {m.download_gb}"
+            assert 0 < m.download_gb < 200, f"{m.key}: {m.download_gb}"
 
     def test_sharded_models_list_every_shard(self):
         """A partial shard set loads with an opaque llama.cpp error."""

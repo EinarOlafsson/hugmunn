@@ -10,7 +10,7 @@ from hugmunn.core import effort as effortkit
 from hugmunn.core.cloud import AnthropicClient, OpenAIClient, _explain
 from hugmunn.core.providers import CloudModel, Provider
 
-MODEL = CloudModel("claude-opus-5", "Opus 5", Provider.ANTHROPIC, thinking=True,
+MODEL = CloudModel("claude-haiku-4-5-20251001", "Haiku 4.5", Provider.ANTHROPIC, thinking=True,
                    max_output=16000)
 GPT = CloudModel("gpt-5.1", "GPT-5.1", Provider.OPENAI, thinking=True)
 
@@ -173,7 +173,7 @@ def test_a_budget_larger_than_the_model_allows_is_clamped_not_sent():
 
 
 def test_a_budget_the_model_can_afford_is_sent_intact():
-    big = CloudModel("claude-opus-5", "Opus 5", Provider.ANTHROPIC,
+    big = CloudModel("claude-haiku-4-5-20251001", "Haiku 4.5", Provider.ANTHROPIC,
                      thinking=True, max_output=64_000)
     payload = AnthropicClient(big, "k", thinking_budget=32_768)._payload(
         [{"role": "user", "content": "hi"}], None, None, 4096

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.0.10
+
+- Add GPT-6 Astra, Sol and Luna with streaming Responses API tool support.
+- Refresh Claude defaults to Opus 5.5 and Fable 5.1, with adaptive thinking
+  and signed thinking replay for current Claude models.
+- Add verified Qwen3.8-27B GGUF downloads, including a Heretic variant, and
+  the smaller Gemma-4-12B Heretic model.
+- Respect provider-reported Claude token limits and omit unsupported sampling
+  controls from reasoning requests.
+
 ## 0.0.0.9 — 2026-09-23
 
 - License new releases under PolyForm Noncommercial 1.0.0. Noncommercial use,

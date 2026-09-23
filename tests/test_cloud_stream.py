@@ -293,3 +293,63 @@ def test_the_agent_loop_runs_a_tool_round_trip_over_anthropic(stub, tmp_path):
     result_ids = [b["tool_use_id"] for m in converted if isinstance(m["content"], list)
                   for b in m["content"] if b.get("type") == "tool_result"]
     assert ids == result_ids, "every tool_use must have a matching tool_result"
+
+
+@pytest.mark.parametrize("model_id,effort", [("gpt-6-astra", "low"), ("gpt-6-sol", "none"), ("gpt-6-luna", "none")])
+def test_gpt6_responses_tools_and_reasoning_replay(stub, model_id, effort):
+    thought = {"type": "reasoning", "id": "rs_1", "summary": [], "encrypted_content": "opaque"}
+    call = {"type": "function_call", "call_id": "call_1", "name": "read_file", "arguments": '{"path":"a"}'}
+    stub.status = 200
+    stub.script = [
+        {"type": "response.output_text.delta", "delta": "Reading."},
+        {"type": "response.output_item.done", "item": thought},
+        {"type": "response.output_item.done", "item": call},
+        {"type": "response.completed", "response": {"usage": {"output_tokens": 9}}},
+    ]
+    c = cloud.OpenAIClient(CloudModel(model_id, model_id, Provider.OPENAI, thinking=True), "test", reasoning_effort="minimal")
+    events = collect(c, tools=[{"type": "function", "function": {"name": "read_file", "parameters": {"type": "object"}}}])
+    assert [e.kind for e in events] == ["content", "tool_calls", "done"]
+    assert events[1].tool_calls[0].parsed_arguments() == {"path": "a"}
+    assert stub.received["path"] == "/v1/responses"
+    p = stub.received["payload"]
+    assert p["reasoning"]["effort"] == effort and p["store"] is False
+    assert p["tools"][0]["strict"] is False
+    inputs = c._response_input([
+        {"role": "assistant", "content": "Reading.", "tool_calls": [{"id": "call_1", "function": {"name": "read_file", "arguments": call["arguments"]}}]},
+        {"role": "tool", "tool_call_id": "call_1", "content": "result"},
+    ])
+    assert inputs[0] == thought and inputs[-1]["type"] == "function_call_output"
+    c._response_input([{"role": "user", "content": "new conversation"}])
+    assert not c._reasoning_items
+
+
+@pytest.mark.parametrize("ending", ["response.incomplete", "response.failed", None])
+def test_gpt6_does_not_execute_partial_calls(stub, ending):
+    stub.status = 200
+    stub.script = [{"type": "response.output_item.done", "item": {
+        "type": "function_call", "call_id": "c1", "name": "write_file", "arguments": "{}"}}]
+    if ending:
+        stub.script.append({"type": ending})
+    c = cloud.OpenAIClient(CloudModel("gpt-6-sol", "Sol", Provider.OPENAI), "test")
+    events = collect(c)
+    assert [e.kind for e in events] == ["error"]
+
+
+def test_claude_adaptive_thinking_signature_survives_tool_round(stub):
+    stub.status = 200
+    stub.script = [
+        {"type": "content_block_start", "index": 0, "content_block": {"type": "thinking", "thinking": ""}},
+        {"type": "content_block_delta", "index": 0, "delta": {"type": "thinking_delta", "thinking": "plan"}},
+        {"type": "content_block_delta", "index": 0, "delta": {"type": "signature_delta", "signature": "signed"}},
+        {"type": "content_block_stop", "index": 0},
+        *ANTHROPIC_TOOLS[4:],
+    ]
+    c = cloud.AnthropicClient(CloudModel("claude-opus-5-5", "Opus", Provider.ANTHROPIC, thinking=True), "test")
+    events = collect(c)
+    p = stub.received["payload"]
+    assert p["thinking"] == {"type": "adaptive"}
+    assert p["output_config"] == {"effort": "low"}
+    payload = c._payload([{"role": "assistant", "tool_calls": [{"id": "toolu_a", "function": {"name": "read_file", "arguments": "{}"}}]},
+                          {"role": "tool", "tool_call_id": "toolu_a", "content": "x"}], None, 0.7, 4096)
+    assert payload["messages"][0]["content"][0] == {"type": "thinking", "thinking": "plan", "signature": "signed"}
+    assert "temperature" not in payload
