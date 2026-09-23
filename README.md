@@ -10,6 +10,17 @@ what they have seen. Hugmunn takes its name from the pair.
   <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg" alt="Hugmunn — two circling ravens" width="420">
 </picture>
 
+[![PyPI](https://img.shields.io/pypi/v/hugmunn)](https://pypi.org/project/hugmunn/)
+[![Python](https://img.shields.io/badge/Python-3.10%E2%80%933.13-3776AB?logo=python&logoColor=white)](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/installation.md)
+[![Tests](https://github.com/EinarOlafsson/hugmunn/actions/workflows/ci.yml/badge.svg?branch=nightly)](https://github.com/EinarOlafsson/hugmunn/actions/workflows/ci.yml)
+[![GUI](https://img.shields.io/badge/GUI-Qt%20%28PyQt6%29-41CD52)](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/desktop.md)
+[![Installers](https://img.shields.io/github/v/release/EinarOlafsson/hugmunn?label=Installers)](https://github.com/EinarOlafsson/hugmunn/releases/latest)
+[![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/installers.md)
+[![Docs](https://img.shields.io/badge/Docs-Guides%20%26%20API-4A9EFF)](https://github.com/EinarOlafsson/hugmunn/tree/main/docs)
+[![Source](https://img.shields.io/badge/GitHub-Source-181717?logo=github)](https://github.com/EinarOlafsson/hugmunn)
+[![Issues](https://img.shields.io/github/issues/EinarOlafsson/hugmunn)](https://github.com/EinarOlafsson/hugmunn/issues)
+[![License](https://img.shields.io/github/license/EinarOlafsson/hugmunn)](https://github.com/EinarOlafsson/hugmunn/blob/main/LICENSE)
+
 Hugmunn is a desktop application and Python library for working with language
 models. It connects to local models through [llama.cpp](https://github.com/ggml-org/llama.cpp)
 and to cloud models through the Anthropic and OpenAI APIs.
