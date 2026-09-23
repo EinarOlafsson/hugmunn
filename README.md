@@ -5,9 +5,9 @@ Huginn and Muninn are Odin’s two ravens in Norse mythology. Their names mean
 what they have seen. Hugmunn takes its name from the pair.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-white.svg?v=joined-wings">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg?v=joined-wings">
-  <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg?v=joined-wings" alt="Hugmunn — two ravens with joined wings sheltering an all-seeing eye" width="420">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-white.svg?v=fewer-feathers">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg?v=fewer-feathers">
+  <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/src/hugmunn/resources/icons/hugmunn-horizontal-black.svg?v=fewer-feathers" alt="Hugmunn — two ravens with joined wings sheltering an all-seeing eye" width="420">
 </picture>
 
 [![PyPI](https://img.shields.io/pypi/v/hugmunn)](https://pypi.org/project/hugmunn/)
@@ -87,8 +87,8 @@ network when requested.
 ## Desktop controls
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/docs/images/desktop-dark.png?v=joined-wings">
-  <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/docs/images/desktop-light.png?v=joined-wings" alt="Hugmunn desktop with model controls and raven artwork" width="900">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/docs/images/desktop-dark.png?v=fewer-feathers">
+  <img src="https://raw.githubusercontent.com/EinarOlafsson/hugmunn/main/docs/images/desktop-light.png?v=fewer-feathers" alt="Hugmunn desktop with model controls and raven artwork" width="900">
 </picture>
 
 | Control | What it changes |

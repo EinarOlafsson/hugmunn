@@ -1,6 +1,7 @@
 # Eye placement and gaze
 
-**Selected for the application: 01 — Outward gaze.**
+**Selected composition: 01 — Outward gaze.** The application now uses its
+[simplified refinement](../simplified/README.md), with fewer feather lines.
 
 Four refinements of the selected woven-wing concept. The symbolic eye moves
 into the space between the birds, beneath their joined inner wings.

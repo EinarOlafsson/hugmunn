@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.0.7 — 2026-09-23
+
+- Simplify the raven logo with fewer feather divisions and larger hollow
+  shapes, keeping the outward gaze, joined wings, and central all-seeing eye.
+- Update light and dark marks, wordmarks, desktop icons, and screenshots.
+  Preserve the detailed version and the new original with its prompt in `icons/`.
+
 ## 0.0.0.6 — 2026-09-23
 
 - Use the selected outward-looking ravens with joined wings and the all-seeing

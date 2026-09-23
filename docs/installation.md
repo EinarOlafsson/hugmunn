@@ -21,7 +21,7 @@ For development, clone the repository and install it with
 `python -m pip install -e .`. To install a built wheel:
 
 ```bash
-python -m pip install /path/to/hugmunn-0.0.0.6-py3-none-any.whl
+python -m pip install /path/to/hugmunn-0.0.0.7-py3-none-any.whl
 ```
 
 The wheel includes Python modules, skill packs, and artwork. It does not include

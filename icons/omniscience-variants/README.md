@@ -32,5 +32,5 @@ heads. Two earlier separate-bird alternatives are preserved in
 [`alternates/`](alternates/), together with their prompts.
 
 The active application artwork is the later refinement,
-[01 — Outward gaze](../README.md#active-logo--joined-wings), with the eye
-below the joined wings.
+[simplified joined-wing design](../README.md#active-logo--joined-wings), with
+the eye below the joined wings.
