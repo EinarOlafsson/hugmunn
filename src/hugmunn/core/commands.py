@@ -36,11 +36,15 @@ class Command:
 
 COMMANDS: tuple[Command, ...] = (
     Command("help", "", "List these commands."),
-    Command("remote", "[on|off|url]",
+    Command("remote", "[on|off|url|setup]",
             "Expose hugmunn to another device.",
             "Starts a local web server and prints the address. Nothing is "
             "reachable from outside this machine until you also run a tunnel; "
-            "the reply says how. A token is always required."),
+            "use the Remote access window for login and network settings. "
+            "A username and password are always required by the desktop server."),
+    Command("gpu", "<command>|status|stop",
+            "Unload the local model, run a foreground GPU task, then reload it."),
+    Command("skills", "", "Open the searchable skills library."),
     Command("goal", "<objective>",
             "Work toward an objective until it is met.",
             "The agent keeps going across tool rounds rather than stopping at "

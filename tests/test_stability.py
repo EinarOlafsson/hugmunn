@@ -118,8 +118,11 @@ def test_the_bridge_releases_the_lock_even_when_a_turn_raises(window, monkeypatc
     bridge = RemoteBridge(window)
     monkeypatch.setattr(type(window), "build_agent",
                         lambda self, client=None: (_ for _ in ()).throw(RuntimeError("boom")))
-    with pytest.raises(RuntimeError):
-        list(bridge.send("go"))
+    monkeypatch.setattr(window, "_ready_to_send", lambda: True)
+    monkeypatch.setattr(window, "_build_client", lambda: object())
+    events = list(bridge.send("go"))
+    assert events[0]["kind"] == "error"
+    assert "boom" in events[0]["text"]
     assert not window._turn_lock.locked()
 
 

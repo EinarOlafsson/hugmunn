@@ -1,0 +1,794 @@
+[
+  {
+    "name": "agents-sdk",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "cloudflare/skills/agents-sdk"
+  },
+  {
+    "name": "cloudflare",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "cloudflare/skills/cloudflare"
+  },
+  {
+    "name": "wrangler",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "cloudflare/skills/wrangler"
+  },
+  {
+    "name": "building-native-ui",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/building-native-ui"
+  },
+  {
+    "name": "codex-expo-run-actions",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/codex-expo-run-actions"
+  },
+  {
+    "name": "expo-api-routes",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/expo-api-routes"
+  },
+  {
+    "name": "expo-cicd-workflows",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/expo-cicd-workflows"
+  },
+  {
+    "name": "expo-deployment",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/expo-deployment"
+  },
+  {
+    "name": "expo-dev-client",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/expo-dev-client"
+  },
+  {
+    "name": "expo-module",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/expo-module"
+  },
+  {
+    "name": "expo-tailwind-setup",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/expo-tailwind-setup"
+  },
+  {
+    "name": "expo-ui-jetpack-compose",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/expo-ui-jetpack-compose"
+  },
+  {
+    "name": "expo-ui-swift-ui",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/expo-ui-swift-ui"
+  },
+  {
+    "name": "native-data-fetching",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/native-data-fetching"
+  },
+  {
+    "name": "upgrading-expo",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/upgrading-expo"
+  },
+  {
+    "name": "use-dom",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "expo/skills/use-dom"
+  },
+  {
+    "name": "dashboard-expert",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "mixpanel-headless/skills/dashboard-expert"
+  },
+  {
+    "name": "mixpanel-auth",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "mixpanel-headless/skills/mixpanel-auth"
+  },
+  {
+    "name": "mixpanelyst",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "mixpanel-headless/skills/mixpanelyst"
+  },
+  {
+    "name": "mixpanel-headless-setup",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "mixpanel-headless/skills/setup"
+  },
+  {
+    "name": "notion-knowledge-capture",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "notion/skills/notion-knowledge-capture"
+  },
+  {
+    "name": "notion-meeting-intelligence",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "notion/skills/notion-meeting-intelligence"
+  },
+  {
+    "name": "notion-research-documentation",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "notion/skills/notion-research-documentation"
+  },
+  {
+    "name": "notion-spec-to-implementation",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "notion/skills/notion-spec-to-implementation"
+  },
+  {
+    "name": "build-chatgpt-app",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "openai-developers/skills/build-chatgpt-app"
+  },
+  {
+    "name": "chatgpt-app-submission",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "openai-developers/skills/chatgpt-app-submission"
+  },
+  {
+    "name": "posthog",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "posthog/skills/posthog"
+  },
+  {
+    "name": "sentry",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "sentry/skills/sentry"
+  },
+  {
+    "name": "supabase",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "supabase/skills/supabase"
+  },
+  {
+    "name": "supabase-postgres-best-practices",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "supabase/skills/supabase-postgres-best-practices"
+  },
+  {
+    "name": "brainstorming",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/brainstorming"
+  },
+  {
+    "name": "dispatching-parallel-agents",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/dispatching-parallel-agents"
+  },
+  {
+    "name": "executing-plans",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/executing-plans"
+  },
+  {
+    "name": "finishing-a-development-branch",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/finishing-a-development-branch"
+  },
+  {
+    "name": "receiving-code-review",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/receiving-code-review"
+  },
+  {
+    "name": "requesting-code-review",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/requesting-code-review"
+  },
+  {
+    "name": "subagent-driven-development",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/subagent-driven-development"
+  },
+  {
+    "name": "systematic-debugging",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/systematic-debugging"
+  },
+  {
+    "name": "test-driven-development",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/test-driven-development"
+  },
+  {
+    "name": "using-git-worktrees",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/using-git-worktrees"
+  },
+  {
+    "name": "using-superpowers",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/using-superpowers"
+  },
+  {
+    "name": "verification-before-completion",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/verification-before-completion"
+  },
+  {
+    "name": "writing-plans",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/writing-plans"
+  },
+  {
+    "name": "writing-skills",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "superpowers/skills/writing-skills"
+  },
+  {
+    "name": "temporal-cloud-setup",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "temporal/skills/temporal-cloud-setup"
+  },
+  {
+    "name": "temporal-developer",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "temporal/skills/temporal-developer"
+  },
+  {
+    "name": "temporal-ops",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "temporal/skills/temporal-ops"
+  },
+  {
+    "name": "temporal-serverless",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "temporal/skills/temporal-serverless"
+  },
+  {
+    "name": "android-emulator-qa",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "test-android-apps/skills/android-emulator-qa"
+  },
+  {
+    "name": "build-zoom-bot",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/build-zoom-bot"
+  },
+  {
+    "name": "build-zoom-meeting-app",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/build-zoom-meeting-app"
+  },
+  {
+    "name": "choose-zoom-approach",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/choose-zoom-approach"
+  },
+  {
+    "name": "zoom-cobrowse-sdk",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/cobrowse-sdk"
+  },
+  {
+    "name": "build-zoom-contact-center-app",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/contact-center"
+  },
+  {
+    "name": "zoom-contact-center-android",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/contact-center/android"
+  },
+  {
+    "name": "zoom-contact-center-ios",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/contact-center/ios"
+  },
+  {
+    "name": "zoom-contact-center-web",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/contact-center/web"
+  },
+  {
+    "name": "debug-zoom",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/debug-zoom"
+  },
+  {
+    "name": "debug-zoom-integration",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/debug-zoom-integration"
+  },
+  {
+    "name": "zoom-general",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/general"
+  },
+  {
+    "name": "build-zoom-meeting-sdk-app",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk"
+  },
+  {
+    "name": "zoom-meeting-sdk-android",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/android"
+  },
+  {
+    "name": "zoom-meeting-sdk-electron",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/electron"
+  },
+  {
+    "name": "zoom-meeting-sdk-ios",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/ios"
+  },
+  {
+    "name": "zoom-meeting-sdk-linux",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/linux"
+  },
+  {
+    "name": "zoom-meeting-sdk-macos",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/macos"
+  },
+  {
+    "name": "zoom-meeting-sdk-react-native",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/react-native"
+  },
+  {
+    "name": "zoom-meeting-sdk-unreal",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/unreal"
+  },
+  {
+    "name": "zoom-meeting-sdk-web",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/web"
+  },
+  {
+    "name": "zoom-meeting-sdk-web-client-view",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/web/client-view"
+  },
+  {
+    "name": "zoom-meeting-sdk-web-component-view",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/web/component-view"
+  },
+  {
+    "name": "zoom-meeting-sdk-windows",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/meeting-sdk/windows"
+  },
+  {
+    "name": "zoom-oauth",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/oauth"
+  },
+  {
+    "name": "build-zoom-phone-integration",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/phone"
+  },
+  {
+    "name": "plan-zoom-integration",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/plan-zoom-integration"
+  },
+  {
+    "name": "plan-zoom-product",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/plan-zoom-product"
+  },
+  {
+    "name": "probe-sdk",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/probe-sdk"
+  },
+  {
+    "name": "build-zoom-rest-api-app",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/rest-api"
+  },
+  {
+    "name": "rivet-sdk",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/rivet-sdk"
+  },
+  {
+    "name": "zoom-rtms",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/rtms"
+  },
+  {
+    "name": "scribe",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/scribe"
+  },
+  {
+    "name": "setup-zoom-oauth",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/setup-zoom-oauth"
+  },
+  {
+    "name": "start",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/start"
+  },
+  {
+    "name": "build-zoom-team-chat-app",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/team-chat"
+  },
+  {
+    "name": "ui-toolkit",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/ui-toolkit"
+  },
+  {
+    "name": "build-zoom-video-sdk-app",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/video-sdk"
+  },
+  {
+    "name": "zoom-video-sdk-android",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/video-sdk/android"
+  },
+  {
+    "name": "zoom-video-sdk-flutter",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/video-sdk/flutter"
+  },
+  {
+    "name": "zoom-video-sdk-ios",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/video-sdk/ios"
+  },
+  {
+    "name": "zoom-video-sdk-linux",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/video-sdk/linux"
+  },
+  {
+    "name": "zoom-video-sdk-macos",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/video-sdk/macos"
+  },
+  {
+    "name": "zoom-video-sdk-react-native",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/video-sdk/react-native"
+  },
+  {
+    "name": "zoom-video-sdk-unity",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/video-sdk/unity"
+  },
+  {
+    "name": "zoom-video-sdk-web",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/video-sdk/web"
+  },
+  {
+    "name": "zoom-video-sdk-windows",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/video-sdk/windows"
+  },
+  {
+    "name": "build-zoom-virtual-agent",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/virtual-agent"
+  },
+  {
+    "name": "zoom-virtual-agent-android",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/virtual-agent/android"
+  },
+  {
+    "name": "zoom-virtual-agent-ios",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/virtual-agent/ios"
+  },
+  {
+    "name": "zoom-virtual-agent-web",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/virtual-agent/web"
+  },
+  {
+    "name": "setup-zoom-webhooks",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/webhooks"
+  },
+  {
+    "name": "setup-zoom-websockets",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/websockets"
+  },
+  {
+    "name": "zoom-apps-sdk",
+    "source": "https://github.com/openai/plugins",
+    "revision": "1dc195897af4161d039b80d8471ec0a10c9bbc89",
+    "path": "zoom/skills/zoom-apps-sdk"
+  },
+  {
+    "name": "aspnet-core",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/aspnet-core"
+  },
+  {
+    "name": "chatgpt-apps",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/chatgpt-apps"
+  },
+  {
+    "name": "cli-creator",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/cli-creator"
+  },
+  {
+    "name": "cloudflare-deploy",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/cloudflare-deploy"
+  },
+  {
+    "name": "define-goal",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/define-goal"
+  },
+  {
+    "name": "gh-address-comments",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/gh-address-comments"
+  },
+  {
+    "name": "gh-fix-ci",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/gh-fix-ci"
+  },
+  {
+    "name": "hatch-pet",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/hatch-pet"
+  },
+  {
+    "name": "jupyter-notebook",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/jupyter-notebook"
+  },
+  {
+    "name": "linear",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/linear"
+  },
+  {
+    "name": "migrate-to-codex",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/migrate-to-codex"
+  },
+  {
+    "name": "netlify-deploy",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/netlify-deploy"
+  },
+  {
+    "name": "openai-docs",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/openai-docs"
+  },
+  {
+    "name": "pdf",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/pdf"
+  },
+  {
+    "name": "playwright",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/playwright"
+  },
+  {
+    "name": "playwright-interactive",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/playwright-interactive"
+  },
+  {
+    "name": "render-deploy",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/render-deploy"
+  },
+  {
+    "name": "screenshot",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/screenshot"
+  },
+  {
+    "name": "security-best-practices",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/security-best-practices"
+  },
+  {
+    "name": "security-ownership-map",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/security-ownership-map"
+  },
+  {
+    "name": "security-threat-model",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/security-threat-model"
+  },
+  {
+    "name": "speech",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/speech"
+  },
+  {
+    "name": "transcribe",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/transcribe"
+  },
+  {
+    "name": "vercel-deploy",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/vercel-deploy"
+  },
+  {
+    "name": "winui-app",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/winui-app"
+  },
+  {
+    "name": "yeet",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".curated/yeet"
+  },
+  {
+    "name": "imagegen",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".system/imagegen"
+  },
+  {
+    "name": "plugin-creator",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".system/plugin-creator"
+  },
+  {
+    "name": "skill-creator",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".system/skill-creator"
+  },
+  {
+    "name": "skill-installer",
+    "source": "https://github.com/openai/skills",
+    "revision": "49f948faa9258a0c61caceaf225e179651397431",
+    "path": ".system/skill-installer"
+  }
+]

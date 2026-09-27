@@ -987,6 +987,13 @@ class Settings:
     cloud_models: dict[str, str] = field(default_factory=dict)
     # One of ui.theme.THEMES, or "system".
     theme: str = "dark"
+    panel_opacity: int = 92
+    window_opacity: int = 100
+    rounded_windows: bool = True
+    remote_host: str = "127.0.0.1"
+    remote_port: int = 8770
+    remote_certfile: str = ""
+    remote_keyfile: str = ""
     #: Runtime/launch preference; auto lets llama.cpp fit supported devices.
     runtime_backend: str = "auto"
     agreement_version: str = ""

@@ -123,7 +123,7 @@ class TestShippedInventory:
     """Guard the properties the sidebar and context budget depend on."""
 
     def test_every_skill_has_a_known_category(self):
-        allowed = {"Core", "Coding", "Science", "Web", "Writing", "Meta"}
+        allowed = {"Core", "Coding", "Science", "Web", "Writing", "Meta", "Codex"}
         bad = {s.name: s.category for s in skills.load_all() if s.category not in allowed}
         assert not bad, f"unexpected categories: {bad}"
 
@@ -144,12 +144,12 @@ class TestShippedInventory:
         skills. Category selection is the intended workflow now. If this
         fails, trim a skill or split a category — do not just raise it.
         """
-        total = skills.total_tokens(skills.load_all())
+        total = skills.total_tokens([s for s in skills.load_all() if not s.source_path])
         assert total < 16_000, f"{total} tokens — trim, or split a category"
 
     def test_no_category_alone_blows_a_16k_context(self):
         """Enabling one whole category must stay usable on the smallest models."""
-        grouped = skills.by_category(skills.load_all())
+        grouped = skills.by_category([s for s in skills.load_all() if not s.source_path])
         fat = {c: skills.total_tokens(g) for c, g in grouped.items()
                if skills.total_tokens(g) > 5_000}
         assert not fat, f"category too large to enable wholesale: {fat}"

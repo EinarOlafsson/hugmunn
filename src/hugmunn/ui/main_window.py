@@ -135,7 +135,10 @@ class Composer(QTextEdit):
         super().keyPressEvent(event)
 
 
-class MainWindow(QMainWindow):
+from .chrome import ChromeWindow
+
+
+class MainWindow(ChromeWindow):
     """Desktop chat window with model controls, tools, and saved sessions."""
 
     #: Seconds a context summary may take before it is abandoned. It runs on
@@ -149,6 +152,12 @@ class MainWindow(QMainWindow):
 
         self.settings = Settings.load()
         self.server = ServerManager()
+        from ..core.gpu import GpuTaskRunner
+        self.gpu = GpuTaskRunner(self.server)
+        self._gpu_worker = None
+        self._approval_dialogs = {}
+        self._remote_dialog = None
+        self._remote_password = ""
         self.history: list[dict[str, Any]] = []
         self.session = sessionkit.Session(
             id=sessionkit.new_id(), started=time.time(), updated=time.time())
@@ -190,6 +199,7 @@ class MainWindow(QMainWindow):
         self._refresh_branding()
         self._refresh_models()
         self._sync_controls()
+        self.apply_appearance(save=False)
         # Deferred so the window is on screen before anything modal appears:
         # a dialog over a blank grey rectangle reads as a crash on startup.
         QTimer.singleShot(300, self._offer_restore)
@@ -205,7 +215,12 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([300, 880])
-        self.setCentralWidget(splitter)
+        shell = QWidget()
+        shell_layout = QVBoxLayout(shell)
+        shell_layout.setContentsMargins(12, 10, 12, 12)
+        shell_layout.addWidget(splitter)
+        splitter.setHandleWidth(12)
+        self.setCentralWidget(shell)
         self._build_menus()
 
         QShortcut(QKeySequence("Ctrl+L"), self, self._new_conversation)
@@ -214,7 +229,7 @@ class MainWindow(QMainWindow):
     def _build_menus(self) -> None:
         bar = self.menuBar()
 
-        app_menu = bar.addMenu("&hugmunn")
+        self._menu_app_menu = app_menu = bar.addMenu("&hugmunn")
         settings = QAction("Settings…", self)
         settings.setShortcut(QKeySequence("Ctrl+,"))
         settings.triggered.connect(self._open_settings)
@@ -253,7 +268,7 @@ class MainWindow(QMainWindow):
         quit_action.triggered.connect(self.close)
         app_menu.addAction(quit_action)
 
-        view = bar.addMenu("&View")
+        self._menu_view = view = bar.addMenu("&View")
         self._theme_actions: dict[str, QAction] = {}
         for name in ("system", *theme.THEMES):
             act = QAction(theme.LABELS[name], self)
@@ -263,7 +278,7 @@ class MainWindow(QMainWindow):
             view.addAction(act)
             self._theme_actions[name] = act
 
-        accounts = bar.addMenu("&Accounts")
+        self._menu_accounts = accounts = bar.addMenu("&Accounts")
         for provider in providers.CLOUD:
             act = QAction(f"Sign in to {providers.LABELS[provider]}…", self)
             act.triggered.connect(lambda _=False, p=provider: self._sign_in(p))
@@ -744,6 +759,8 @@ class MainWindow(QMainWindow):
 
     def _build_conversation(self) -> QWidget:
         page = QWidget()
+        page.setObjectName("conversationPane")
+        page.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -807,6 +824,8 @@ class MainWindow(QMainWindow):
     # -------------------------------------------------------------- downloads
 
     def _offer_download(self, spec: ModelSpec) -> None:
+        if getattr(self, "_remote_driving", False):
+            return
         """Ask where the weights should go, then fetch them."""
         if not spec.repo or not spec.files:
             QMessageBox.information(
@@ -903,10 +922,26 @@ class MainWindow(QMainWindow):
 
     # ---------------------------------------------------------------- skills
 
+    def import_codex_skills(self):
+        count = skillkit.import_codex()
+        self._reload_skills()
+        return count
+
+    def _reload_skills(self):
+        self._skills = skillkit.load_all()
+        self.skills_button.setMenu(self._build_skills_menu())
+        self._update_skills_button()
+
+    def _open_skills_library(self):
+        from .skills_dialog import SkillsDialog
+        SkillsDialog(self).exec()
+
     def _build_skills_menu(self) -> QMenu:
         """Category submenus of checkable skills, plus bulk actions."""
         menu = QMenu(self)
         self._skill_actions: dict[str, QAction] = {}
+        menu.addAction("Browse and search skills…", self._open_skills_library)
+        menu.addSeparator()
 
         for category, group in skillkit.by_category(self._skills).items():
             submenu = menu.addMenu(category)
@@ -1272,6 +1307,8 @@ class MainWindow(QMainWindow):
         threading.Thread(target=check, daemon=True).start()
 
     def _sign_in(self, provider: Provider) -> None:
+        if getattr(self, "_remote_driving", False):
+            return
         dialog = LoginDialog(provider, self)
         dialog.exec()
         if cli.is_signed_in(provider):
@@ -1304,6 +1341,7 @@ class MainWindow(QMainWindow):
         self.resources.restyle()
         self.composer_bar.setStyleSheet(f"border-top: 1px solid {theme.active()['border']};")
         self._refresh_branding()
+        self.update()
 
     def _refresh_branding(self) -> None:
         """Update the wordmark and window icon for the active background."""
@@ -1405,6 +1443,9 @@ class MainWindow(QMainWindow):
         SettingsDialog(self, self).exec()
 
     def _quick_cleanup(self, action: str) -> None:
+        if self._is_busy() and action != "disk":
+            self.stats.setText("Wait for the current task before freeing resources.")
+            return
         title, explanation = cleanup.CONFIRMATIONS[action]
         if action == "disk":
             entries = cleanup.disk_report()
@@ -1432,10 +1473,10 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------ server ctl
 
     def _toggle_server(self) -> None:
+        if self._is_busy():
+            return
         if self.server.is_running:
-            self.server.stop()
-            self.server_status.setText("Stopped")
-            self._sync_controls()
+            self._stop_server_worker()
             return
 
         spec = self._current_spec()
@@ -1484,15 +1525,37 @@ class MainWindow(QMainWindow):
                 if proceed != QMessageBox.StandardButton.Yes:
                     return
 
+        self._start_server_worker(spec)
+
+    def _start_server_worker(self, spec):
         self.server_button.setEnabled(False)
         self.server_status.setText("Starting…")
         worker = ServerWorker(self.server, spec, self)
         worker.progress.connect(self.server_status.setText)
         worker.ready.connect(self._on_server_ready)
         worker.failed.connect(self._on_server_failed)
-        worker.finished.connect(lambda: setattr(self, "_server_worker", None))
+        worker.finished.connect(self._server_worker_finished)
         self._server_worker = worker
         worker.start()
+        self._sync_controls()
+
+    def _stop_server_worker(self):
+        from .workers import ServerStopWorker
+        worker = ServerStopWorker(self.server, self)
+        worker.failed.connect(lambda text: self.transcript.add(Notice(text, style.ERR)))
+        worker.finished.connect(self._server_stopped)
+        self._server_worker = worker
+        self.server_status.setText("Stopping…")
+        self._sync_controls()
+        worker.start()
+
+    def _server_stopped(self):
+        self.server_status.setText("Ready" if self.server.is_running else "Stopped")
+        self._server_worker_finished()
+
+    def _server_worker_finished(self):
+        self._server_worker = None
+        self._sync_controls()
 
     def _on_server_ready(self, model_name: str) -> None:
         """Report where the model is actually running, not just that it started.
@@ -1525,6 +1588,9 @@ class MainWindow(QMainWindow):
         self._sync_controls()
 
     def _on_server_failed(self, message: str) -> None:
+        if message == "Model startup cancelled.":
+            self.server_status.setText("Stopped")
+            return
         from ..core.reporting import report_error
         report_error("model-start")
         self.server_status.setText("Failed")
@@ -1654,15 +1720,47 @@ class MainWindow(QMainWindow):
         if action in ("off", "stop"):
             return commandkit.Outcome(message=self.stop_remote())
         if action in ("url", "status"):
-            if self._remote is None or not self._remote.is_running:
-                return commandkit.Outcome(message="Remote access is off. /remote on")
             return commandkit.Outcome(message=self._remote_description())
-        return commandkit.Outcome(message=self.start_remote(), refresh=True)
+        if action not in ("on", "setup"):
+            return commandkit.Outcome(message="Usage: /remote [on|off|url|setup]")
+        result = self.start_remote()
+        self._show_remote_dialog()
+        return commandkit.Outcome(message=result)
+
+    def _cmd_skills(self, argument: str):
+        self._open_skills_library()
+        return commandkit.Outcome(message=f"{len(self._skills)} skills available.")
+
+    def _cmd_gpu(self, argument: str):
+        if not argument or argument == "status":
+            return commandkit.Outcome(message=f"GPU: {self.gpu.status}\nUse /gpu <command> to run a GPU task.")
+        if argument == "stop":
+            self.gpu.cancel()
+            return commandkit.Outcome(message="Cancelling GPU task; the model will reload afterward.")
+        self.start_gpu_task(argument)
+        return commandkit.Outcome(message="GPU task started. Use Stop to cancel; the model reloads afterward.")
+
+    def start_gpu_task(self, command):
+        if self._is_busy():
+            raise RuntimeError("Wait for the current task to finish before starting a GPU task.")
+        from .workers import GpuWorker
+        worker = GpuWorker(self.gpu, self.settings.workdir, command, self)
+        worker.progress.connect(self.stats.setText)
+        worker.result.connect(lambda text: self.transcript.add(Notice(text, style.TEXT_DIM)))
+        worker.finished.connect(self._gpu_finished)
+        self._gpu_worker = worker
+        self.stats.setText("Preparing GPU task…")
+        self._sync_controls()
+        worker.start()
+
+    def _gpu_finished(self):
+        self._gpu_worker = None
+        self.server_status.setText("Ready" if self.server.is_running else "Stopped")
+        self.stats.setText(self.gpu.status)
+        self._sync_controls()
 
     def _cmd_stop(self, argument: str):
         self._cancel()
-        if self._bridge is not None:
-            self._bridge.cancel()
         return commandkit.Outcome(message="Cancelled.")
 
     def _cmd_clear(self, argument: str):
@@ -1763,97 +1861,52 @@ class MainWindow(QMainWindow):
     # -------------------------------------------------------------- remote
 
     def start_remote(self) -> str:
-        from ..core import remote as remotekit
+        from ..core.remote import Credentials, new_token
         from ..core.webserver import RemoteServer
-
         from .remote_bridge import RemoteBridge
-
         if self._remote is not None and self._remote.is_running:
             return self._remote_description()
-
+        credentials = Credentials.load()
+        if credentials is None:
+            self._remote_password = new_token()[:24]
+            credentials = Credentials.create("hugmunn", self._remote_password)
+            credentials.save()
         if self._bridge is None:
             self._bridge = RemoteBridge(self)
-            self._bridge.event.connect(self._on_remote_event)
-            self._bridge.approval.connect(self._on_remote_approval)
-            self._bridge.state_changed.connect(self._sync_controls)
-
-        self._remote = RemoteServer(self._bridge, port=remotekit.DEFAULT_PORT)
+        server = RemoteServer(self._bridge, host=self.settings.remote_host,
+                              port=self.settings.remote_port, credentials=credentials,
+                              certfile=self.settings.remote_certfile or None,
+                              keyfile=self.settings.remote_keyfile or None)
         try:
-            self._remote.start()
-        except OSError as exc:
-            self._remote = None
-            return (f"Could not start on port {remotekit.DEFAULT_PORT}: {exc}\n"
-                    f"Another copy of hugmunn may already have it.")
+            server.start()
+        except (OSError, ValueError) as exc:
+            return f"Could not start remote access: {exc}"
+        self._remote = server
         return self._remote_description()
 
+    def _show_remote_dialog(self):
+        from .remote_dialog import RemoteDialog
+        if self._remote_dialog is None:
+            self._remote_dialog = RemoteDialog(self)
+        self._remote_dialog.refresh()
+        self._remote_dialog.show()
+        self._remote_dialog.raise_()
+        self._remote_dialog.activateWindow()
+
     def stop_remote(self) -> str:
-        if self._remote is None or not self._remote.is_running:
+        if self._remote is None:
             return "Remote access was already off."
-        self._remote.stop()
-        self._remote = None
-        return "Remote access off. The address no longer resolves."
+        if self._remote is not None:
+            self._remote.stop()
+            self._remote = None
+        return "Remote access off."
 
     def _remote_description(self) -> str:
-        from ..core import remote as remotekit
-
-        server = self._remote
-        lines = [
-            "Remote access is on.",
-            "",
-            f"  {server.url()}",
-            "",
-            server.exposure.warning(),
-            "",
-            "The link carries the token. Anyone who has it can run commands "
-            "on this machine, so treat it as a password.",
-            "",
-            "To reach it from another network, run one of these here:",
-        ]
-        for option in remotekit.tunnel_options(server.port):
-            lines += ["", f"  {option['name']}", f"    {option['command']}",
-                      f"    {option['note']}"]
-        return "\n".join(lines)
-
-    def _on_remote_event(self, payload: dict) -> None:
-        """Mirror a browser-driven turn into the desktop transcript."""
-        kind = payload.get("kind")
-        text = payload.get("text", "")
-        if kind == "user":
-            self.transcript.add(UserBubble(text))
-        elif kind == "command":
-            self.transcript.add(UserBubble(text))
-            self.transcript.add(Notice(payload.get("result", ""),
-                                       theme.active()["fg_dim"]))
-        elif kind == "reasoning":
-            self._on_reasoning(text)
-        elif kind == "content":
-            self._on_content(text)
-        elif kind == "tool_start":
-            self._on_tool_start(payload.get("tool_name", ""),
-                                payload.get("tool_summary", ""),
-                                payload.get("tool_id", ""))
-        elif kind == "tool_result":
-            self._on_tool_result(payload.get("tool_name", ""),
-                                 payload.get("tool_summary", ""), text)
-        elif kind == "error":
-            self.transcript.add(Notice(text, theme.active()["error"]))
-        elif kind == "done":
-            self._on_turn_finished({})
-        self.transcript.follow()
-
-    def _on_remote_approval(self, call_id: str, name: str, summary: str,
-                            arguments: dict) -> None:
-        """Show the desktop dialog for a call the browser started.
-
-        Non-modal on purpose: the phone may answer first, and a modal the
-        desktop cannot dismiss would then have to be clicked anyway.
-        """
-        dialog = ApprovalDialog(name, summary, arguments, self)
-        dialog.setModal(False)
-        dialog.finished.connect(
-            lambda result, cid=call_id: self._bridge.resolve_approval(
-                cid, result == QDialog.DialogCode.Accepted))
-        dialog.show()
+        if self._remote is None or not self._remote.is_running:
+            return "Remote access is off. /remote to start."
+        return (f"Remote access is on: {self._remote.url()}\n"
+                "Sign in with your remote username and password. "
+                "Use the Remote access window to change login or network settings.")
 
     # ------------------------------------------------------------ sessions
 
@@ -1942,7 +1995,7 @@ class MainWindow(QMainWindow):
         restored conversation whose messages are present but whose window is
         empty looks like the restore failed.
         """
-        if self._agent_worker is not None:
+        if self._is_busy():
             return
         self.history = list(session.messages)
         self.session = session
@@ -2245,7 +2298,7 @@ class MainWindow(QMainWindow):
             self.settings.save()
 
     def _new_conversation(self) -> None:
-        if self._agent_worker is not None:
+        if self._is_busy():
             return
         if self.history:
             sessionkit.mark_closed(self.session)
@@ -2267,7 +2320,7 @@ class MainWindow(QMainWindow):
     def _sync_controls(self) -> None:
         cloud = self._is_cloud()
         running = self.server.is_running
-        busy = self._agent_worker is not None
+        busy = self._is_busy()
 
         # There is no process to start for a cloud model, so the control that
         # starts one is hidden rather than disabled — a greyed button invites
@@ -2277,7 +2330,7 @@ class MainWindow(QMainWindow):
         self.server_button.setEnabled(not busy)
         self.server_button.setText("Stop server" if running else "Start server")
 
-        self.send_button.setEnabled(self._ready_to_send() and not busy)
+        self.send_button.setEnabled(not busy)
         self.send_button.setVisible(not busy)
         self.stop_button.setVisible(busy)
         self.provider_combo.setEnabled(not busy)
@@ -2295,19 +2348,20 @@ class MainWindow(QMainWindow):
             return None
         return cli.CliClient(spec, self.settings.effort_level)
 
-    def _send(self) -> None:
-        if self._agent_worker is not None or not self._ready_to_send():
-            return
-        if not self._turn_lock.acquire(blocking=False):
-            self.transcript.add(Notice(
-                "A turn started from the remote session is still running.",
-                theme.active()["warning"]))
-            self.transcript.follow()
-            return
-        text = self.composer.toPlainText().strip()
-        if not text:
-            return
+    def _is_busy(self):
+        return (self._agent_worker is not None or self._server_worker is not None
+                or self._gpu_worker is not None or self.gpu.busy or self._turn_lock.locked())
 
+    def _send(self) -> None:
+        try:
+            self._submit_text(self.composer.toPlainText().strip())
+        except Exception as exc:
+            self.transcript.add(Notice(str(exc), style.ERR))
+
+    def _submit_text(self, text: str) -> None:
+        if not text or self._is_busy():
+            return
+        # Commands work even before a model is loaded, including /remote.
         # Resolved here, never sent. A model asked to interpret "/remote"
         # explains what it thinks the word means.
         if commandkit.is_command(text):
@@ -2317,65 +2371,77 @@ class MainWindow(QMainWindow):
                 self.transcript.add(UserBubble(text))
                 self.transcript.add(Notice(outcome.message, theme.active()["fg_dim"]))
                 self.transcript.follow()
-                self._turn_lock.release()
                 return
             text = outcome.send_text or text
 
-        client = self._build_client()
-        if client is None:
-            self._turn_lock.release()
-            QMessageBox.warning(
-                self, "Not signed in",
-                f"Sign in to {providers.LABELS[self._provider()]} before sending.",
+        if not self._ready_to_send():
+            self.transcript.add(Notice("Start a model or connect a provider before sending.", style.WARN))
+            return
+        if not self._turn_lock.acquire(blocking=False):
+            return
+        try:
+            client = self._build_client()
+            if client is None:
+                if getattr(self, "_remote_driving", False):
+                    raise RuntimeError("No model client is ready. Select a model or connect a provider.")
+                self._turn_lock.release()
+                QMessageBox.warning(
+                    self, "Not signed in",
+                    f"Sign in to {providers.LABELS[self._provider()]} before sending.",
+                )
+                return
+            self.composer.clear()
+
+            self.transcript.add(UserBubble(text))
+            self.history.append({"role": "user", "content": text})
+            # Saved before generation starts: a crash mid-reply should still leave
+            # the question behind.
+            self._persist()
+
+            # Fit the conversation before sending. Doing it here rather than
+            # inside the agent means the transcript can say what was lost, which
+            # a silently-shortened history cannot.
+            outcome = contextkit.compress(
+                self.history, self._context_budget(), self._context_strategy(),
+                summarise=self._summarise_span,
             )
-            return
-        self.composer.clear()
+            if outcome.overflowed:
+                self.transcript.add(Notice(outcome.note, style.ERR))
+                self.transcript.follow()
+                self._update_context_meter()
+                self._turn_lock.release()
+                return
+            if outcome.dropped:
+                self.history[:] = outcome.history
+                self.transcript.add(Notice(outcome.note, style.WARN))
+                self.transcript.follow()
 
-        self.transcript.add(UserBubble(text))
-        self.history.append({"role": "user", "content": text})
-        # Saved before generation starts: a crash mid-reply should still leave
-        # the question behind.
-        self._persist()
+            agent = self.build_agent(client)
+            assert agent is not None
 
-        # Fit the conversation before sending. Doing it here rather than
-        # inside the agent means the transcript can say what was lost, which
-        # a silently-shortened history cannot.
-        outcome = contextkit.compress(
-            self.history, self._context_budget(), self._context_strategy(),
-            summarise=self._summarise_span,
-        )
-        if outcome.overflowed:
-            self.transcript.add(Notice(outcome.note, style.ERR))
-            self.transcript.follow()
-            self._update_context_meter()
-            self._turn_lock.release()
-            return
-        if outcome.dropped:
-            self.history[:] = outcome.history
-            self.transcript.add(Notice(outcome.note, style.WARN))
-            self.transcript.follow()
+            self._thinking = None
+            self._assistant = None
+            self._tool_cards.clear()
 
-        agent = self.build_agent(client)
-        assert agent is not None
-
-        self._thinking = None
-        self._assistant = None
-        self._tool_cards.clear()
-
-        worker = AgentWorker(agent, self.history, self)
-        worker.reasoning.connect(self._on_reasoning)
-        worker.content.connect(self._on_content)
-        worker.tool_start.connect(self._on_tool_start)
-        worker.tool_result.connect(self._on_tool_result)
-        worker.tool_denied.connect(self._on_tool_denied)
-        worker.approval_requested.connect(self._on_approval_requested)
-        worker.turn_finished.connect(self._on_turn_finished)
-        worker.failed.connect(self._on_turn_failed)
-        worker.finished.connect(self._on_worker_done)
-        self._agent_worker = worker
-        self.stats.setText("Generating…")
-        self._sync_controls()
-        worker.start()
+            worker = AgentWorker(agent, self.history, self)
+            worker.reasoning.connect(self._on_reasoning)
+            worker.content.connect(self._on_content)
+            worker.tool_start.connect(self._on_tool_start)
+            worker.tool_result.connect(self._on_tool_result)
+            worker.tool_denied.connect(self._on_tool_denied)
+            worker.approval_requested.connect(self._on_approval_requested)
+            worker.turn_finished.connect(self._on_turn_finished)
+            worker.failed.connect(self._on_turn_failed)
+            worker.finished.connect(self._on_worker_done)
+            self._agent_worker = worker
+            if self._bridge is not None:
+                self._bridge.observe_worker(worker)
+            self.stats.setText("Generating…")
+            self._sync_controls()
+            worker.start()
+        finally:
+            if self._agent_worker is None and self._turn_lock.locked():
+                self._turn_lock.release()
 
     def _summarise_span(self, messages: list[dict[str, Any]]) -> str:
         """Ask the current model to summarise the turns being dropped.
@@ -2432,7 +2498,7 @@ class MainWindow(QMainWindow):
             use_tools=self._tools_active(),
             max_iterations=iterations,
             active_skills=self._active_skills(),
-            extra_tools=self._active_plugins(),
+            extra_tools=self._active_plugins() + [self.gpu.tool()],
             effort=self._effort(),
             persistence=self._persistence(),
             autonomy=self._autonomy(),
@@ -2440,6 +2506,12 @@ class MainWindow(QMainWindow):
         )
 
     def _cancel(self) -> None:
+        if self._server_worker is not None:
+            self.server.cancel_start()
+        self.gpu.cancel()
+        if self._bridge is not None:
+            for call_id in list(self._approval_dialogs):
+                self._resolve_shared_approval(call_id, False)
         if self._agent_worker is not None:
             self._agent_worker.cancel()
             self.stats.setText("Cancelling…")
@@ -2492,10 +2564,31 @@ class MainWindow(QMainWindow):
         return next(reversed(list(self._tool_cards.values())), None) if self._tool_cards else None
 
     def _on_approval_requested(self, name: str, summary: str, arguments: dict) -> None:
+        if self._bridge is None or self._remote is None:
+            dialog = ApprovalDialog(name, summary, arguments, self)
+            allowed = dialog.exec() == QDialog.DialogCode.Accepted
+            if self._agent_worker is not None:
+                self._agent_worker.provide_approval(allowed)
+            return
+        import uuid
+        call_id = uuid.uuid4().hex
+        self._bridge.approvals.create(call_id, name, summary, arguments)
         dialog = ApprovalDialog(name, summary, arguments, self)
-        allowed = dialog.exec() == QDialog.DialogCode.Accepted
+        self._approval_dialogs[call_id] = dialog
+        dialog.finished.connect(lambda result: self._resolve_shared_approval(
+            call_id, result == QDialog.DialogCode.Accepted))
+        dialog.show()
+
+    def _resolve_shared_approval(self, call_id, allowed):
+        if not self._bridge.approvals.resolve(call_id, allowed):
+            return False
+        decision = self._bridge.approvals.result(call_id)
+        dialog = self._approval_dialogs.pop(call_id, None)
+        if dialog is not None:
+            dialog.done(QDialog.DialogCode.Accepted if decision else QDialog.DialogCode.Rejected)
         if self._agent_worker is not None:
-            self._agent_worker.provide_approval(allowed)
+            self._agent_worker.provide_approval(decision)
+        return True
 
     def _on_turn_finished(self, timings: dict) -> None:
         self._persist()
@@ -2535,6 +2628,12 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):  # noqa: N802 - Qt naming
         # Before anything else: a one-second timer that fires during teardown
         # reaches widgets Qt has already destroyed.
+        if self._is_busy():
+            self._cancel()
+            self.stats.setText("Stopping work before closing…")
+            event.ignore()
+            QTimer.singleShot(300, self.close)
+            return
         self.resources.stop()
         # The HTTP server holds a listening socket and a thread. Daemon
         # threads die with the process, but the port stays bound until then --
@@ -2544,7 +2643,7 @@ class MainWindow(QMainWindow):
             self._remote.stop()
             self._remote = None
         if self._bridge is not None:
-            self._bridge.cancel()
+            self._bridge.close()
         if self._agent_worker is not None:
             self._agent_worker.cancel()
             self._agent_worker.wait(3000)

@@ -55,6 +55,7 @@ class AgentWorker(QThread):
     approval_requested = Signal(str, str, dict)  # name, summary, arguments
     turn_finished = Signal(dict)                # llama.cpp timings
     failed = Signal(str)
+    event = Signal(object)
 
     def __init__(self, agent: Agent, history: list[dict[str, Any]], parent=None) -> None:
         super().__init__(parent)
@@ -94,6 +95,7 @@ class AgentWorker(QThread):
             self.failed.emit(f"{type(exc).__name__}: {exc}")
 
     def _dispatch(self, event: AgentEvent) -> None:
+        self.event.emit(event)
         match event.kind:
             case "reasoning":
                 self.reasoning.emit(event.text)
@@ -109,6 +111,36 @@ class AgentWorker(QThread):
                 self.failed.emit(event.text)
             case "done":
                 self.turn_finished.emit(event.timings)
+
+
+class ServerStopWorker(QThread):
+    failed = Signal(str)
+
+    def __init__(self, manager, parent=None):
+        super().__init__(parent)
+        self.manager = manager
+
+    def run(self):
+        try:
+            self.manager.stop()
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
+class GpuWorker(QThread):
+    progress = Signal(str)
+    result = Signal(str)
+
+    def __init__(self, runner, workdir, command, parent=None):
+        super().__init__(parent)
+        self.runner, self.workdir, self.command = runner, workdir, command
+
+    def run(self):
+        try:
+            result = self.runner.run(self.workdir, self.command, on_progress=self.progress.emit)
+        except Exception as exc:
+            result = str(exc)
+        self.result.emit(result)
 
 
 class CatalogueWorker(QThread):

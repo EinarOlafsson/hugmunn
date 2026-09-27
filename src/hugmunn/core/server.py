@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable
 
@@ -18,6 +19,10 @@ from .client import LlamaClient
 
 class ServerError(HugmunnError):
     """A local model server could not be started or did not become ready."""
+
+
+class GpuCleanupError(ServerError):
+    """Task processes could not be reaped; leave the model unloaded."""
 
 
 class ServerManager:
@@ -33,6 +38,10 @@ class ServerManager:
         self._adopted = False
         self.log_tail: list[str] = []
         self._log_thread: threading.Thread | None = None
+        self._lifecycle = threading.RLock()
+        self._launch = None
+        self.gpu_reserved = False
+        self._cancel_start = threading.Event()
 
     @property
     def spec(self) -> ModelSpec | None:
@@ -51,6 +60,16 @@ class ServerManager:
         timeout: float = 900.0,
         extra_args: list[str] | None = None,
     ) -> None:
+        """Launch a model, excluding concurrent GPU handoffs."""
+        with self._lifecycle:
+            self._cancel_start.clear()
+            self._start(spec, on_progress, timeout, extra_args)
+
+    def cancel_start(self):
+        """Request startup cancellation without blocking the GUI thread."""
+        self._cancel_start.set()
+
+    def _start(self, spec, on_progress=None, timeout=900.0, extra_args=None):
         """Launch ``spec`` and block until its /health endpoint reports ready.
 
         Large MoE models read 50-100 GB off disk before serving, so the default
@@ -62,6 +81,11 @@ class ServerManager:
 
         client = LlamaClient(spec.base_url)
         if client.is_ready():
+            if (self._proc is not None and self._proc.poll() is None
+                    and self._spec is not None and self._spec.base_url == spec.base_url):
+                report(f"{spec.label} is already running")
+                return
+            self.stop()
             report(f"Adopted running server on port {spec.port}")
             self._spec, self._adopted, self._proc = spec, True, None
             return
@@ -168,6 +192,7 @@ class ServerManager:
 
     def _spawn(self, command, spec, cwd, report, timeout, client) -> None:
         """Launch a native process and wait for readiness while collecting logs."""
+        self._launch = (list(command), spec, Path(cwd))
         self._proc = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
@@ -186,6 +211,9 @@ class ServerManager:
 
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
+            if self._cancel_start.is_set():
+                self.stop()
+                raise ServerError("Model startup cancelled.")
             if self._proc.poll() is not None:
                 self._log_thread.join(timeout=1)
                 raise ServerError(
@@ -218,6 +246,48 @@ class ServerManager:
 
     def stop(self) -> None:
         """Terminate a server we started. Adopted servers are left alone."""
+        with self._lifecycle:
+            self._stop()
+
+    @contextmanager
+    def gpu_session(self, report=None):
+        """Release our model's VRAM and restore its exact launch in ``finally``.
+
+        Adopted servers cannot be suspended: they belong to another process.
+        The lifecycle lock prevents model starts/stops throughout the handoff.
+        """
+        report = report or (lambda message: None)
+        with self._lifecycle:
+            if self._adopted:
+                raise ServerError("GPU handoff requires a model started by Hugmunn. "
+                                  "Stop the externally managed server first.")
+            launch = self._launch if self.is_running else None
+            if self.is_running and launch is None:
+                raise ServerError("Cannot hand off a model without a saved launch configuration.")
+            self.gpu_reserved = True
+            try:
+                if launch:
+                    report("Unloading model from GPU…")
+                    self._stop()
+                try:
+                    yield
+                except GpuCleanupError:
+                    launch = None
+                    raise
+                finally:
+                    if launch:
+                        command, spec, cwd = launch
+                        report("Reloading model onto GPU…")
+                        try:
+                            self._spawn(command, spec, cwd, report, 900.0,
+                                        LlamaClient(spec.base_url))
+                        except Exception as exc:
+                            self._stop()
+                            raise ServerError(f"GPU task ended, but model reload failed: {exc}") from exc
+            finally:
+                self.gpu_reserved = False
+
+    def _stop(self) -> None:
         if self._adopted:
             self._spec, self._adopted = None, False
             return

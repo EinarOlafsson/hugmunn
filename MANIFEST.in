@@ -1,11 +1,11 @@
 include LICENSE README.md CHANGELOG.md CONTRIBUTING.md
 include THIRD_PARTY_NOTICES.md
 recursive-include licenses *.txt
-recursive-include docs *.md *.rst *.py *.png
+recursive-include docs *.md *.rst *.py *.png *.json
 recursive-include examples *.py
 recursive-include packaging *.py *.spec *.nsi *.md
 recursive-include tests *.py
-recursive-include src/hugmunn/skills *.md
+recursive-include src/hugmunn/skills *.md *.zip
 recursive-include src/hugmunn/resources/icons *.svg *.png *.ico *.icns
 include src/hugmunn/py.typed
 prune docs/_build

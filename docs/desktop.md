@@ -59,18 +59,86 @@ prompt; they are not executable plugins. Custom tools are Python code.
 Choose a theme from **View**. The raven wordmark and window icon switch between
 black and white to match the selected theme.
 
+## Appearance
+
+Settings → Appearance includes panel opacity (50–100%), whole-window opacity,
+and rounded window chrome. Panel transparency keeps text solid; whole-window
+transparency fades the entire application. Drag the empty title area to move,
+double-click it to maximize/restore, and drag the edges to resize. Turn off
+rounded windows to return to the operating system's title bar. Window opacity
+requires desktop compositor support; Qt cannot provide desktop blur everywhere.
+
+## Codex skills
+
+Open **Tools → Skills → Browse and search skills**, or type `/skills`. The
+catalogue includes 132 licensed skills from OpenAI's public plugin and skill
+repositories, plus Hugmunn's own instruction packs. Upstream revisions and
+paths are recorded in [the catalogue manifest](codex-skills-catalogue.json).
+Each copied bundle retains its license, references, scripts and assets.
+
+Use **Import installed Codex skills** to save skills from `$CODEX_HOME/skills`
+(default `~/.codex/skills`), `~/.agents/skills`, and the newest locally cached
+version of each Codex plugin. **Import folder** accepts other skill collections.
+Copies live in the current Hugmunn profile's `skills` directory. Importing
+never runs scripts, installs software, or enables a skill automatically.
+
+Codex skills appear as short descriptions and file locations in the prompt;
+the agent reads the complete `SKILL.md` only when relevant. Enable the skills
+you need. Some skills require external connectors, CLIs, packages or accounts;
+copying their instructions does not supply those capabilities.
+
 ## Remote page
 
-Type `/remote` to start a local browser endpoint for the active conversation.
-The application prints a URL containing an access token. The page can display
-responses, submit messages, and answer tool approval prompts. `/remote off`
-stops the endpoint; `/remote url` prints the current address.
+Type `/remote`, even before loading a model. Hugmunn starts a browser endpoint
+and opens the **Remote access** window with its address and login controls.
+The first login uses username `hugmunn` and a generated password. Reveal/copy
+that password locally and save it, or choose your own username and a password
+of at least 12 characters. Passwords are hashed in `remote-auth.json`; they
+never appear in conversation history, ordinary settings, or browser URLs.
+If you forget the password, set a new one from `/remote setup` on the desktop.
 
-The service binds to loopback by default. Access from another device requires
-your own tunnel or private network forwarding. Keep the token private: anyone
-who can reach the endpoint with the token can interact with the conversation
-and its approvals. This page is a companion to the running application, not a
-separately hosted service or a versioned public HTTP API.
+Open the displayed URL and sign in. Browser controls include:
 
-Type `/help` to list all available commands, including `/model`, `/theme`,
-`/effort`, `/persistence`, and `/autonomy`.
+- Messages, live responses, Stop, and shared desktop/browser tool approvals.
+- Provider/model selection and local model startup/unload.
+- New, saved and restored conversations; goal and working directory.
+- Effort, persistence, autonomy, reasoning, tool access and system prompt.
+- Context size, skills, installed custom tools, themes and opacity.
+- Foreground GPU commands, status, output and cancellation.
+
+Account sign-in, model downloads, runtime installation and remote credentials
+are configured on the desktop. Settings changes are refused while work is in
+flight. A disconnected browser can reconnect without cancelling desktop work.
+
+The default binding is `127.0.0.1:8770`. For a second device, select **Local
+network** and use the host computer's LAN IP, or keep loopback and use one of
+the tunnel commands shown in the dialog. Use HTTPS/private networking outside
+a trusted LAN: plain HTTP does not encrypt passwords or conversation contents.
+You can supply a certificate/key pair for native HTTPS or use an HTTPS tunnel.
+The application must remain open. Sessions expire after 12 hours; logout,
+remote restart and password changes revoke access. `/remote off` stops the
+endpoint; `/remote url` shows its address.
+
+## GPU handoff
+
+On Linux/macOS, type `/gpu python my_gpu_task.py`, use the browser's **GPU task**
+card, or let the agent call `run_gpu_task`. The command runs in the selected
+working directory. Agent calls follow the same approval policy as shell
+commands. The default timeout is one hour; agent calls can set 1–86400 seconds.
+
+Hugmunn stops its owned local model process and waits for it to exit, runs the
+GPU command in a separate process group, cleans up that group, then attempts
+to restart the model with its exact previous launch arguments. Normal failure,
+timeout and cancellation all attempt restoration. Reload failures remain
+visible and leave the model stopped. Use Stop or `/gpu stop` to cancel.
+Conversation state stays in memory and on disk while inference is unavailable.
+
+Only a model started by this Hugmunn instance can be unloaded. An adopted
+external model is refused; other applications' GPU processes are never killed.
+Commands must run in the foreground and keep their children in the process
+group. This is resource coordination, not a sandbox for untrusted commands;
+it cannot reserve VRAM against unrelated programs. Windows GPU handoff is
+currently unavailable because equivalent process-tree cleanup is not yet
+implemented. Browser control and appearance remain available on Windows.
+
+Type `/help` to list the commands.

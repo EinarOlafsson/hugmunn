@@ -31,6 +31,7 @@ dependencies = [
     "httpx>=0.27",
     "markdown>=3.5",
     "Pygments>=2.17",
+    "PyYAML>=6.0",
 ]
 
 [project.urls]
@@ -66,7 +67,7 @@ namespaces = true
 version = {attr = "hugmunn._version.__version__"}
 
 [tool.setuptools.package-data]
-hugmunn = ["skills/*.md", "resources/*.txt", "resources/icons/*.svg", "resources/icons/*.png", "resources/icons/*.ico", "resources/icons/*.icns", "py.typed"]
+hugmunn = ["skills/*.md", "skills/*.zip", "resources/*.txt", "resources/icons/*.svg", "resources/icons/*.png", "resources/icons/*.ico", "resources/icons/*.icns", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

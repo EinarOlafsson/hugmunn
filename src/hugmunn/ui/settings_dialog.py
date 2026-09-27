@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QGridLayout, QHBoxLayout, QLabel,
+    QCheckBox, QSlider, QComboBox, QDialog, QDialogButtonBox, QGridLayout, QHBoxLayout, QLabel,
     QMessageBox, QPushButton, QTabWidget, QVBoxLayout, QWidget,
 )
 
@@ -65,12 +65,20 @@ class SettingsDialog(QDialog):
         self.swatches.setWordWrap(True)
         layout.addWidget(self.swatches)
 
-        note = QLabel(
-            "Every palette is checked against WCAG AA — body text at 4.5:1, hint "
-            "text and status colours at 3:1 — on every surface it can appear on. "
-            "A theme that fails is a test failure, not a matter of taste."
-        )
-        note.setObjectName("blurb")
+        for field, title in (("panel_opacity", "Panel opacity"), ("window_opacity", "Window opacity")):
+            label = QLabel(f"{title}: {getattr(self.window.settings, field)}%")
+            slider = QSlider(Qt.Orientation.Horizontal)
+            slider.setRange(50, 100)
+            slider.setValue(getattr(self.window.settings, field))
+            slider.valueChanged.connect(lambda value, f=field, t=title, label=label:
+                (label.setText(f"{t}: {value}%"), self.window.apply_appearance(**{f: value})))
+            layout.addWidget(label)
+            layout.addWidget(slider)
+        rounded = QCheckBox("Rounded window and custom title bar")
+        rounded.setChecked(self.window.settings.rounded_windows)
+        rounded.toggled.connect(lambda checked: self.window.apply_appearance(rounded=checked))
+        layout.addWidget(rounded)
+        note = QLabel("Panel opacity keeps text solid. Window opacity also fades text and depends on desktop compositor support.")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -189,6 +197,9 @@ class SettingsDialog(QDialog):
     def _run_cleanup(self, action: str) -> None:
         title, explanation = cleanup.CONFIRMATIONS[action]
         label = getattr(self, f"_result_{action}")
+        if self.window._is_busy() and action != "disk":
+            label.setText("Wait for the current task before freeing resources.")
+            return
 
         if action == "disk":
             entries = cleanup.disk_report()

@@ -136,7 +136,7 @@ def decide(
             return Decision(True, f"{outside[0]} is outside the working directory")
         # A shell command has no parseable path, so it cannot be shown to stay
         # inside the workspace. Confirm it rather than assume.
-        if tool_name in ("run_command", "python_exec"):
+        if tool_name in ("run_command", "python_exec", "run_gpu_task"):
             return Decision(True, f"{tool_name} can reach outside the working directory")
         return Decision(False)
 

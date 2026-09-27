@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.0.13
+
+- Add rounded desktop chrome and persistent panel/window opacity controls.
+- Add username/password browser access through `/remote`, revocable sessions,
+  HTTPS support, shared approvals and broad desktop controls dispatched safely
+  through Qt's GUI thread. Commands work before loading a model.
+- Bundle 132 licensed Codex skills with support files and provenance; add a
+  searchable library, local import, and on-demand instruction loading.
+- Add `/gpu` and `run_gpu_task` on Linux/macOS: unload the owned model, run a
+  cancellable task, clean up its process group, and restore the exact launch.
+
 ## 0.0.0.12
 
 - Correct model-discovery documentation to describe cached CLI subscription

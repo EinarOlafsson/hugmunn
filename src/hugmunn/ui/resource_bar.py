@@ -170,6 +170,21 @@ class ResourceBar(QFrame):
 
         self.note.setText(self._warning(snap))
         self.note.setVisible(bool(self.note.text()))
+        self._fit_height()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._fit_height()
+
+    def _fit_height(self):
+        if not hasattr(self, "note"):
+            return
+        layout = self.layout()
+        margins = layout.contentsMargins()
+        width = max(100, self.width() - margins.left() - margins.right() - 2)
+        note_height = max(self.note.sizeHint().height(), self.note.heightForWidth(width)) if self.note.text() else 0
+        self.setMinimumHeight(4 * _Bar.HEIGHT + layout.spacing() * (4 if note_height else 3)
+                              + margins.top() + margins.bottom() + note_height + 2)
 
     @staticmethod
     def _warning(snap: Snapshot) -> str:

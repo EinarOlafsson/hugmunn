@@ -268,6 +268,12 @@ _PALETTES = {
 }
 
 _active = "dark"
+_panel_opacity = .92
+
+
+def set_panel_opacity(value):
+    global _panel_opacity
+    _panel_opacity = max(.5, min(1., float(value)))
 
 
 def palette_for(name: str = "dark") -> dict:
@@ -419,6 +425,7 @@ def stylesheet(name: str | None = None) -> str:
     """
     p = palette_for(resolve(name) if name else _active)
     page = p["backdrop"] or p["page"]
+    panel = css(p["surface"], _panel_opacity)
     return f"""
 /* No background here. A blanket QWidget rule paints every widget, labels
    included, so a label inside a raised panel draws a window-coloured box
@@ -427,6 +434,7 @@ def stylesheet(name: str | None = None) -> str:
    inherits what it sits on. */
 QWidget {{ color: {p['fg']}; font-size: 14px; }}
 QMainWindow, QDialog {{ background: {page}; }}
+QMainWindow#hugmunnWindow {{ background: transparent; }}
 QScrollArea, QScrollArea > QWidget > QWidget {{ background: transparent; }}
 
 /* Passive widgets: never their own colour, always their container's. */
@@ -448,7 +456,8 @@ QLabel#status  {{ color: {p['fg_dim']}; font-size: 12px; }}
 QLabel#blurb   {{ color: {p['fg_dim']}; font-size: 11px; }}
 QLabel#cloud   {{ color: {p['warning']}; font-size: 11px; font-weight: 600; }}
 
-QFrame#sidebar {{ background: {p['surface']}; border-right: 1px solid {p['border']}; }}
+QWidget#conversationPane {{ background: {panel}; border: 1px solid {p['border']}; border-radius: 18px; }}
+QFrame#sidebar {{ background: {panel}; border: 1px solid {p['border']}; border-radius: 18px; }}
 
 QComboBox, QLineEdit, QSpinBox {{
     background: {p['surface_alt']}; border: 1px solid {p['border']};
@@ -464,7 +473,7 @@ QComboBox QAbstractItemView {{
 
 QPushButton {{
     background: {p['surface_alt']}; border: 1px solid {p['border']};
-    border-radius: 6px; padding: 7px 14px; color: {p['fg']};
+    border-radius: 10px; padding: 8px 14px; color: {p['fg']};
 }}
 QPushButton:hover {{ border-color: {p['accent']}; background: {p['surface_hi']}; }}
 QPushButton:disabled {{ color: {p['fg_dim']}; border-color: {p['border_soft']}; }}
@@ -476,7 +485,7 @@ QPushButton#danger {{ border-color: {p['error']}; color: {p['error']}; }}
 
 QTextEdit#composer {{
     background: {p['surface_alt']}; border: 1px solid {p['border']};
-    border-radius: 8px; padding: 8px; color: {p['fg']};
+    border-radius: 14px; padding: 10px; color: {p['fg']};
 }}
 QTextEdit#composer:focus {{ border-color: {p['accent']}; }}
 QPlainTextEdit {{ background: {p['surface_alt']}; border: 1px solid {p['border']};
@@ -486,7 +495,7 @@ QTextBrowser {{ background: transparent; border: none; }}
 
 QFrame#userMsg {{ background: {p['user']}; border-radius: 10px; }}
 QFrame#toolCard, QFrame#thinkCard {{
-    background: {p['surface']}; border: 1px solid {p['border']}; border-radius: 8px;
+    background: {panel}; border: 1px solid {p['border']}; border-radius: 14px;
 }}
 
 QToolButton {{ background: transparent; border: none; color: {p['fg_dim']};
@@ -501,7 +510,7 @@ QScrollBar:horizontal {{ background: transparent; height: 10px; }}
 QScrollBar::handle:horizontal {{ background: {p['border']}; border-radius: 5px; min-width: 30px; }}
 
 QCheckBox {{ spacing: 8px; }}
-QSplitter::handle {{ background: {p['border']}; width: 1px; }}
+QSplitter::handle {{ background: transparent; width: 10px; }}
 QProgressBar {{ background: {p['surface_alt']}; border: 1px solid {p['border']};
                 border-radius: 6px; text-align: center; color: {p['fg']}; }}
 QProgressBar::chunk {{ background: {p['accent']}; border-radius: 5px; }}
@@ -512,7 +521,7 @@ QTabBar::tab {{ background: transparent; color: {p['fg_dim']};
 QTabBar::tab:selected {{ color: {p['fg']}; border-bottom-color: {p['accent']}; }}
 
 QMenu {{ background: {p['surface_alt']}; border: 1px solid {p['border']}; color: {p['fg']}; }}
-QMenuBar {{ background: {p['surface']}; color: {p['fg']}; }}
+QMenuBar {{ background: transparent; color: {p['fg']}; padding: 5px 10px; }}
 QMenuBar::item {{ background: transparent; padding: 4px 8px; }}
 QMenuBar::item:selected {{ background: {p['accent']}; color: {p['on_accent']}; }}
 QMenu::item:selected {{ background: {p['accent']}; color: {p['on_accent']}; }}

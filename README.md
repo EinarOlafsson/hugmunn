@@ -163,7 +163,8 @@ network when requested.
 need approval. These are separate settings.
 
 Conversations are saved as you work. **Ctrl+L** starts a new one. Type `/help`
-for commands, or `/remote` to open the same conversation in a browser through a
+for commands, or `/remote` to control the application in a browser with a
+username/password login through a
 local, token-protected page. See the
 [desktop guide](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/desktop.md)
 for details.
@@ -263,3 +264,14 @@ These terms apply to new releases beginning with 0.0.0.9. Previously published
 versions retain the license supplied with those versions. Model weights,
 llama.cpp, Qt, and other dependencies retain their own licenses; see the
 [third-party notices](https://github.com/EinarOlafsson/hugmunn/blob/main/THIRD_PARTY_NOTICES.md).
+
+### Appearance, remote control and GPU tasks
+
+Settings → Appearance offers rounded windows and separate panel/window opacity.
+Type `/remote` for browser control with a username and password; the desktop
+dialog includes LAN, HTTPS and tunnel options. `/skills` opens the searchable
+library of 132 bundled Codex skills and imports your installed skills.
+On Linux/macOS, `/gpu python task.py` temporarily unloads Hugmunn's model,
+runs the command, then reloads it. See the
+[desktop guide](https://github.com/EinarOlafsson/hugmunn/blob/main/docs/desktop.md)
+for controls, limits and recovery behavior.

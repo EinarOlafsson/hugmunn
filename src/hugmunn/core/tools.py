@@ -543,7 +543,7 @@ def execute(
 
 def summarize_call(name: str, arguments: dict[str, Any]) -> str:
     """One-line human description used in the approval prompt and transcript."""
-    if name == "run_command":
+    if name in ("run_command", "run_gpu_task"):
         return arguments.get("command", "")
     if name == "write_file":
         content = arguments.get("content", "")

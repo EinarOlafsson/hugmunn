@@ -46,7 +46,7 @@ inside the bundle. No changes are made to these libraries by the Hugmunn build.
 
 The distribution retains installed metadata and license files for its Python
 dependencies. Direct runtime dependencies include HTTPX (BSD-3-Clause),
-Python-Markdown (BSD-3-Clause), and Pygments (BSD-2-Clause), along with their
+Python-Markdown (BSD-3-Clause), PyYAML (MIT), and Pygments (BSD-2-Clause), along with their
 dependencies. Native bundles also contain Python under the Python Software
 Foundation license and its included third-party notices. PyInstaller's
 bootloader distribution exception applies to its bundled bootloader.
@@ -55,3 +55,15 @@ Model weights and llama.cpp are downloaded separately and are not included
 in Hugmunn's Python distributions or native installers. Their own license
 terms apply. Commercial permission for Hugmunn does not grant commercial
 permission for a model or another dependency.
+
+## Bundled Codex skills
+
+`src/hugmunn/skills/codex-library.zip` contains 132 instruction/resource bundles
+from https://github.com/openai/plugins and https://github.com/openai/skills.
+These remain under their upstream Apache-2.0 or MIT licenses, independently
+of Hugmunn's license. Each bundle retains its own LICENSE.txt and existing
+copyright notices. `SOURCES.json` inside the archive and
+`docs/codex-skills-catalogue.json` identify the exact upstream commit and path.
+Scripts are distributed as support files, not automatically executed or
+installed as application tools. User-imported skills retain their original
+license terms and are stored in the user's profile, not redistributed here.

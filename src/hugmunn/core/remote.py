@@ -1,35 +1,20 @@
-"""Access tokens and the security posture for remote access.
+"""Remote login, password hashing, expiring sessions and access throttling.
 
-What this exposes is not a chat window. It is an agent that can run shell
-commands and write files on the machine it is hosted on, at whatever autonomy
-level is set. Anyone holding the URL holds that. So the rules here are
-constraints rather than defaults, and the UI states them rather than burying
-them:
-
-* **A token is always required.** There is no unauthenticated mode, not even
-  on loopback — the whole point of the feature is that the port ends up
-  reachable from elsewhere, and an "I'll turn auth on later" setting is one
-  that never gets turned on.
-* **The token is compared in constant time**, and never logged, never put in a
-  page title, never echoed back in an error.
-* **Loopback by default.** Reaching the machine from outside is a tunnel's
-  job. Binding to a public interface is possible and takes an explicit
-  argument, because typing `0.0.0.0` should feel like a decision.
-* **Failures are rate-limited per address.** A 32-byte token is not
-  guessable, but an endpoint that answers a thousand guesses a second is a
-  gift to anyone who finds the port.
-* **Approvals still happen.** Remote does not mean unattended: the same
-  autonomy policy applies, and the prompt is answered from whichever client
-  is watching.
-
-The token lives with the API keys, not in ``settings.json`` — same reasoning,
-and the same file mode.
+The desktop requires username/password authentication. Password verifiers live
+in a separate owner-only file; cookies are memory-only and revoked on restart.
+Legacy programmatic clients can still request explicit bearer-token mode.
+Loopback is the default; network exposure is configured on the desktop.
 """
 
 from __future__ import annotations
 
 import hmac
+import hashlib
+import json
+import os
 import secrets
+import tempfile
+import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
@@ -44,6 +29,92 @@ FAILURE_WINDOW = 60.0
 LOCKOUT = 300.0
 
 DEFAULT_PORT = 8770
+
+
+@dataclass(frozen=True)
+class Credentials:
+    """A salted password verifier; plaintext is never written to disk."""
+
+    username: str
+    salt: str
+    digest: str
+
+    @classmethod
+    def create(cls, username: str, password: str):
+        username = username.strip()
+        if not username or len(username) > 64 or any(c.isspace() for c in username):
+            raise ValueError("Use a username of 1–64 characters without spaces.")
+        if not 12 <= len(password) <= 1024:
+            raise ValueError("Use a password of 12–1024 characters.")
+        salt = secrets.token_hex(16)
+        digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt),
+                                n=16384, r=8, p=1).hex()
+        return cls(username, salt, digest)
+
+    def matches(self, username: str, password: str) -> bool:
+        if len(password) > 1024 or len(username) > 64:
+            return False
+        digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(self.salt),
+                                n=16384, r=8, p=1).hex()
+        return token_matches(username, self.username) & token_matches(digest, self.digest)
+
+    def save(self):
+        from ..config import config_dir
+        root = config_dir()
+        root.mkdir(parents=True, exist_ok=True)
+        fd, name = tempfile.mkstemp(dir=root, prefix=".remote-")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(vars(self), stream)
+            os.replace(name, root / "remote-auth.json")
+        finally:
+            if os.path.exists(name):
+                os.unlink(name)
+
+    @classmethod
+    def load(cls):
+        from ..config import config_dir
+        try:
+            data = json.loads((config_dir() / "remote-auth.json").read_text())
+            value = cls(**data)
+            if not isinstance(value.username, str) or not value.username.strip():
+                return None
+            if len(bytes.fromhex(value.salt)) != 16 or len(bytes.fromhex(value.digest)) != 64:
+                return None
+            return value
+        except (OSError, TypeError, ValueError):
+            return None
+
+
+class Sessions:
+    """Expiring browser sessions. Tokens are memory-only and individually revocable."""
+
+    def __init__(self, lifetime=12 * 3600):
+        self.lifetime = lifetime
+        self._items = {}
+        self._lock = threading.Lock()
+
+    def create(self):
+        with self._lock:
+            now = time.monotonic()
+            self._items = {k: v for k, v in self._items.items() if v > now}
+            if len(self._items) >= 32:
+                del self._items[next(iter(self._items))]
+            token = new_token()
+            self._items[token] = now + self.lifetime
+            return token
+
+    def valid(self, token):
+        with self._lock:
+            return self._items.get(token, 0) > time.monotonic()
+
+    def revoke(self, token):
+        with self._lock:
+            self._items.pop(token, None)
+
+    def clear(self):
+        with self._lock:
+            self._items.clear()
 
 
 def new_token() -> str:
